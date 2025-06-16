@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --background: radial-gradient(circle at top center, rgba(59,130,246,0.25) 0%, rgba(15,23,42,0.7) 70%),
+                linear-gradient(135deg, #1c355e 0%, #2b60c5 50%, #5faaff 100%);
+  --foreground: #f8fafc;
+  --accent: #3b7fff;
+  --accent-hover: #2152a3;
+  --accent-light: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.12);
+  --danger: #f87171;
+  --success: #22c55e;
+  --font-sans: var(--font-geist-sans), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: radial-gradient(circle at top center, rgba(59,130,246,0.25) 0%, rgba(15,23,42,0.7) 70%),
+                  linear-gradient(135deg, #0a1120 0%, #1c355e 50%, #2b60c5 100%);
+    --foreground: #f8fafc;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-light: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.12);
+    --danger: #f87171;
+    --success: #4ade80;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  position: relative;
+  z-index: 0;
+}
+
+body::before {
+  content: "";
+  background: 
+    radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 55%), /* added this for subtle logo contrast boost */
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.07) 0%, transparent 60%), 
+    radial-gradient(circle at 70% 70%, rgba(255,255,255,0.04) 0%, transparent 60%);
+  background-size: cover;
+  opacity: 0.05; /* slightly increased */
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
