@@ -1,5 +1,3 @@
-// backend/src/app.module.ts
-
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -28,6 +26,7 @@ import { CspClient } from './infrastructure/api-clients/csp.client';
 import { CspDataClient } from './infrastructure/api-clients/csp-data.client';
 import { ApiConfigService } from './shared/config/api-config.service';
 import { SubnetController } from './controller/subnet.controller';
+import { DebugController } from './controller/debug.controller';
 
 @Module({
   imports: [
@@ -49,6 +48,7 @@ import { SubnetController } from './controller/subnet.controller';
   ],
   controllers: [
     AppController,
+    DebugController,
     DhcpOptionController,
     AuthController,
     SubnetController,

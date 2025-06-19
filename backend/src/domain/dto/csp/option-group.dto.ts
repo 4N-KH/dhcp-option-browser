@@ -1,16 +1,16 @@
-export interface CspSubnetDto {
+export interface CspOptionGroupDto {
   id: string;
   name: string;
-  address: string;
-  cidr: number;
-  parent?: string;
-  space?: string;
-  comment?: string;
-  dhcp_options?: {
+
+  dhcp_options: {
     group?: string;
     option_code: string;
     option_value: string;
     type: string;
   }[];
+
+  comment?: string;
+  protocol?: string;
+
   [key: string]: any;
 }

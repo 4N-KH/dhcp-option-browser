@@ -1,16 +1,16 @@
-export interface CspSubnetDto {
+export interface CspAddressBlockDto {
   id: string;
   name: string;
   address: string;
   cidr: number;
+  comment?: string;
   parent?: string;
   space?: string;
-  comment?: string;
   dhcp_options?: {
     group?: string;
     option_code: string;
     option_value: string;
     type: string;
   }[];
-  [key: string]: any;
+  [key: string]: any; // open for future/edge fields
 }

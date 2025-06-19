@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DeepPartial } from 'typeorm';
 
 import { AuthCredentialDto } from '../domain/dto/auth-credential.dto';
-import { AuthMode } from '../domain/enums/auth-mode.enum';
+import { AuthMode } from '../domain/enums/csp/auth-mode.enum';
 import { CredentialEntity } from '../infrastructure/database/credential.entity';
 import { encrypt, decrypt } from '../shared/parser/credential-encryptor';
 

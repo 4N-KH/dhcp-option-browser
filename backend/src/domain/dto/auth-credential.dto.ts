@@ -1,7 +1,7 @@
 // DTO for authentication credentials
 import { IsEnum, IsOptional, IsString, IsBoolean } from 'class-validator';
-import { AuthMode } from '../enums/auth-mode.enum';
-import { Region } from '../enums/region.enum';
+import { AuthMode } from '../enums/csp/auth-mode.enum';
+import { Region } from '../enums/csp/region.enum';
 
 export class AuthCredentialDto {
   @IsEnum(AuthMode)

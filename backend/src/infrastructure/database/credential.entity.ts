@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
-import { AuthMode } from '../../domain/enums/auth-mode.enum';
+import { AuthMode } from '../../domain/enums/csp/auth-mode.enum';
 
 @Entity()
 export class CredentialEntity {
