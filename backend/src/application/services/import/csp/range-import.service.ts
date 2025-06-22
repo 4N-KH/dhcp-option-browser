@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspRangeDto } from '@/domain/dto/csp/range.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
-import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
  * Service for importing DHCP options assigned to Ranges from CSP.
@@ -14,42 +10,38 @@ import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
 export class CspRangeImportService {
   private readonly logger = new Logger(CspRangeImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Imports all Ranges and persists directly assigned DHCP options.
+   * Imports all Ranges and logs directly assigned DHCP options.
    */
-  async importRanges(): Promise<void> {
+  async importRanges(): Promise<CspRangeDto[]> {
     this.logger.log('Starting import of CSP Ranges...');
-    const ranges: CspRangeDto[] = await this.cspDataClient.fetchRanges();
+    const rawRanges = await this.cspDataClient.fetchRanges();
 
-    if (!ranges?.length) {
+    if (!rawRanges?.length) {
       this.logger.warn('No Ranges found.');
-      return;
+      return [];
     }
 
-    let totalOptions = 0;
+    // Normalisiere dhcp_options bei jedem Range
+    const ranges: CspRangeDto[] = rawRanges.map((range) => ({
+      ...range,
+      dhcp_options: normalizeDhcpOptions(range.dhcp_options),
+    }));
 
+    let totalOptions = 0;
     for (const range of ranges) {
-      if (Array.isArray(range.dhcp_options) && range.dhcp_options.length > 0) {
-        for (const opt of range.dhcp_options) {
-          const entity = this.dhcpOptionRepo.create({
-            code: Number(opt.option_code),
-            value: opt.option_value,
-            origin: `${DhcpOptionOrigin.RANGE}:${range.id}`,
-          });
-          await this.dhcpOptionRepo.save(entity);
-          totalOptions++;
-        }
+      if (range.dhcp_options && range.dhcp_options.length > 0) {
+        totalOptions += range.dhcp_options.length;
       }
     }
 
     this.logger.log(
-      `Imported DHCP options from ${ranges.length} Ranges (${totalOptions} options).`,
+      `Fetched ${ranges.length} Ranges from CSP (${totalOptions} DHCP options in total).`,
     );
+    // Optional: this.logger.debug(JSON.stringify(ranges.slice(0, 2), null, 2));
+
+    return ranges;
   }
 }

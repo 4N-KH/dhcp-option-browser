@@ -1,6 +1,3 @@
-// Macht die Datei sicher zu einem ES-Modul
-export {};
-
 export interface CspFixedAddressDto {
   id: string;
   name: string;
@@ -10,14 +7,13 @@ export interface CspFixedAddressDto {
   match_value: string;
 
   dhcp_options?: {
-    group?: string;
+    group?: string | null;
     option_code: string;
     option_value: string;
     type: string;
   }[];
 
-  comment?: string;
-  parent?: string;
+  comment?: string | null;
+  parent?: string | null;
   inheritance_sources?: Record<string, any>;
-  [key: string]: any;
 }

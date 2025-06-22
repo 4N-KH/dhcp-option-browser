@@ -1,4 +1,3 @@
-// backend/src/infrastructure/api-clients/nios.client.ts
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { AuthCredentialDto } from '../../domain/dto/auth-credential.dto';

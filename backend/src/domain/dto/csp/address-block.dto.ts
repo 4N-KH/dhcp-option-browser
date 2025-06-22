@@ -3,14 +3,13 @@ export interface CspAddressBlockDto {
   name: string;
   address: string;
   cidr: number;
-  comment?: string;
-  parent?: string;
-  space?: string;
+  comment?: string | null;
+  parent?: string | null;
+  space?: string | null;
   dhcp_options?: {
-    group?: string;
+    group?: string | null;
     option_code: string;
     option_value: string;
     type: string;
   }[];
-  [key: string]: any; // open for future/edge fields
 }

@@ -1,58 +1,51 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspOptionGroupDto } from '@/domain/dto/csp/option-group.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
-import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
  * Service for importing Option Groups from CSP.
  * - Fetches all Option Groups via CspDataClient
- * - Persists all DHCP options contained in each Option Group
+ * - Logs all DHCP options contained in each Option Group
  */
 @Injectable()
 export class CspOptionGroupImportService {
   private readonly logger = new Logger(CspOptionGroupImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Imports all Option Groups and persists all options contained in each group.
+   * Imports all Option Groups and logs all options contained in each group.
    */
-  async importOptionGroups(): Promise<void> {
+  async importOptionGroups(): Promise<CspOptionGroupDto[]> {
     this.logger.log('Starting import of CSP Option Groups...');
-    const groups: CspOptionGroupDto[] =
-      await this.cspDataClient.fetchOptionGroups();
+    const rawGroups = await this.cspDataClient.fetchOptionGroups();
 
-    if (!groups || groups.length === 0) {
+    if (!rawGroups || rawGroups.length === 0) {
       this.logger.warn('No Option Groups found.');
-      return;
+      return [];
     }
 
-    let totalOptions = 0;
+    // Normalisiere die DHCP Options für alle Gruppen
+    const groups: CspOptionGroupDto[] = rawGroups.map(group => ({
+      ...group,
+      dhcp_options: normalizeDhcpOptions(group.dhcp_options),
+    }));
 
+    let totalOptions = 0;
     for (const group of groups) {
       if (group.dhcp_options && group.dhcp_options.length > 0) {
-        for (const opt of group.dhcp_options) {
-          const entity = this.dhcpOptionRepo.create({
-            code: Number(opt.option_code),
-            value: opt.option_value,
-            origin: `${DhcpOptionOrigin.OPTION_GROUP}:${group.id}`,
-          });
-          await this.dhcpOptionRepo.save(entity);
-          totalOptions++;
-        }
+        totalOptions += group.dhcp_options.length;
       }
     }
 
     this.logger.log(
-      `Imported DHCP options from ${groups.length} Option Groups (${totalOptions} options).`,
+      `Fetched ${groups.length} Option Groups from CSP (${totalOptions} DHCP options in total).`,
     );
+    // Optional: Log ein Beispiel
+    // this.logger.debug(JSON.stringify(groups[0], null, 2));
+
+    return groups;
   }
 }

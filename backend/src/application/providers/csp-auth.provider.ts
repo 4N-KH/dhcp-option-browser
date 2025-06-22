@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AuthProvider } from '../../domain/ports/auth-provider.interface';
-import { AuthCredentialDto } from '../../domain/dto/auth-credential.dto';
-import { CspClient } from '../../infrastructure/api-clients/csp.client';
-import { AuthResult } from '../../domain/dto/auth-result.dto';
+import { AuthProvider } from '@/domain/ports/auth-provider.interface';
+import { AuthCredentialDto } from '@/domain/dto/auth-credential.dto';
+import { CspAuthClient } from '@/infrastructure/api-clients/csp/auth.client';
+import { AuthResult } from '@/domain/dto/auth-result.dto';
 
 // Provides CSP authentication logic
 @Injectable()
 export class CspAuthProvider implements AuthProvider {
   private readonly logger = new Logger(CspAuthProvider.name);
 
-  constructor(private readonly cspClient: CspClient) {}
+  constructor(private readonly cspClient: CspAuthClient) {}
 
   // Handles login flow for CSP mode
   async login(dto: AuthCredentialDto): Promise<AuthResult> {

@@ -3,24 +3,19 @@ export interface CspRangeDto {
   name: string;
   start: string;
   end: string;
-  parent?: string;
-  space?: string;
-  comment?: string;
-
+  parent?: string | null;
+  space?: string | null;
+  comment?: string | null;
   dhcp_options?: {
-    group?: string;
+    group?: string | null;
     option_code: string;
     option_value: string;
     type: string;
   }[];
-
   exclusion_ranges?: {
     start: string;
     end: string;
-    comment?: string;
+    comment?: string | null;
   }[];
-
   inheritance_sources?: Record<string, any>;
-
-  [key: string]: any;
 }

@@ -1,57 +1,50 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspConfigProfileDto } from '@/domain/dto/csp/config-profile.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
  * Service for importing configuration profiles from CSP.
  * - Fetches config profiles via CspDataClient
- * - Maps and persists relevant DHCP options per profile (minimal example)
+ * - Logs relevant DHCP options per profile
  */
 @Injectable()
 export class CspConfigProfileImportService {
   private readonly logger = new Logger(CspConfigProfileImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Import all CSP configuration profiles and persist included DHCP options.
+   * Import all CSP configuration profiles and log included DHCP options.
    */
-  async importConfigProfiles(): Promise<void> {
+  async importConfigProfiles(): Promise<CspConfigProfileDto[]> {
     this.logger.log('Starting import of CSP configuration profiles...');
-    const profiles: CspConfigProfileDto[] =
-      await this.cspDataClient.fetchConfigProfiles();
+    const rawProfiles = await this.cspDataClient.fetchConfigProfiles();
 
-    if (!profiles || profiles.length === 0) {
+    if (!rawProfiles || rawProfiles.length === 0) {
       this.logger.warn('No CSP configuration profiles found.');
-      return;
+      return [];
     }
 
-    let totalOptions = 0;
+    // Normalisieren der dhcp_options
+    const profiles: CspConfigProfileDto[] = rawProfiles.map((profile) => ({
+      ...profile,
+      dhcp_options: normalizeDhcpOptions(profile.dhcp_options),
+    }));
 
+    let totalOptions = 0;
     for (const profile of profiles) {
       if (profile.dhcp_options && profile.dhcp_options.length > 0) {
-        for (const opt of profile.dhcp_options) {
-          const entity = this.dhcpOptionRepo.create({
-            code: Number(opt.option_code),
-            value: opt.option_value,
-            origin: `CONFIG_PROFILE:${profile.id}`,
-          });
-          await this.dhcpOptionRepo.save(entity);
-          totalOptions++;
-        }
+        totalOptions += profile.dhcp_options.length;
       }
     }
 
     this.logger.log(
-      `Imported DHCP options from ${profiles.length} config profiles (${totalOptions} options).`,
+      `Fetched ${profiles.length} config profiles from CSP (${totalOptions} DHCP options in total).`,
     );
+    // Optional: this.logger.debug(JSON.stringify(profiles.slice(0, 2), null, 2));
+
+    return profiles;
   }
 }

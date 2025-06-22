@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspIpSpaceDto } from '@/domain/dto/csp/ip-space.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
-import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
  * Imports DHCP options set directly on IP Spaces from the CSP API.
@@ -14,43 +11,37 @@ import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
 export class CspIpSpaceImportService {
   private readonly logger = new Logger(CspIpSpaceImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Imports all IP Spaces and persists directly assigned DHCP options.
+   * Loads all IP Spaces and logs directly assigned DHCP options.
    */
-  async importIpSpaces(): Promise<void> {
+  async importIpSpaces(): Promise<CspIpSpaceDto[]> {
     this.logger.log('Importing IP Spaces and their DHCP options from CSP...');
-    const ipSpaces: CspIpSpaceDto[] = await this.cspDataClient.fetchIpSpaces();
+    const rawIpSpaces = await this.cspDataClient.fetchIpSpaces();
 
-    if (!ipSpaces?.length) {
+    if (!rawIpSpaces?.length) {
       this.logger.warn('No IP Spaces found.');
-      return;
+      return [];
     }
 
-    let totalOptions = 0;
+    // Normalisiere dhcp_options für jeden Space
+    const ipSpaces: CspIpSpaceDto[] = rawIpSpaces.map(space => ({
+      ...space,
+      dhcp_options: normalizeDhcpOptions(space.dhcp_options),
+    }));
 
+    let totalOptions = 0;
     for (const space of ipSpaces) {
-      if (Array.isArray(space.dhcp_options) && space.dhcp_options.length > 0) {
-        for (const opt of space.dhcp_options) {
-          const entity = this.dhcpOptionRepo.create({
-            code: Number(opt.option_code),
-            value: opt.option_value,
-            // Nutze das Enum + dynamischer Suffix für IP Space
-            origin: `${DhcpOptionOrigin.IP_SPACE}:${space.id}`,
-          });
-          await this.dhcpOptionRepo.save(entity);
-          totalOptions++;
-        }
+      if (space.dhcp_options && space.dhcp_options.length > 0) {
+        totalOptions += space.dhcp_options.length;
       }
     }
 
     this.logger.log(
-      `Imported DHCP options from ${ipSpaces.length} IP Spaces (${totalOptions} options).`,
+      `Fetched ${ipSpaces.length} IP Spaces from CSP (${totalOptions} DHCP options in total).`,
     );
+    // Optional: this.logger.debug(JSON.stringify(ipSpaces[0], null, 2));
+    return ipSpaces;
   }
 }

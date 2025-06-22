@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspAddressBlockDto } from '@/domain/dto/csp/address-block.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
-import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
  * Service for importing DHCP options assigned to Address Blocks from CSP.
@@ -14,44 +11,39 @@ import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
 export class CspAddressBlockImportService {
   private readonly logger = new Logger(CspAddressBlockImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Imports all Address Blocks and persists directly assigned DHCP options.
+   * Imports all Address Blocks and logs directly assigned DHCP options.
    */
-  async importAddressBlocks(): Promise<void> {
+  async importAddressBlocks(): Promise<CspAddressBlockDto[]> {
     this.logger.log('Starting import of CSP Address Blocks...');
-    const blocks: CspAddressBlockDto[] =
-      await this.cspDataClient.fetchAddressBlocks();
+    const rawBlocks = await this.cspDataClient.fetchAddressBlocks();
 
-    if (!blocks?.length) {
+    if (!rawBlocks?.length) {
       this.logger.warn('No Address Blocks found.');
-      return;
+      return [];
     }
+
+    // **dhcp_options normalisieren, damit Typ passt**
+    const blocks = rawBlocks.map((block) => ({
+      ...block,
+      dhcp_options: normalizeDhcpOptions(block.dhcp_options),
+    }));
 
     let totalOptions = 0;
 
     for (const block of blocks) {
       if (Array.isArray(block.dhcp_options) && block.dhcp_options.length > 0) {
-        for (const opt of block.dhcp_options) {
-          const entity = this.dhcpOptionRepo.create({
-            code: Number(opt.option_code),
-            value: opt.option_value,
-            // Verwende das Origin-Enum mit dynamischer Block-ID
-            origin: `${DhcpOptionOrigin.ADDRESS_BLOCK}:${block.id}`,
-          });
-          await this.dhcpOptionRepo.save(entity);
-          totalOptions++;
-        }
+        totalOptions += block.dhcp_options.length;
       }
     }
 
     this.logger.log(
-      `Imported DHCP options from ${blocks.length} Address Blocks (${totalOptions} options).`,
+      `Fetched ${blocks.length} Address Blocks from CSP (${totalOptions} DHCP options in total).`,
     );
+    // Optional: this.logger.debug(JSON.stringify(blocks.slice(0, 2), null, 2));
+
+    return blocks;
   }
 }

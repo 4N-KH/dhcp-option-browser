@@ -4,8 +4,6 @@ export interface CspOptionCodeDto {
   name: string;
   type: string;
 
-  option_space?: string;
-  comment?: string;
-
-  [key: string]: any;
+  option_space?: string | null;
+  comment?: string | null;
 }

@@ -1,51 +1,42 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspGlobalDhcpConfigDto } from '@/domain/dto/csp/global-dhcp-config.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
-import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
- * Imports and persists global DHCP options from the CSP API.
+ * Imports global DHCP options from the CSP API (no DB persistence).
  */
 @Injectable()
 export class CspGlobalConfigImportService {
   private readonly logger = new Logger(CspGlobalConfigImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Fetches global DHCP configuration from CSP and saves all options to DB.
+   * Fetches global DHCP configuration from CSP and logs all options.
    */
-  async importGlobalDhcpConfig(): Promise<void> {
+  async importGlobalDhcpConfig(): Promise<CspGlobalDhcpConfigDto | null> {
     this.logger.log('Importing global DHCP configuration from CSP...');
 
-    const globalConfig: CspGlobalDhcpConfigDto =
-      await this.cspDataClient.fetchGlobalDhcpConfig();
+    const rawGlobalConfig = await this.cspDataClient.fetchGlobalDhcpConfig();
 
-    if (!globalConfig?.dhcp_options?.length) {
+    if (!rawGlobalConfig?.dhcp_options?.length) {
       this.logger.warn('No DHCP options found in global configuration.');
-      return;
+      return null;
     }
 
-    for (const opt of globalConfig.dhcp_options) {
-      // Additional validation, deduplication, transformation can be placed here
-      const entity = this.dhcpOptionRepo.create({
-        code: Number(opt.option_code),
-        value: opt.option_value,
-        origin: DhcpOptionOrigin.GLOBAL_DHCP_CONFIG,
-      });
-      await this.dhcpOptionRepo.save(entity);
-    }
+    // Typensichere Normalisierung der dhcp_options
+    const globalConfig: CspGlobalDhcpConfigDto = {
+      ...rawGlobalConfig,
+      dhcp_options: normalizeDhcpOptions(rawGlobalConfig.dhcp_options),
+    };
 
     this.logger.log(
-      `Imported ${globalConfig.dhcp_options.length} global DHCP options from CSP.`,
+      `Fetched ${globalConfig.dhcp_options.length} global DHCP options from CSP.`,
     );
+    // Optional: this.logger.debug(JSON.stringify(globalConfig.dhcp_options, null, 2));
+
+    return globalConfig;
   }
 }

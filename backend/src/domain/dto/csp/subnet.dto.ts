@@ -3,14 +3,15 @@ export interface CspSubnetDto {
   name: string;
   address: string;
   cidr: number;
-  parent?: string;
-  space?: string;
-  comment?: string;
+  parent?: string | null;
+  space?: string | null;
+  comment?: string | null;
   dhcp_options?: {
-    group?: string;
+    group?: string | null;
     option_code: string;
     option_value: string;
     type: string;
   }[];
-  [key: string]: any;
+  // Falls "option_group" in API vorkommt, ergänze:
+  option_group?: string | null;
 }

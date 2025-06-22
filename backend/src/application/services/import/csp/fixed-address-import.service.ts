@@ -1,58 +1,51 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { CspDataClient } from '@/infrastructure/api-clients/csp-data.client';
+import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspFixedAddressDto } from '@/domain/dto/csp/fixed-address.dto';
-import { DhcpOption } from '@/infrastructure/database/dhcp-option.entity';
-import { DhcpOptionOrigin } from '@/domain/enums/csp/dhcp-origin.enum';
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
 /**
  * Service for importing Fixed Addresses from CSP.
  * - Fetches Fixed Addresses via CspDataClient
- * - Maps and persists DHCP options set directly on each Fixed Address
+ * - Logs DHCP options set directly on each Fixed Address
  */
 @Injectable()
 export class CspFixedAddressImportService {
   private readonly logger = new Logger(CspFixedAddressImportService.name);
 
-  constructor(
-    private readonly cspDataClient: CspDataClient,
-    @InjectRepository(DhcpOption)
-    private readonly dhcpOptionRepo: Repository<DhcpOption>,
-  ) {}
+  constructor(private readonly cspDataClient: CspDataClient) {}
 
   /**
-   * Imports all Fixed Addresses and persists directly assigned DHCP options.
+   * Imports all Fixed Addresses and logs directly assigned DHCP options.
    */
-  async importFixedAddresses(): Promise<void> {
+  async importFixedAddresses(): Promise<CspFixedAddressDto[]> {
     this.logger.log('Starting import of CSP Fixed Addresses...');
-    const fixedAddresses: CspFixedAddressDto[] =
-      await this.cspDataClient.fetchFixedAddresses();
+    const rawFixedAddresses = await this.cspDataClient.fetchFixedAddresses();
 
-    if (!fixedAddresses || fixedAddresses.length === 0) {
+    if (!rawFixedAddresses || rawFixedAddresses.length === 0) {
       this.logger.warn('No Fixed Addresses found.');
-      return;
+      return [];
     }
+
+    // Normalisieren der dhcp_options für jeden Fixed Address
+    const fixedAddresses: CspFixedAddressDto[] = rawFixedAddresses.map((fa) => ({
+      ...fa,
+      dhcp_options: normalizeDhcpOptions(fa.dhcp_options),
+    }));
 
     let totalOptions = 0;
 
     for (const fa of fixedAddresses) {
       if (fa.dhcp_options && fa.dhcp_options.length > 0) {
-        for (const opt of fa.dhcp_options) {
-          const entity = this.dhcpOptionRepo.create({
-            code: Number(opt.option_code),
-            value: opt.option_value,
-            origin: `${DhcpOptionOrigin.FIXED_ADDRESS}:${fa.id}`,
-          });
-          await this.dhcpOptionRepo.save(entity);
-          totalOptions++;
-        }
+        totalOptions += fa.dhcp_options.length;
       }
     }
 
     this.logger.log(
-      `Imported DHCP options from ${fixedAddresses.length} Fixed Addresses (${totalOptions} options).`,
+      `Fetched ${fixedAddresses.length} Fixed Addresses from CSP (${totalOptions} DHCP options in total).`,
     );
+    // Optional: this.logger.debug(JSON.stringify(fixedAddresses.slice(0, 2), null, 2));
+
+    return fixedAddresses;
   }
 }

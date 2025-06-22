@@ -10,8 +10,8 @@ export interface CspAuthTestResult {
 }
 
 @Injectable()
-export class CspClient {
-  private readonly logger = new Logger(CspClient.name);
+export class CspAuthClient {
+  private readonly logger = new Logger(CspAuthClient.name);
   private readonly endpoint =
     'https://csp.infoblox.com/api/ddi/v1/ipam/ip_space';
 
