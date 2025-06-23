@@ -12,12 +12,12 @@ import AuthModeTabs from "../components/AuthModeTabs";
 import GridLoginFields from "../components/GridLoginFields";
 import CspLoginFields from "../components/CspLoginFields";
 import RememberCheckbox from "../components/RememberCheckbox";
-import { login } from "@/services/auth.service";
+import { login, saveCspCredential } from "@/services/auth.service";
 import { AuthCredentialDto } from "@/types/dto/auth-credential.dto";
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-// grouped form utils for child components
+// Utility for grouping form control methods for child components
 export interface FormUtils {
   watch: UseFormWatch<LoginFormData>;
   setValue: UseFormSetValue<LoginFormData>;
@@ -25,16 +25,18 @@ export interface FormUtils {
 
 interface LoginFormProps {
   onLogin: (dto: AuthCredentialDto, remember: boolean) => void;
+  initialValues?: Partial<LoginFormData>;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
-  // form setup
+const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
+  // Initialise form with react-hook-form and Zod schema validation
   const {
     register,
     handleSubmit,
     watch,
     setValue,
     formState: { errors, isValid, isSubmitting },
+    reset,
   } = useForm<LoginFormData>({
     mode: "onChange",
     resolver: zodResolver(loginSchema),
@@ -45,26 +47,51 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       apiKey: "",
       region: Region.EU,
       remember: false,
+      ...initialValues, // Autofill if provided
     },
   });
+
+  // Ensure autofill applies if initialValues change
+  useEffect(() => {
+    if (initialValues) {
+      reset({
+        mode: initialValues.mode ?? AuthMode.GRID,
+        username: initialValues.username ?? "",
+        password: initialValues.password ?? "",
+        apiKey: initialValues.apiKey ?? "",
+        region: initialValues.region ?? Region.EU,
+        remember: initialValues.remember ?? false,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues]);
 
   const formUtils: FormUtils = { watch, setValue };
 
   const mode = watch("mode");
   const region = watch("region") ?? Region.EU;
+  const remember = watch("remember");
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // focus first field on mode change
+  // Set focus to the first field when mode changes
   useEffect(() => {
     firstInputRef.current?.focus();
   }, [mode]);
 
+  // Handles form submission, including secure credential storage for CSP
   const onSubmit = async (data: LoginFormData) => {
-    const result = await login(data);
-    if (result.success) {
-      onLogin(data, data.remember);
+    if (mode === AuthMode.CSP && remember && data.apiKey) {
+      const saveResult = await saveCspCredential(data.apiKey, region);
+      if (!saveResult.success) {
+        alert(saveResult.message || "Could not save CSP credentials.");
+        return;
+      }
+    }
+    const loginResult = await login(data);
+    if (loginResult.success) {
+      onLogin(data, remember);
     } else {
-      alert(result.message || "Unknown error");
+      alert(loginResult.message || "Unknown error");
     }
   };
 
@@ -73,10 +100,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-8 font-sans transition-all duration-300"
     >
-      {/* mode selector */}
+      {/* Authentication mode selection */}
       <AuthModeTabs selectedMode={mode} onSelect={(m) => setValue("mode", m)} />
 
-      {/* mode-dependent login fields */}
+      {/* Render input fields based on mode */}
       {mode === AuthMode.GRID && (
         <GridLoginFields
           register={register}
@@ -96,10 +123,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         />
       )}
 
-      {/* remember + submit */}
+      {/* Remember me and submit button */}
       <div className="pt-4 flex items-center justify-between">
         <RememberCheckbox
-          checked={watch("remember")}
+          checked={remember}
           onChange={(e) => setValue("remember", e.target.checked)}
         />
 
@@ -117,7 +144,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         </button>
       </div>
 
-      {/* root-level error */}
+      {/* Display root-level errors */}
       {errors.root && (
         <p className="text-sm text-red-600 mt-3 text-center">
           {errors.root.message}

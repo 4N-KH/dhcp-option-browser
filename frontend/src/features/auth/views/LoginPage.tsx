@@ -1,15 +1,35 @@
 "use client";
 
 import Image from "next/image";
+import React, { useEffect, useState } from "react";
 import LoginForm from "../forms/LoginForm";
 import { AuthCredentialDto } from "@/types/dto/auth-credential.dto";
+import { AuthMode } from "@/types/enum/auth-mode.enum";
+import { Region } from "@/types/enum/region.enum";
+import { getCspCredential } from "@/services/auth.service";
 
 interface LoginPageProps {
   onLogin: (dto: AuthCredentialDto, remember: boolean) => void;
 }
 
-// Renders full-screen login page with styled container
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+  const [initialValues, setInitialValues] = useState<Partial<AuthCredentialDto>>({});
+
+  useEffect(() => {
+    // Fetches API key for autofill from server, never store in client
+    const region = Region.EU;
+    getCspCredential(region).then((result) => {
+      if (result.success && result.apiKey) {
+        setInitialValues({
+          mode: AuthMode.CSP,
+          apiKey: result.apiKey,
+          region,
+          remember: true,
+        });
+      }
+    });
+  }, []);
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-[var(--background)] px-4 sm:px-6 font-sans relative overflow-hidden">
       <div className="relative z-10 w-full max-w-md sm:max-w-lg p-[2px] rounded-3xl bg-gradient-to-r from-[#1c355e] via-[#2b60c5] to-[#5faaff] shadow-[0_20px_50px_rgba(0,0,0,0.25)] transition-transform hover:scale-[1.005] duration-500 ease-[cubic-bezier(0.19,1,0.22,1)]">
@@ -43,7 +63,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
           {/* Login form */}
           <div className="relative z-10">
-            <LoginForm onLogin={onLogin} />
+            <LoginForm onLogin={onLogin} initialValues={initialValues} />
           </div>
         </div>
       </div>

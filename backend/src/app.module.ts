@@ -6,14 +6,13 @@ import { HttpModule } from '@nestjs/axios';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
 
-import { CredentialEntity } from './infrastructure/database/credential.entity';
+import { CredentialCspService } from './application/services/auth/csp/credential-csp.service';
 
-import { AuthController } from './controller/auth.controller';
-import { AuthService } from './application/auth.service';
-import { CredentialService } from './application/services/credential.service';
-
+// Auth Provider & Services
 import { GridAuthProvider } from './application/providers/grid-auth.provider';
 import { CspAuthProvider } from './application/providers/csp-auth.provider';
+import { CspAuthLoginService } from './application/services/auth/csp/csp-auth-login.service';
+import { CspApiKeyVerifierService } from './application/services/auth/csp/csp-api-key-verifier.service';
 
 import { NiosClient } from './infrastructure/api-clients/nios.client';
 import { CspAuthClient } from './infrastructure/api-clients/csp/auth.client';
@@ -23,7 +22,6 @@ import { CspDataClient } from './infrastructure/api-clients/csp/data.client';
 import { ApiConfigService } from './shared/config/api-config.service';
 import { ImportController } from './controller/import.controller';
 
-// IMPORT-SERVICES
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspSubnetImportService } from './application/services/import/csp/subnet-import.service';
 import { CspOptionGroupImportService } from './application/services/import/csp/option-group-import.service';
@@ -35,6 +33,13 @@ import { CspGlobalConfigImportService } from './application/services/import/csp/
 import { CspConfigProfileImportService } from './application/services/import/csp/config-profile-import.service';
 import { CspOptionCodeImportService } from './application/services/import/csp/option-code-import.service';
 import { CspAddressBlockController } from './controller/csp-address-block.controller';
+
+import { CredentialsCspController } from './controller/auth/csp/credentials-csp.controller';
+import { AuthController } from './controller/auth/auth.controller';
+
+// --- ENTITIES ---
+import { CspCredentialEntity } from './infrastructure/database/csp/csp-credential.entity';
+import { UserEntity } from './infrastructure/database/csp/user.entity';
 
 @Module({
   imports: [
@@ -49,30 +54,29 @@ import { CspAddressBlockController } from './controller/csp-address-block.contro
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [CredentialEntity],
+      entities: [CspCredentialEntity, UserEntity],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([CredentialEntity]),
+    TypeOrmModule.forFeature([CspCredentialEntity, UserEntity]),
   ],
   controllers: [
     AppController,
-    AuthController,
     ImportController,
     CspAddressBlockController,
+    CredentialsCspController,
+    AuthController,
   ],
   providers: [
     AppService,
-    // DhcpManagerService entfernt
-    AuthService,
-    CredentialService,
+    CredentialCspService,
     GridAuthProvider,
     CspAuthProvider,
+    CspApiKeyVerifierService,
+    CspAuthLoginService,
     NiosClient,
     CspAuthClient,
     CspDataClient,
     ApiConfigService,
-
-    // Alle Import- und Orchestrator-Services:
     DhcpCspImportOrchestratorService,
     CspSubnetImportService,
     CspOptionGroupImportService,

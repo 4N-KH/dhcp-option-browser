@@ -12,7 +12,7 @@ export class AppService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     try {
-      // 1. Subnets laden und DHCP-Optionen normalisieren
+      // Step 1: Load all subnets from CSP and normalise DHCP options for consistency
       const rawSubnets = await this.cspClient.fetchSubnets();
       const subnets: CspSubnetDto[] = rawSubnets.map((subnet) => ({
         ...subnet,
@@ -20,9 +20,10 @@ export class AppService implements OnModuleInit {
       }));
 
       this.logger.log(`Retrieved ${subnets.length} subnets from CSP`);
+      // For debugging: output a preview of the first three subnets
       this.logger.debug(JSON.stringify(subnets.slice(0, 3), null, 2));
 
-      // 2. Globale DHCP-Konfiguration loggen (inkl. Option Group), normalisiert
+      // Step 2: Retrieve and log the global DHCP configuration, normalising options (IPv4 and IPv6)
       const rawGlobalDhcpConfig = await this.cspClient.fetchGlobalDhcpConfig();
       const globalDhcpConfig: CspGlobalDhcpConfigDto = {
         ...rawGlobalDhcpConfig,
@@ -36,12 +37,13 @@ export class AppService implements OnModuleInit {
           JSON.stringify(globalDhcpConfig, null, 2),
       );
 
-      // 3. Subnetze mit Option Group loggen
+      // Step 3: Filter and log all subnets which have an option group assigned
       const subnetsWithGroup = subnets.filter((s) => !!s.option_group);
       if (subnetsWithGroup.length > 0) {
         this.logger.log(
           `Found ${subnetsWithGroup.length} subnets with option group.`,
         );
+        // For debugging: output an example subnet with an option group
         this.logger.debug(
           'Example (first): ' + JSON.stringify(subnetsWithGroup[0], null, 2),
         );
@@ -49,6 +51,7 @@ export class AppService implements OnModuleInit {
         this.logger.log('No subnets with option group found.');
       }
     } catch (error) {
+      // Logs any error that occurs during CSP data retrieval
       this.logger.error('Failed to retrieve CSP data', error);
     }
   }
