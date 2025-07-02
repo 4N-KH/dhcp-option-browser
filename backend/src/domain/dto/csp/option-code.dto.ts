@@ -6,4 +6,10 @@ export interface CspOptionCodeDto {
 
   option_space?: string | null;
   comment?: string | null;
+
+  source?: string | null;
+  array?: boolean | null;
+
+  created_at?: string | null;
+  updated_at?: string | null;
 }

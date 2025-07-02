@@ -22,7 +22,7 @@ export const CspRangeSchema = z.object({
     )
     .optional(),
 
-  inheritance_sources: z.record(z.any()).optional(),
+  inheritance_sources: z.union([z.record(z.any()), z.null()]).optional(),
 });
 
 export type CspRange = z.infer<typeof CspRangeSchema>;

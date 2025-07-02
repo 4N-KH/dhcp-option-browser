@@ -7,12 +7,10 @@ import { signJwtStrict } from '@/shared/utils/jwt.util';
 import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Structure for successful login responses.
- */
 export interface LoginResult {
   success: boolean;
   token: string;
+  expiresIn: string;
 }
 
 @Injectable()
@@ -27,9 +25,13 @@ export class CspAuthLoginService {
 
   /**
    * Authenticates a CSP API key and issues a JWT upon success.
+   * Token lifetime is determined by the "remember" flag.
    */
-  async login(apiKey: string, region: string): Promise<LoginResult> {
-    // 1. Validate input (single responsibility, fail fast)
+  async login(
+    apiKey: string,
+    region: string,
+    remember: boolean = false,
+  ): Promise<LoginResult> {
     if (
       typeof apiKey !== 'string' ||
       !apiKey ||
@@ -40,29 +42,25 @@ export class CspAuthLoginService {
       throw new UnauthorizedException('Missing credentials');
     }
 
-    // 2. Delegate API key validation to dedicated service
     await this.validateApiKey(apiKey);
 
-    // 3. Retrieve or provision user entity (never store API keys, only hashes)
     const user = await this.getOrCreateUser(apiKey, region);
 
-    // 4. Issue signed JWT (never include API key in payload)
+    const expiresIn = remember ? '7d' : '1h';
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       this.logger.error('JWT_SECRET environment variable is not set');
       throw new Error('Missing JWT_SECRET');
     }
-    const token = signJwtStrict({ id: user.id, region }, secret, {
-      expiresIn: '1h',
-    });
 
-    this.logger.log(`Issued JWT for CSP user id=${user.id} (region=${region})`);
-    return { success: true, token };
+    const token = signJwtStrict({ id: user.id, region }, secret, { expiresIn });
+
+    this.logger.log(
+      `Issued JWT for CSP user id=${user.id} (region=${region}, remember=${remember}, expiresIn=${expiresIn})`,
+    );
+    return { success: true, token, expiresIn };
   }
 
-  // --- SOLID: private methods for isolated responsibilities ---
-
-  /** Delegates CSP API key verification to the external service. */
   private async validateApiKey(apiKey: string): Promise<void> {
     try {
       await this.verifier.verify(apiKey);
@@ -76,10 +74,6 @@ export class CspAuthLoginService {
     }
   }
 
-  /**
-   * Retrieves user for the given region and API key hash, or creates one if absent.
-   * Never stores the raw API key, only a cryptographic hash.
-   */
   private async getOrCreateUser(
     apiKey: string,
     region: string,
@@ -93,12 +87,12 @@ export class CspAuthLoginService {
         loginHash,
       });
       await this.userRepo.save(user);
+      user = await this.userRepo.findOne({ where: { region, loginHash } });
       this.logger.log(`Created new CSP user (region=${region})`);
     }
-    return user;
+    return user!;
   }
 
-  /** Produces a deterministic cryptographic hash from region and API key. */
   private makeLoginHash(region: string, apiKey: string): string {
     return crypto
       .createHash('sha256')

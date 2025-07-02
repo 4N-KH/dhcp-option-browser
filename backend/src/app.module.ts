@@ -3,25 +3,32 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 
-import { AppService } from './app.service';
+// --- Application & Controllers ---
 import { AppController } from './app.controller';
 
+// --- Auth Providers & Services ---
 import { CredentialCspService } from './application/services/auth/csp/credential-csp.service';
-
-// Auth Provider & Services
 import { GridAuthProvider } from './application/providers/grid-auth.provider';
 import { CspAuthProvider } from './application/providers/csp-auth.provider';
 import { CspAuthLoginService } from './application/services/auth/csp/csp-auth-login.service';
 import { CspApiKeyVerifierService } from './application/services/auth/csp/csp-api-key-verifier.service';
 
+// --- API Clients ---
 import { NiosClient } from './infrastructure/api-clients/nios.client';
 import { CspAuthClient } from './infrastructure/api-clients/csp/auth.client';
-
-// CSP-specific imports
 import { CspDataClient } from './infrastructure/api-clients/csp/data.client';
-import { ApiConfigService } from './shared/config/api-config.service';
-import { ImportController } from './controller/import.controller';
 
+// --- Shared ---
+import { ApiConfigService } from './shared/config/api-config.service';
+
+// --- Import/Export Controller ---
+import { ImportController } from './controller/import.controller';
+import { ImportRawDataController } from './controller/csp-import.controller';
+import { CredentialsCspController } from './controller/auth/csp/credentials-csp.controller';
+import { AuthController } from './controller/auth/auth.controller';
+import { CspFullImportController } from './controller/csp-full-import.controller';
+
+// --- Import Services ---
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspSubnetImportService } from './application/services/import/csp/subnet-import.service';
 import { CspOptionGroupImportService } from './application/services/import/csp/option-group-import.service';
@@ -32,20 +39,39 @@ import { CspFixedAddressImportService } from './application/services/import/csp/
 import { CspGlobalConfigImportService } from './application/services/import/csp/global-config-import.service';
 import { CspConfigProfileImportService } from './application/services/import/csp/config-profile-import.service';
 import { CspOptionCodeImportService } from './application/services/import/csp/option-code-import.service';
-import { CspAddressBlockController } from './controller/csp-address-block.controller';
+import { CspOptionSpaceImportService } from './application/services/import/csp/option-space-import.service';
+import { CspOptionFilterImportService } from './application/services/import/csp/option-filter-import.service';
 
-import { CredentialsCspController } from './controller/auth/csp/credentials-csp.controller';
-import { AuthController } from './controller/auth/auth.controller';
-
-// --- ENTITIES ---
+// --- Entities ---
+import { AddressBlock } from './infrastructure/database/csp/adress-block.entity';
+import { AddressBlockDhcpOption } from './infrastructure/database/csp/address-block-dhcp-option.entity';
+import { AddressBlockOptionGroup } from './infrastructure/database/csp/address-block-option-group.entity';
 import { CspCredentialEntity } from './infrastructure/database/csp/csp-credential.entity';
+import { DhcpGlobalConfig } from './infrastructure/database/csp/global-config.entity';
+import { DhcpGlobalConfigOption } from './infrastructure/database/csp/global-config-option.entity';
+import { DhcpGlobalConfigOptionGroup } from './infrastructure/database/csp/global-config-option-group.entity';
+import { FixedAddress } from './infrastructure/database/csp/fixed-address.entity';
+import { FixedDhcpOption } from './infrastructure/database/csp/fixed-dhcp-option.entity';
+import { IpSpace } from './infrastructure/database/csp/ip-space.entity';
+import { IpSpaceDhcpOption } from './infrastructure/database/csp/ip-space-dhcp-option.entity';
+import { IpSpaceOptionGroup } from './infrastructure/database/csp/ip-space-option-group.entity'; // NEU: für OptionGroup-Zuordnung an IpSpace!
+import { OptionCodeEntity } from './infrastructure/database/csp/option-code.entity';
+import { OptionFilter } from './infrastructure/database/csp/option-filter.entity';
+import { OptionGroup } from './infrastructure/database/csp/option-group.entity';
+import { OptionGroupDhcpOption } from './infrastructure/database/csp/option-group-dhcp-option.entity';
+import { OptionSpace } from './infrastructure/database/csp/option-space.entity';
+import { Range } from './infrastructure/database/csp/range.entity';
+import { RangeDhcpOption } from './infrastructure/database/csp/range-dhcp-option.entity';
+import { RangeExclusion } from './infrastructure/database/csp/range-exclusion.entity';
+import { RangeOptionGroup } from './infrastructure/database/csp/range-option-group.entity';
+import { Subnet } from './infrastructure/database/csp/subnet.entity';
+import { SubnetDhcpOption } from './infrastructure/database/csp/subnet-dhcp-option.entity';
+import { SubnetOptionGroup } from './infrastructure/database/csp/subnet-option-group.entity';
 import { UserEntity } from './infrastructure/database/csp/user.entity';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
     HttpModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -54,20 +80,81 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [CspCredentialEntity, UserEntity],
+      entities: [
+        // User/Auth
+        CspCredentialEntity,
+        UserEntity,
+        // Address Block
+        AddressBlock,
+        AddressBlockDhcpOption,
+        AddressBlockOptionGroup,
+        // Subnet
+        Subnet,
+        SubnetDhcpOption,
+        SubnetOptionGroup,
+        // Range
+        Range,
+        RangeDhcpOption,
+        RangeExclusion,
+        RangeOptionGroup,
+        // Option Group
+        OptionGroup,
+        OptionGroupDhcpOption,
+        // Option Code, Space, Filter
+        OptionCodeEntity,
+        OptionSpace,
+        OptionFilter,
+        // IpSpace
+        IpSpace,
+        IpSpaceDhcpOption,
+        IpSpaceOptionGroup,
+        // DHCP Global Config
+        DhcpGlobalConfig,
+        DhcpGlobalConfigOption,
+        DhcpGlobalConfigOptionGroup,
+        // Fixed Address
+        FixedAddress,
+        FixedDhcpOption,
+      ],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([CspCredentialEntity, UserEntity]),
+    TypeOrmModule.forFeature([
+      CspCredentialEntity,
+      UserEntity,
+      AddressBlock,
+      AddressBlockDhcpOption,
+      AddressBlockOptionGroup,
+      Subnet,
+      SubnetDhcpOption,
+      SubnetOptionGroup,
+      Range,
+      RangeDhcpOption,
+      RangeExclusion,
+      RangeOptionGroup,
+      OptionGroup,
+      OptionGroupDhcpOption,
+      OptionCodeEntity,
+      OptionSpace,
+      OptionFilter,
+      IpSpace,
+      IpSpaceDhcpOption,
+      IpSpaceOptionGroup,
+      DhcpGlobalConfig,
+      DhcpGlobalConfigOption,
+      DhcpGlobalConfigOptionGroup,
+      FixedAddress,
+      FixedDhcpOption,
+    ]),
   ],
   controllers: [
     AppController,
     ImportController,
-    CspAddressBlockController,
+    ImportRawDataController,
     CredentialsCspController,
     AuthController,
+    CspFullImportController,
   ],
   providers: [
-    AppService,
     CredentialCspService,
     GridAuthProvider,
     CspAuthProvider,
@@ -87,6 +174,8 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CspGlobalConfigImportService,
     CspConfigProfileImportService,
     CspOptionCodeImportService,
+    CspOptionSpaceImportService,
+    CspOptionFilterImportService,
   ],
 })
 export class AppModule {}

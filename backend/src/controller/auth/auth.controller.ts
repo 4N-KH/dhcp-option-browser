@@ -14,15 +14,24 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: AuthCredentialDto) {
     if (dto.mode === AuthMode.CSP) {
-      // CSP Login (API-Key, Region)
-      const result = await this.cspAuth.login(dto.apiKey!, dto.region!);
-      return { success: result.success, token: result.token };
+      const result = await this.cspAuth.login(
+        dto.apiKey!,
+        dto.region!,
+        dto.remember ?? false,
+      );
+      return {
+        success: result.success,
+        token: result.token,
+        expiresIn: result.expiresIn,
+      };
     }
     if (dto.mode === AuthMode.GRID) {
-      // Grid Login (Username/Password)
       const result = await this.gridAuth.login(dto);
-      // Optional: JWT-Token generieren für GRID (analog wie für CSP)
-      return { success: result.success, token: null, message: result.message };
+      return {
+        success: result.success,
+        token: null,
+        message: result.message,
+      };
     }
     return { success: false, message: 'Invalid auth mode' };
   }

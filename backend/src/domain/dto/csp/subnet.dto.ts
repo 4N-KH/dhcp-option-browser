@@ -12,6 +12,4 @@ export interface CspSubnetDto {
     option_value: string;
     type: string;
   }[];
-  // Falls "option_group" in API vorkommt, ergänze:
-  option_group?: string | null;
 }

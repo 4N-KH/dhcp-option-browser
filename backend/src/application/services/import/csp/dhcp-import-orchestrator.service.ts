@@ -49,7 +49,7 @@ export class DhcpCspImportOrchestratorService {
 
       this.logger.log('--- CSP DHCP full import completed successfully ---');
     } catch (error) {
-      this.logger.error('CSP DHCP full import failed', error);
+      this.logger.error('CSP DHCP full import failed:', (error as Error)?.message, error);
       throw error;
     }
   }

@@ -18,6 +18,6 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 64 })
   loginHash: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

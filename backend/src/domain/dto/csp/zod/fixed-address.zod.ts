@@ -11,7 +11,7 @@ export const CspFixedAddressSchema = z.object({
   dhcp_options: z.array(DhcpOptionSchema).optional(),
   comment: z.string().nullable().optional(),
   parent: z.string().nullable().optional(),
-  inheritance_sources: z.record(z.any()).optional(),
+  inheritance_sources: z.record(z.any()).nullable().optional(),
 });
 
 export type CspFixedAddress = z.infer<typeof CspFixedAddressSchema>;

@@ -3,6 +3,8 @@ export interface CspOptionGroupDto {
   name: string;
   comment?: string | null;
   protocol?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 
   dhcp_options?: {
     group?: string | null;
