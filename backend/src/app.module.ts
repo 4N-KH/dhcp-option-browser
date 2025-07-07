@@ -28,6 +28,10 @@ import { CredentialsCspController } from './controller/auth/csp/credentials-csp.
 import { AuthController } from './controller/auth/auth.controller';
 import { CspFullImportController } from './controller/csp-full-import.controller';
 
+// --- DHCP Hierarchy (NEU) ---
+import { CspDhcpHierarchyController } from './controller/csp-dhcp-tree.controller';
+import { CspDhcpHierarchyService } from './application/services/option-hierarchy/csp/dhcp-hierarchy.service';
+
 // --- Import Services ---
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspSubnetImportService } from './application/services/import/csp/subnet-import.service';
@@ -53,7 +57,7 @@ import { DhcpGlobalConfigOption } from './infrastructure/database/csp/global-con
 import { DhcpGlobalConfigOptionGroup } from './infrastructure/database/csp/global-config-option-group.entity';
 import { FixedAddress } from './infrastructure/database/csp/fixed-address.entity';
 import { FixedDhcpOption } from './infrastructure/database/csp/fixed-dhcp-option.entity';
-import { FixedAddressOptionGroup } from './infrastructure/database/csp/fixed-address-option-group.entity'; // NEU!
+import { FixedAddressOptionGroup } from './infrastructure/database/csp/fixed-address-option-group.entity';
 import { IpSpace } from './infrastructure/database/csp/ip-space.entity';
 import { IpSpaceDhcpOption } from './infrastructure/database/csp/ip-space-dhcp-option.entity';
 import { IpSpaceOptionGroup } from './infrastructure/database/csp/ip-space-option-group.entity';
@@ -148,7 +152,7 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CredentialsCspController,
     AuthController,
     CspFullImportController,
-    // OptionHierarchyController, // For future use
+    CspDhcpHierarchyController,
   ],
   providers: [
     CredentialCspService,
@@ -173,12 +177,7 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CspOptionCodeImportService,
     CspOptionSpaceImportService,
     CspOptionFilterImportService,
-    // OptionAggregationService,
-    // ResolveEffectiveOptionsUseCase,
-    /**{
-      provide: OPTION_HIERARCHY_REPOSITORY,
-      useClass: OptionHierarchyRepositoryImpl,
-    },*/
+    CspDhcpHierarchyService,
   ],
 })
 export class AppModule {}

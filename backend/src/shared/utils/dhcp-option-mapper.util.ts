@@ -1,5 +1,3 @@
-// backend/src/shared/util/dhcp-option-mapper.util.ts
-
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 
