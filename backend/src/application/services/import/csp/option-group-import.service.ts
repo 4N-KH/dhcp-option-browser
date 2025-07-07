@@ -40,8 +40,8 @@ export class CspOptionGroupImportService {
       entity.name = dto.name;
       entity.comment = dto.comment ?? undefined;
       entity.protocol = dto.protocol ?? undefined;
-      entity.createdAt = dto.created_at ?? undefined;
-      entity.updatedAt = dto.updated_at ?? undefined;
+      //entity.createdAt = dto.created_at ?? undefined;
+      //entity.updatedAt = dto.updated_at ?? undefined;
 
       await this.optionGroupRepo.save(entity);
       importedEntities.push(entity);

@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { FixedAddress } from './fixed-address.entity';
 import { OptionCodeEntity } from './option-code.entity';
+import { OptionSpace } from './option-space.entity';
 
 @Entity({ name: 'fixed_address_dhcp_option' })
 export class FixedDhcpOption {
@@ -21,9 +22,6 @@ export class FixedDhcpOption {
 
   @Column()
   fixedAddressId: number;
-
-  @Column({ type: 'text', nullable: true })
-  group?: string | null;
 
   @Column()
   option_code: string;
@@ -40,4 +38,11 @@ export class FixedDhcpOption {
 
   @Column({ nullable: true })
   optionCodeId?: number;
+
+  @ManyToOne(() => OptionSpace, { nullable: true })
+  @JoinColumn({ name: 'optionSpaceId' })
+  optionSpace?: OptionSpace | null;
+
+  @Column({ nullable: true })
+  optionSpaceId?: number | null;
 }

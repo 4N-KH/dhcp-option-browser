@@ -8,7 +8,15 @@ import { IpSpaceDhcpOption } from '@/infrastructure/database/csp/ip-space-dhcp-o
 import { IpSpaceOptionGroup } from '@/infrastructure/database/csp/ip-space-option-group.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
+import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
+
+import {
+  buildOptionCodeMap,
+  mapDhcpOptionToEntity,
+} from '@/shared/utils/dhcp-option-mapper.util';
+
+import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
 @Injectable()
 export class CspIpSpaceImportService {
@@ -26,6 +34,8 @@ export class CspIpSpaceImportService {
     private readonly optionGroupRepo: Repository<OptionGroup>,
     @InjectRepository(OptionCodeEntity)
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
+    @InjectRepository(OptionSpace)
+    private readonly optionSpaceRepo: Repository<OptionSpace>,
   ) {}
 
   async importIpSpaces(): Promise<IpSpace[]> {
@@ -39,21 +49,19 @@ export class CspIpSpaceImportService {
       return [];
     }
 
-    // Prepare lookup maps for option codes and option groups
-    const allOptionCodes = await this.optionCodeRepo.find();
-    const optionCodeMap = new Map<string, OptionCodeEntity>();
-    for (const code of allOptionCodes) {
-      if (code.externalId) optionCodeMap.set(code.externalId, code);
-      if (code.code !== undefined && code.code !== null) {
-        optionCodeMap.set(String(code.code), code);
-      }
-    }
+    // Prepare lookup maps
+    const optionCodeMap = buildOptionCodeMap(
+      await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
+    );
 
-    const allOptionGroups = await this.optionGroupRepo.find();
+    // Prepare OptionGroup map (by externalId, name, id)
     const optionGroupMap = new Map<string, OptionGroup>();
-    for (const og of allOptionGroups) {
-      if (og.externalId) optionGroupMap.set(og.externalId, og);
-      if (og.name) optionGroupMap.set(og.name, og);
+    for (const og of await this.optionGroupRepo.find()) {
+      if (!og) continue;
+      if (og.externalId)
+        optionGroupMap.set(og.externalId.trim().toLowerCase(), og);
+      if (og.name) optionGroupMap.set(og.name.trim().toLowerCase(), og);
+      if (og.id) optionGroupMap.set(String(og.id), og);
     }
 
     const importedSpaces: IpSpace[] = [];
@@ -72,74 +80,54 @@ export class CspIpSpaceImportService {
 
       // Save to ensure .id is set
       entity = await this.ipSpaceRepo.save(entity);
-
       if (!entity.id) {
         this.logger.error(
-          `Kritischer Fehler: Keine ID nach Save für IpSpace mit externalId=${dto.id} erhalten. Import wird übersprungen.`,
+          `Critical error: No ID returned after save for IpSpace with externalId=${dto.id}. Skipping import.`,
         );
         continue;
       }
 
-      // Lösche alte DHCP-Optionen (idempotent)
+      // Delete old DHCP options (idempotent)
       await this.ipSpaceDhcpOptionRepo.delete({ ipSpaceId: entity.id });
 
-      // Normalisiere und speichere neue Optionen
-      const normalizedOptions = normalizeDhcpOptions(dto.dhcp_options ?? []);
-      const dhcpOptionEntities = normalizedOptions.map((opt) => {
-        const codeEntity = optionCodeMap.get(opt.option_code);
-        return this.ipSpaceDhcpOptionRepo.create({
-          ipSpaceId: entity.id,
-          group: opt.group ?? null,
-          option_code: opt.option_code,
-          option_value: opt.option_value,
-          type: opt.type,
-          optionCodeId: codeEntity?.id ?? undefined, // undefined, nicht null
-        });
-      });
-
-      if (dhcpOptionEntities.length > 0) {
+      // Nur echte Optionen importieren (type !== 'group')
+      const normalizedOptions = normalizeDhcpOptions(
+        dto.dhcp_options ?? [],
+      ).filter((opt) => opt.type !== 'group');
+      if (normalizedOptions.length > 0) {
+        const dhcpOptionEntities = normalizedOptions.map((opt) =>
+          this.ipSpaceDhcpOptionRepo.create({
+            ipSpaceId: entity.id,
+            ...mapDhcpOptionToEntity<IpSpaceDhcpOption>(opt, optionCodeMap),
+          }),
+        );
         await this.ipSpaceDhcpOptionRepo.save(dhcpOptionEntities);
       }
 
-      // Lösche alte OptionGroup-Relationen
+      // Delete old OptionGroup relations
       await this.ipSpaceOptionGroupRepo.delete({ ipSpaceId: entity.id });
 
-      // Sammle eindeutige Gruppen aus den Optionen
-      const groupIds = Array.from(
-        new Set(
-          (normalizedOptions ?? [])
-            .map((opt) => opt.group)
-            .filter((g): g is string => typeof g === 'string' && !!g),
-        ),
+      // OptionGroups aus ALLEN dhcp_options extrahieren
+      const foundGroups = resolveOptionGroupsFromOptions(
+        dto.dhcp_options ?? [],
+        optionGroupMap,
+        null,
       );
-
-      const optionGroupJoins = groupIds
-        .map((groupId) => {
-          const ogEntity = optionGroupMap.get(groupId);
-          if (!ogEntity) {
-            this.logger.warn(
-              `OptionGroup "${groupId}" nicht gefunden – Zuordnung für IpSpace "${entity.name}" wird übersprungen.`,
-            );
-            return null;
-          }
-          return this.ipSpaceOptionGroupRepo.create({
+      if (foundGroups.length > 0) {
+        const joins = foundGroups.map((optionGroup) =>
+          this.ipSpaceOptionGroupRepo.create({
             ipSpaceId: entity.id,
-            optionGroupId: ogEntity.id,
-          });
-        })
-        .filter(Boolean);
-
-      if (optionGroupJoins.length > 0) {
-        await this.ipSpaceOptionGroupRepo.save(
-          optionGroupJoins as IpSpaceOptionGroup[],
+            optionGroupId: optionGroup.id,
+          }),
         );
+        await this.ipSpaceOptionGroupRepo.save(joins);
       }
 
       importedSpaces.push(entity);
     }
 
     this.logger.log(
-      `Import complete: ${importedSpaces.length} IP Spaces with DHCP options & option groups have been saved.`,
+      `Import complete: ${importedSpaces.length} IP Spaces with DHCP options and option groups have been saved.`,
     );
     return importedSpaces;
   }

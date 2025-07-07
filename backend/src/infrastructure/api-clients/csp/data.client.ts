@@ -4,7 +4,7 @@ import { lastValueFrom } from 'rxjs';
 import { ApiConfigService } from '@/shared/config/api-config.service';
 import { fetchAllPaginated } from './http-paginator.util';
 
-// Zod-Schemas importieren
+// Zod schemas
 import { CspSubnetSchema } from '@/domain/dto/csp/zod/subnet.zod';
 import { CspGlobalDhcpConfigSchema } from '@/domain/dto/csp/zod/global-dhcp-config.zod';
 import { CspOptionGroupSchema } from '@/domain/dto/csp/zod/option-group.zod';
@@ -22,10 +22,9 @@ import {
   validateObject,
 } from '@/shared/validator/zod-validator.util';
 
-// AddressBlock-Normalizer importieren
 import { normalizeAddressBlockDtos } from '@/shared/parser/normalize-address-block-dtos';
 
-// Type Guard für paginierten API-Response mit results-Array
+// Helper: Type Guard for paginated API responses with results array
 function hasResultsArray(obj: unknown): obj is { results: unknown[] } {
   return (
     typeof obj === 'object' &&
@@ -34,7 +33,7 @@ function hasResultsArray(obj: unknown): obj is { results: unknown[] } {
   );
 }
 
-// Absolut type-sicherer Error-Extractor ohne ESLint-Fehler
+// Robust error extractor (type safe, no ESLint errors)
 function extractErrorMessage(e: unknown): string {
   if (
     typeof e === 'object' &&
@@ -49,7 +48,7 @@ function extractErrorMessage(e: unknown): string {
   if (typeof e === 'string') {
     return e;
   }
-  return 'Unbekannter Fehler';
+  return 'Unknown error';
 }
 
 @Injectable()
@@ -74,64 +73,109 @@ export class CspDataClient {
     };
   }
 
-  async fetchIpSpaces() {
+  // Standard page size for production – can be overridden per call
+  private readonly defaultPageSize = 100;
+
+  async fetchIpSpaces(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/ipam/ip_space`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     return validateArray(CspIpSpaceSchema, raw);
   }
 
-  async fetchAddressBlocks() {
+  async fetchAddressBlocks(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/ipam/address_block`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
-    // NEU: ZUERST NORMALISIEREN, DANN VALIDIEREN
+    // Always normalise, then validate
     const normalized = normalizeAddressBlockDtos(raw);
     return validateArray(CspAddressBlockSchema, normalized);
   }
 
-  async fetchSubnets() {
+  async fetchSubnets(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/ipam/subnet`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     return validateArray(CspSubnetSchema, raw);
   }
 
-  async fetchRanges() {
+  async fetchRanges(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/ipam/range`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     return validateArray(CspRangeSchema, raw);
   }
 
-  async fetchFixedAddresses() {
+  async fetchFixedAddresses(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/dhcp/fixed_address`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     return validateArray(CspFixedAddressSchema, raw);
   }
 
-  async fetchOptionGroups() {
+  async fetchOptionGroups(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/dhcp/option_group`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     return validateArray(CspOptionGroupSchema, raw);
   }
@@ -144,54 +188,82 @@ export class CspDataClient {
     return validateObject(CspOptionGroupSchema, response.data);
   }
 
-  async fetchOptionCodes() {
+  async fetchOptionCodes(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/dhcp/option_code`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     return validateArray(CspOptionCodeSchema, raw);
   }
 
-  async fetchOptionSpaces() {
+  async fetchOptionSpaces(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/dhcp/option_space`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     const optionSpaces = hasResultsArray(raw) ? raw.results : raw;
     return validateArray(CspOptionSpaceSchema, optionSpaces);
   }
 
-  async fetchOptionFilters() {
+  async fetchOptionFilters(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/dhcp/option_filter`;
     const raw = await fetchAllPaginated<unknown>(
       this.http,
       url,
       this.getHeaders(),
+      pageSize,
+      onProgress,
+      isCancelled,
     );
     const optionFilters = hasResultsArray(raw) ? raw.results : raw;
     return validateArray(CspOptionFilterSchema, optionFilters);
   }
 
-  async fetchConfigProfiles() {
+  async fetchConfigProfiles(
+    pageSize = this.defaultPageSize,
+    onProgress?: (percent: number) => void,
+    isCancelled?: () => boolean,
+  ) {
     const url = `${this.config.cspBaseUrl}/dhcp/config_profile/profiles`;
     try {
       const raw = await fetchAllPaginated<unknown>(
         this.http,
         url,
         this.getHeaders(),
+        pageSize,
+        onProgress,
+        isCancelled,
       );
       if (!raw || (Array.isArray(raw) && raw.length === 0)) {
-        this.logger.warn('Keine Config Profiles gefunden (leere Antwort).');
+        this.logger.warn('No config profiles found (empty response).');
         return [];
       }
       return validateArray(CspConfigProfileSchema, raw);
     } catch (e) {
       this.logger.warn(
-        `Config Profiles konnten nicht geladen werden: ${extractErrorMessage(e)}`,
+        `Config profiles could not be loaded: ${extractErrorMessage(e)}`,
       );
       return [];
     }
@@ -206,7 +278,7 @@ export class CspDataClient {
       return validateObject(CspGlobalDhcpConfigSchema, response.data);
     } catch (e) {
       this.logger.warn(
-        `Global DHCP Config konnte nicht geladen werden: ${extractErrorMessage(e)}`,
+        `Global DHCP config could not be loaded: ${extractErrorMessage(e)}`,
       );
       return null;
     }

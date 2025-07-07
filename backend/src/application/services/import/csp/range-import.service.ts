@@ -1,5 +1,3 @@
-// backend/src/application/services/import/csp/range-import.service.ts
-
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +9,13 @@ import { RangeDhcpOption } from '@/infrastructure/database/csp/range-dhcp-option
 import { RangeExclusion } from '@/infrastructure/database/csp/range-exclusion.entity';
 import { RangeOptionGroup } from '@/infrastructure/database/csp/range-option-group.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
+import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
+
+import {
+  buildOptionCodeMap,
+  mapDhcpOptionToEntity,
+} from '@/shared/utils/dhcp-option-mapper.util';
+import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
 @Injectable()
 export class CspRangeImportService {
@@ -30,10 +35,12 @@ export class CspRangeImportService {
     private readonly rangeOptionGroupRepo: Repository<RangeOptionGroup>,
     @InjectRepository(OptionGroup)
     private readonly optionGroupRepo: Repository<OptionGroup>,
+    @InjectRepository(OptionCodeEntity)
+    private readonly optionCodeRepo: Repository<OptionCodeEntity>,
   ) {}
 
   /**
-   * Importiert alle Ranges aus CSP inkl. OptionGroups und persistiert sie in der Datenbank.
+   * Imports all Ranges from CSP, including OptionGroups and DHCP options, and stores them in the database.
    */
   async importRanges(): Promise<Range[]> {
     this.logger.log('Importing Ranges from CSP...');
@@ -44,30 +51,42 @@ export class CspRangeImportService {
       return [];
     }
 
-    // Hole alle Subnets für Parent-Zuordnung
+    // Build lookup maps for subnets and option groups
     const subnets = await this.subnetRepo.find();
     const subnetMap = new Map<string, Subnet>();
     for (const s of subnets) {
       if (s.externalId) subnetMap.set(s.externalId, s);
     }
 
-    // Hole alle OptionGroups einmalig und mappe sie auf ihren Namen
     const allOptionGroups = await this.optionGroupRepo.find();
-    const optionGroupByName = new Map<string, OptionGroup>();
-    for (const group of allOptionGroups) {
-      if (group.name) optionGroupByName.set(group.name, group);
+    const optionGroupMap = new Map<string, OptionGroup>();
+    for (const og of allOptionGroups) {
+      if (!og) continue;
+      if (og.externalId)
+        optionGroupMap.set(og.externalId.trim().toLowerCase(), og);
+      const m = og.externalId
+        ?.trim()
+        .toLowerCase()
+        .match(/^dhcp\/option_group\/(.+)$/);
+      if (m) optionGroupMap.set(m[1], og);
+      if (og.name) optionGroupMap.set(og.name.trim().toLowerCase(), og);
+      if (og.id) optionGroupMap.set(String(og.id), og);
     }
+
+    const optionCodeMap = buildOptionCodeMap(
+      await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
+    );
 
     const importedRanges: Range[] = [];
 
     for (const dto of dtos) {
-      // Parent-Zuordnung (subnetId)
+      // Parent assignment (subnetId)
       const parentSubnet = dto.parent ? subnetMap.get(dto.parent) : undefined;
       if (!parentSubnet) {
         this.logger.warn(
           `No parent subnet found for Range ${dto.id} (parent: ${dto.parent}). Skipping.`,
         );
-        continue; // Parent muss da sein
+        continue;
       }
 
       let range = await this.rangeRepo.findOne({
@@ -84,72 +103,108 @@ export class CspRangeImportService {
       range.comment = dto.comment ?? null;
       range.subnet = parentSubnet;
       range.subnetId = parentSubnet.id;
-      // Defensive: inheritance_sources niemals als null speichern!
-      range.inheritance_sources = dto.inheritance_sources ?? undefined;
 
       await this.rangeRepo.save(range);
 
-      // DHCP-Optionen (neu anlegen, alte ggf. löschen)
-      if (Array.isArray(range.dhcpOptions)) {
-        await this.dhcpOptionRepo.delete({ rangeId: range.id });
-      }
+      // --- DHCP options (nur echte Optionen, keine Gruppen) ---
+      await this.dhcpOptionRepo.delete({ rangeId: range.id });
+
       if (Array.isArray(dto.dhcp_options) && dto.dhcp_options.length > 0) {
-        for (const opt of dto.dhcp_options) {
-          if (
+        const validOptions = dto.dhcp_options.filter(
+          (
+            opt,
+          ): opt is {
+            group?: string | null;
+            option_code: string;
+            option_value: string;
+            type: string;
+          } =>
+            !!opt &&
             typeof opt.option_code === 'string' &&
             typeof opt.option_value === 'string' &&
-            typeof opt.type === 'string'
-          ) {
-            const option = this.dhcpOptionRepo.create({
-              range,
-              rangeId: range.id,
-              group: typeof opt.group === 'string' ? opt.group : null,
-              option_code: opt.option_code,
-              option_value: opt.option_value,
-              type: opt.type,
-            });
-            await this.dhcpOptionRepo.save(option);
-          }
+            typeof opt.type === 'string' &&
+            opt.type !== 'group',
+        );
+        const dhcpOptionEntities = validOptions.map((opt) =>
+          this.dhcpOptionRepo.create({
+            ...mapDhcpOptionToEntity<RangeDhcpOption>(opt, optionCodeMap),
+            range,
+            rangeId: range.id,
+          }),
+        );
+        if (dhcpOptionEntities.length > 0) {
+          await this.dhcpOptionRepo.save(dhcpOptionEntities);
         }
       }
 
-      // OptionGroups (aus DHCP-Optionen herauslesen: alle unterschiedlichen group-Namen)
-      // Zuerst alle zugehörigen Gruppenverknüpfungen entfernen
+      // --- OptionGroups assignment via Utility ---
       await this.rangeOptionGroupRepo.delete({ rangeId: range.id });
 
-      // Gruppennamen aus dhcp_options extrahieren und eindeutige Namen bilden
-      const groupNames = Array.isArray(dto.dhcp_options)
-        ? Array.from(
-            new Set(
-              dto.dhcp_options
-                .map((o) => o.group)
-                .filter((g): g is string => !!g && typeof g === 'string'),
-            ),
-          )
+      // Map groupKeys for logging
+      let groupKeys = Array.isArray(dto.dhcp_options)
+        ? dto.dhcp_options
+            .map((opt) =>
+              typeof opt.group === 'string'
+                ? opt.group.trim().toLowerCase()
+                : null,
+            )
+            .filter((g): g is string => !!g)
         : [];
+      groupKeys = Array.from(new Set(groupKeys));
 
-      // Jede OptionGroup anhand Namen zuordnen (du könntest auch nach externalId mappen, wenn vorhanden)
-      for (const groupName of groupNames) {
-        const optionGroup = optionGroupByName.get(groupName);
-        if (optionGroup) {
-          const rog = this.rangeOptionGroupRepo.create({
+      const foundGroups = resolveOptionGroupsFromOptions(
+        dto.dhcp_options,
+        optionGroupMap,
+        null,
+      );
+
+      // (Optional) Logging: show first 3 resolutions
+      let resolveLog = '';
+      let logCount = 0;
+      for (const groupKey of groupKeys) {
+        const og =
+          optionGroupMap.get(groupKey) ||
+          optionGroupMap.get(groupKey.replace(/^dhcp\/option_group\//, '')) ||
+          Array.from(optionGroupMap.values()).find(
+            (g) =>
+              g.externalId?.trim().toLowerCase() === groupKey ||
+              g.name?.trim().toLowerCase() === groupKey,
+          );
+        if (logCount < 3) {
+          if (og) {
+            resolveLog += `  ✔ [${range.start} - ${range.end}] groupKey='${groupKey}' -> OptionGroup='${og.name}' (id=${og.id})\n`;
+          } else {
+            resolveLog += `  ✘ [${range.start} - ${range.end}] groupKey='${groupKey}' -> NOT FOUND\n`;
+          }
+        }
+        logCount++;
+      }
+      if (resolveLog) {
+        this.logger.log(
+          `[OptionGroup-Resolve] Range: ${range.start} - ${range.end} (id=${range.id})\n${resolveLog}${
+            logCount > 3 ? '  ...' : ''
+          }`,
+        );
+      }
+
+      for (const optionGroup of foundGroups) {
+        await this.rangeOptionGroupRepo.save(
+          this.rangeOptionGroupRepo.create({
             range,
             rangeId: range.id,
             optionGroup,
             optionGroupId: optionGroup.id,
-          });
-          await this.rangeOptionGroupRepo.save(rog);
-        } else {
-          this.logger.warn(
-            `OptionGroup "${groupName}" not found in DB for Range "${dto.id}". Skipping group link.`,
-          );
-        }
+          }),
+        );
+      }
+      if (foundGroups.length === 0 && groupKeys.length > 0) {
+        this.logger.warn(
+          `[NO_MATCH] Range '${range.start} - ${range.end}' (ID=${range.id}) - no OptionGroups found for: ${groupKeys.join(', ')}`,
+        );
       }
 
-      // Exclusion Ranges (neu anlegen, alte ggf. löschen)
-      if (Array.isArray(range.exclusionRanges)) {
-        await this.exclusionRepo.delete({ rangeId: range.id });
-      }
+      // --- Exclusion ranges ---
+      await this.exclusionRepo.delete({ rangeId: range.id });
       if (
         Array.isArray(dto.exclusion_ranges) &&
         dto.exclusion_ranges.length > 0
@@ -171,7 +226,9 @@ export class CspRangeImportService {
       importedRanges.push(range);
     }
 
-    this.logger.log(`Import complete: ${importedRanges.length} Ranges saved.`);
+    this.logger.log(
+      `Import complete: ${importedRanges.length} Ranges (including OptionGroups, DHCP options, and exclusions) saved.`,
+    );
     return importedRanges;
   }
 }

@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { Subnet } from './subnet.entity';
 import { OptionCodeEntity } from './option-code.entity';
+import { OptionSpace } from './option-space.entity';
 
 @Entity({ name: 'subnet_dhcp_option' })
 export class SubnetDhcpOption {
@@ -21,9 +22,6 @@ export class SubnetDhcpOption {
 
   @Column()
   subnetId: number;
-
-  @Column({ type: 'varchar', nullable: true })
-  group?: string | null;
 
   @Column()
   option_code: string;
@@ -40,4 +38,11 @@ export class SubnetDhcpOption {
 
   @Column({ nullable: true })
   optionCodeId?: number;
+
+  @ManyToOne(() => OptionSpace, { nullable: true })
+  @JoinColumn({ name: 'optionSpaceId' })
+  optionSpace?: OptionSpace | null;
+
+  @Column({ nullable: true })
+  optionSpaceId?: number | null;
 }

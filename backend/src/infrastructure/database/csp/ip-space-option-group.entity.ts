@@ -1,5 +1,3 @@
-// backend/src/infrastructure/database/csp/ip-space-option-group.entity.ts
-
 import {
   Entity,
   PrimaryGeneratedColumn,

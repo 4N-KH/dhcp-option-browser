@@ -60,7 +60,7 @@ const CspLoginFields: React.FC<Props> = ({
         <label className="block text-sm font-semibold uppercase tracking-wider text-[var(--foreground)] mb-1">
           API Key
         </label>
-        <div className="relative">
+        <div className="flex items-center w-full">
           <input
             {...register("apiKey")}
             ref={(e) => {
@@ -69,7 +69,7 @@ const CspLoginFields: React.FC<Props> = ({
             }}
             type={showApiKey ? "text" : "password"}
             autoComplete="off"
-            className="mt-1 w-full px-5 py-3 rounded-xl border border-[var(--border)] backdrop-blur-sm bg-[var(--accent-light)]/95 text-[var(--foreground)] placeholder-gray-300 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-3 focus:ring-offset-[var(--background)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_20px_rgba(0,0,0,0.15)] transition duration-300 ease-in-out"
+            className="flex-1 mt-1 px-5 py-3 rounded-xl border border-[var(--border)] backdrop-blur-sm bg-[var(--accent-light)]/95 text-[var(--foreground)] placeholder-gray-300 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-3 focus:ring-offset-[var(--background)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_20px_rgba(0,0,0,0.15)] transition duration-300 ease-in-out"
             placeholder="Enter your API key"
           />
           {apiKeyValue.length > 0 && (

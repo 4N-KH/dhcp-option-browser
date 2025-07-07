@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { Range } from './range.entity';
 import { OptionCodeEntity } from './option-code.entity';
+import { OptionSpace } from './option-space.entity';
 
 @Entity({ name: 'range_dhcp_option' })
 export class RangeDhcpOption {
@@ -19,9 +20,6 @@ export class RangeDhcpOption {
 
   @Column()
   rangeId: number;
-
-  @Column({ type: 'varchar', nullable: true })
-  group?: string | null;
 
   @Column()
   option_code: string;
@@ -38,4 +36,11 @@ export class RangeDhcpOption {
 
   @Column({ nullable: true })
   optionCodeId?: number;
+
+  @ManyToOne(() => OptionSpace, { nullable: true })
+  @JoinColumn({ name: 'optionSpaceId' })
+  optionSpace?: OptionSpace | null;
+
+  @Column({ nullable: true })
+  optionSpaceId?: number | null;
 }

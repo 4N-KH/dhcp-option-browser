@@ -1,14 +1,6 @@
 import { z } from 'zod';
+import { DhcpOptionSchema } from './dhcp-option.zod';
 
-// Zentrales Schema für DHCP-Optionen (zentral anlegen und überall verwenden!)
-export const DhcpOptionSchema = z.object({
-  group: z.string().nullable().optional(),
-  option_code: z.string().nullable(),
-  option_value: z.string().nullable(),
-  type: z.string().nullable(),
-});
-
-// 1. Address Block
 export const CspAddressBlockSchema = z.object({
   id: z.string(),
   name: z.string(),

@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { IpSpaceDhcpOption } from './ip-space-dhcp-option.entity';
 import { IpSpaceOptionGroup } from './ip-space-option-group.entity';
+import { AddressBlock } from './adress-block.entity';
 
 @Entity({ name: 'ip_space' })
 export class IpSpace {
@@ -27,13 +28,6 @@ export class IpSpace {
   })
   optionGroups: IpSpaceOptionGroup[];
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
-
-  @Column({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt: Date;
+  @OneToMany(() => AddressBlock, (block) => block.ipSpace)
+  addressBlocks: AddressBlock[];
 }

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// Einzelnes DHCP-Option-Objekt in der Gruppe
 export const DhcpOptionSchema = z.object({
   group: z.string().nullable().optional(),
   option_code: z.string(),

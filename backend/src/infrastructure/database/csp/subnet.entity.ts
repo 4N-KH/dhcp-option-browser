@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { IpSpace } from './ip-space.entity';
+import { AddressBlock } from './adress-block.entity';
 import { SubnetDhcpOption } from './subnet-dhcp-option.entity';
 import { SubnetOptionGroup } from './subnet-option-group.entity';
 
@@ -27,19 +28,15 @@ export class Subnet {
   @Column()
   cidr: number;
 
-  @ManyToOne(() => Subnet, (subnet) => subnet.children, {
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  @JoinColumn({ name: 'parentId' })
-  parent?: Subnet;
+  // ---- NEU: AddressBlock als Parent-Ebene ----
+  @ManyToOne(() => AddressBlock, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'addressBlockId' })
+  addressBlock?: AddressBlock;
 
   @Column({ nullable: true })
-  parentId?: number;
+  addressBlockId?: number;
 
-  @OneToMany(() => Subnet, (subnet) => subnet.parent)
-  children: Subnet[];
-
+  // ---- IpSpace als Parent-Ebene (wenn kein AddressBlock) ----
   @ManyToOne(() => IpSpace, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'spaceId' })
   space?: IpSpace;
@@ -55,14 +52,4 @@ export class Subnet {
 
   @OneToMany(() => SubnetOptionGroup, (sog) => sog.subnet, { cascade: true })
   optionGroups: SubnetOptionGroup[];
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
-
-  @Column({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt: Date;
 }

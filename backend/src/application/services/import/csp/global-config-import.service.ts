@@ -8,7 +8,15 @@ import { DhcpGlobalConfigOption } from '@/infrastructure/database/csp/global-con
 import { DhcpGlobalConfigOptionGroup } from '@/infrastructure/database/csp/global-config-option-group.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
+import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
+
+import {
+  buildOptionCodeMap,
+  mapDhcpOptionToEntity,
+} from '@/shared/utils/dhcp-option-mapper.util';
+
+import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
 @Injectable()
 export class CspGlobalConfigImportService {
@@ -26,168 +34,121 @@ export class CspGlobalConfigImportService {
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
     @InjectRepository(OptionGroup)
     private readonly optionGroupRepo: Repository<OptionGroup>,
+    @InjectRepository(OptionSpace)
+    private readonly optionSpaceRepo: Repository<OptionSpace>,
   ) {}
 
-  async importGlobalDhcpConfig(): Promise<DhcpGlobalConfig> {
+  async importGlobalDhcpConfig(): Promise<DhcpGlobalConfig | null> {
     this.logger.log('Importing global DHCPv4 configuration from CSP...');
     const rawGlobalConfig = await this.cspDataClient.fetchGlobalDhcpConfig();
 
-    this.logger.verbose(`Received from CSP: ${JSON.stringify(rawGlobalConfig, null, 2)}`);
+    this.logger.verbose(
+      `Received from CSP: ${JSON.stringify(rawGlobalConfig, null, 2)}`,
+    );
 
-    // Fehler nur wenn komplett kein Objekt geliefert wird
-    if (!rawGlobalConfig || typeof rawGlobalConfig !== 'object') {
-      this.logger.error(
-        'Global DHCP Config konnte nicht geladen werden – keine gültigen Daten empfangen.',
-      );
-      throw new Error(
-        'Global DHCP Config konnte nicht geladen werden – keine gültigen Daten empfangen.',
-      );
-    }
+    // If empty, delete everything
+    const isEmpty =
+      !rawGlobalConfig ||
+      typeof rawGlobalConfig !== 'object' ||
+      ((!Array.isArray(rawGlobalConfig.dhcp_options) ||
+        rawGlobalConfig.dhcp_options.length === 0) &&
+        (!rawGlobalConfig.comment ||
+          rawGlobalConfig.comment === null ||
+          rawGlobalConfig.comment === ''));
 
-    // Logging der Struktur und "Edge Cases"
-    if (!('dhcp_options' in rawGlobalConfig)) {
-      this.logger.warn(
-        'Achtung: Feld "dhcp_options" fehlt komplett im CSP-Objekt – wird als [] behandelt!',
-      );
-    }
-    if (
-      !rawGlobalConfig.dhcp_options ||
-      !Array.isArray(rawGlobalConfig.dhcp_options)
-    ) {
+    if (isEmpty) {
       this.logger.log(
-        `Feld "dhcp_options" ist ${typeof rawGlobalConfig.dhcp_options} – setze als leeres Array.`,
+        'No global options and no comment – nothing to store as central configuration.',
       );
-    } else if (rawGlobalConfig.dhcp_options.length === 0) {
-      this.logger.log(
-        'Feld "dhcp_options" ist leer – keine globalen Optionen gesetzt.',
-      );
-    } else {
-      this.logger.log(
-        `Feld "dhcp_options" mit ${rawGlobalConfig.dhcp_options.length} Einträgen empfangen.`,
-      );
+      // Delete all config data (and relations)
+      const configs = await this.globalConfigRepo.find();
+      for (const config of configs) {
+        await this.globalConfigOptionRepo.delete({ globalConfigId: config.id });
+        await this.globalConfigOptionGroupRepo.delete({
+          globalConfigId: config.id,
+        });
+        await this.globalConfigRepo.delete(config.id);
+      }
+      return null;
     }
 
-    if ('comment' in rawGlobalConfig) {
-      this.logger.log(`GlobalConfig-Comment: "${rawGlobalConfig.comment}"`);
-    }
-
-    // FK-sichere Löschung: Vorherige zentrale Konfig + Relations entfernen
+    // Remove any previous config (and relations)
     const existing = await this.globalConfigRepo.findOne({
       relations: ['dhcpOptions', 'optionGroups'],
-      where: {}, // Falls du mehrere configs haben solltest, hier ggf. auf eindeutige Criteria einschränken
+      where: {},
     });
     if (existing) {
-      this.logger.log(
-        'Vorherige zentrale Konfiguration gefunden – wird gelöscht.',
-      );
       await this.globalConfigOptionRepo.delete({ globalConfigId: existing.id });
       await this.globalConfigOptionGroupRepo.delete({
         globalConfigId: existing.id,
       });
       await this.globalConfigRepo.delete(existing.id);
-    } else {
-      this.logger.log('Keine vorherige zentrale Konfiguration vorhanden.');
     }
 
-    // Optionen normalisieren (leere Arrays werden korrekt akzeptiert)
-    const normalizedDhcpOptions = normalizeDhcpOptions(
+    // Normalise DHCP options
+    const normalisedDhcpOptions = normalizeDhcpOptions(
       Array.isArray(rawGlobalConfig.dhcp_options)
         ? rawGlobalConfig.dhcp_options
         : [],
     );
-    this.logger.log(
-      `Normalisierte Optionen: ${normalizedDhcpOptions.length} (werden gleich gespeichert)`,
+
+    // Split in echte Optionen und Gruppen
+    const realOptions = normalisedDhcpOptions.filter(
+      (opt) => opt.type !== 'group',
     );
 
-    // OptionGroups extrahieren (nur, wenn Gruppen vorkommen)
-    const groupNames = new Set<string>();
-    for (const opt of normalizedDhcpOptions) {
-      if (
-        opt.group &&
-        typeof opt.group === 'string' &&
-        opt.group.trim() !== ''
-      ) {
-        groupNames.add(opt.group);
-      }
-    }
-    if (groupNames.size > 0) {
-      this.logger.log(
-        `Gefundene Gruppen in Optionen: ${Array.from(groupNames).join(', ')}`,
-      );
-    } else {
-      this.logger.log('Keine OptionGroups in Optionen gefunden.');
-    }
-
-    // OptionGroup-Mapping (Name und/oder externalId)
-    const allOptionGroups = await this.optionGroupRepo.find();
-    const groupMap = new Map<string, OptionGroup>();
-    for (const og of allOptionGroups) {
-      if (og.name) groupMap.set(og.name, og);
-      if (og.externalId) groupMap.set(og.externalId, og);
-    }
-    this.logger.debug(
-      `Loaded ${allOptionGroups.length} OptionGroups aus DB für Mapping.`,
-    );
-
-    // Neue globale Konfiguration (egal ob Optionen vorhanden oder nicht)
+    // Create new config
     const globalConfig = this.globalConfigRepo.create({
       comment: rawGlobalConfig?.comment ?? null,
     });
     await this.globalConfigRepo.save(globalConfig);
-    this.logger.log(
-      `Neue zentrale Konfiguration in DB erzeugt (id=${globalConfig.id}).`,
+
+    // Build OptionCode map
+    const optionCodeMap = buildOptionCodeMap(
+      await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
     );
 
-    // OptionCodes map
-    const allOptionCodes = await this.optionCodeRepo.find();
-    const codeMap = new Map<string, OptionCodeEntity>();
-    for (const oc of allOptionCodes) codeMap.set(String(oc.code), oc);
-
-    // Einzeloptionen anlegen (ggf. keine!)
-    let savedOptions = 0;
-    for (const opt of normalizedDhcpOptions) {
-      const optionCodeEntity = codeMap.get(String(opt.option_code));
-      const optEntity = this.globalConfigOptionRepo.create({
-        globalConfig,
-        globalConfigId: globalConfig.id,
-        group: opt.group ?? null,
-        option_code: opt.option_code,
-        option_value: opt.option_value,
-        type: opt.type,
-        optionCode: optionCodeEntity ?? null,
-        optionCodeId: optionCodeEntity?.id ?? null,
-      });
-      await this.globalConfigOptionRepo.save(optEntity);
-      savedOptions++;
+    // Save all DHCP options (only non-group!)
+    if (realOptions.length > 0) {
+      const dhcpOptionEntities = realOptions.map((opt) =>
+        this.globalConfigOptionRepo.create({
+          globalConfig,
+          globalConfigId: globalConfig.id,
+          ...mapDhcpOptionToEntity<DhcpGlobalConfigOption>(opt, optionCodeMap),
+        }),
+      );
+      await this.globalConfigOptionRepo.save(dhcpOptionEntities);
     }
-    this.logger.log(
-      `${savedOptions} Optionen für zentrale Konfiguration gespeichert.`,
-    );
 
-    // OptionGroups zuordnen (kann auch 0 sein)
-    let savedGroups = 0;
-    for (const groupName of groupNames) {
-      const optionGroup = groupMap.get(groupName);
-      if (optionGroup) {
-        const gcog = this.globalConfigOptionGroupRepo.create({
+    // OptionGroup map (by externalId, name, id)
+    const optionGroupMap = new Map<string, OptionGroup>();
+    for (const og of await this.optionGroupRepo.find()) {
+      if (!og) continue;
+      if (og.externalId)
+        optionGroupMap.set(og.externalId.trim().toLowerCase(), og);
+      if (og.name) optionGroupMap.set(og.name.trim().toLowerCase(), og);
+      if (og.id) optionGroupMap.set(String(og.id), og);
+    }
+
+    // Assign OptionGroups via utility (aus ALLEN Optionen, nicht nur den echten!)
+    const foundGroups = resolveOptionGroupsFromOptions(
+      normalisedDhcpOptions,
+      optionGroupMap,
+      null,
+    );
+    if (foundGroups.length > 0) {
+      const gcogEntities = foundGroups.map((optionGroup) =>
+        this.globalConfigOptionGroupRepo.create({
           globalConfig,
           globalConfigId: globalConfig.id,
           optionGroup,
           optionGroupId: optionGroup.id,
-        });
-        await this.globalConfigOptionGroupRepo.save(gcog);
-        savedGroups++;
-      } else {
-        this.logger.warn(
-          `OptionGroup "${groupName}" aus globaler Konfiguration nicht in DB gefunden.`,
-        );
-      }
+        }),
+      );
+      await this.globalConfigOptionGroupRepo.save(gcogEntities);
     }
-    this.logger.log(
-      `${savedGroups} OptionGroups für zentrale Konfiguration gespeichert.`,
-    );
 
-    // Mit allen Relationen neu laden (liefert immer EINE zentrale Konfiguration)
+    // Return result (with eager relations)
     const result = await this.globalConfigRepo.findOneOrFail({
       where: { id: globalConfig.id },
       relations: ['dhcpOptions', 'optionGroups', 'optionGroups.optionGroup'],

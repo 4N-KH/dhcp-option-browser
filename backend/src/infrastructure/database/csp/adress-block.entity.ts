@@ -6,6 +6,7 @@ import {
   OneToMany,
   JoinColumn,
 } from 'typeorm';
+import { IpSpace } from './ip-space.entity';
 import { AddressBlockDhcpOption } from './address-block-dhcp-option.entity';
 import { AddressBlockOptionGroup } from './address-block-option-group.entity';
 
@@ -29,6 +30,13 @@ export class AddressBlock {
   @Column({ type: 'text', nullable: true })
   comment?: string | null;
 
+  @ManyToOne(() => IpSpace, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'ipSpaceId' })
+  ipSpace?: IpSpace;
+
+  @Column({ nullable: true })
+  ipSpaceId?: number;
+
   @ManyToOne(() => AddressBlock, (block) => block.children, {
     nullable: true,
     onDelete: 'SET NULL',
@@ -50,14 +58,4 @@ export class AddressBlock {
 
   @OneToMany(() => AddressBlockOptionGroup, (abog) => abog.addressBlock)
   optionGroups: AddressBlockOptionGroup[];
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
-
-  @Column({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt: Date;
 }

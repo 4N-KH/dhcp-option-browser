@@ -7,7 +7,9 @@ import * as crypto from 'crypto';
 function getEncryptionKey(): Buffer {
   const secret = process.env.CREDENTIAL_SECRET;
   if (!secret) {
-    throw new Error('[credential-encryptor] CREDENTIAL_SECRET is not set in environment!');
+    throw new Error(
+      '[credential-encryptor] CREDENTIAL_SECRET is not set in environment!',
+    );
   }
   // Always expect a hex string for maximal entropy
   return Buffer.from(secret, 'hex');
@@ -18,8 +20,8 @@ const IV_LENGTH = 12; // GCM standard for secure nonces
 
 export interface EncryptedPayload {
   encrypted: string; // Hex-encoded encrypted data
-  iv: string;        // Hex-encoded initialisation vector (nonce)
-  tag: string;       // Hex-encoded authentication tag
+  iv: string; // Hex-encoded initialisation vector (nonce)
+  tag: string; // Hex-encoded authentication tag
 }
 
 /**
@@ -30,7 +32,10 @@ export function encrypt(plaintext: string): EncryptedPayload {
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, 'utf8'),
+    cipher.final(),
+  ]);
   const tag = cipher.getAuthTag();
   return {
     encrypted: encrypted.toString('hex'),

@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { AddressBlock } from './adress-block.entity';
 import { OptionCodeEntity } from './option-code.entity';
+import { OptionSpace } from './option-space.entity';
 
 @Entity({ name: 'address_block_dhcp_option' })
 export class AddressBlockDhcpOption {
@@ -21,9 +22,6 @@ export class AddressBlockDhcpOption {
 
   @Column()
   addressBlockId: number;
-
-  @Column({ type: 'varchar', nullable: true })
-  group?: string | null;
 
   @Column()
   option_code: string;
@@ -40,4 +38,11 @@ export class AddressBlockDhcpOption {
 
   @Column({ nullable: true })
   optionCodeId?: number;
+
+  @ManyToOne(() => OptionSpace, { nullable: true })
+  @JoinColumn({ name: 'optionSpaceId' })
+  optionSpace?: OptionSpace;
+
+  @Column({ nullable: true })
+  optionSpaceId?: number;
 }

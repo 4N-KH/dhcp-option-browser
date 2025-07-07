@@ -1,10 +1,5 @@
-// backend/src/shared/parser/normalize-address-block-dtos.ts
-
 import { CspAddressBlockDto } from '@/domain/dto/csp/address-block.dto';
 
-/**
- * Filtert und normalisiert AddressBlock-Daten für CSP (maximale Typ-Sicherheit vor Zod).
- */
 export function normalizeAddressBlockDtos(
   input: unknown,
 ): CspAddressBlockDto[] {
@@ -25,17 +20,19 @@ export function normalizeAddressBlockDtos(
             type: string;
           } =>
             !!opt &&
-            typeof opt.option_code === 'string' &&
-            typeof opt.option_value === 'string' &&
-            typeof opt.type === 'string' &&
-            (typeof opt.group === 'string' ||
-              typeof opt.group === 'undefined' ||
-              opt.group === null),
+            // Normale Option
+            ((typeof opt.option_code === 'string' &&
+              typeof opt.option_value === 'string' &&
+              typeof opt.type === 'string') ||
+              // Group-Referenz: group gesetzt UND type ist "group"
+              (opt.type === 'group' && typeof opt.group === 'string')),
         )
         .map((opt) => ({
           group: opt.group ?? undefined,
-          option_code: opt.option_code,
-          option_value: opt.option_value,
+          option_code:
+            typeof opt.option_code === 'string' ? opt.option_code : '',
+          option_value:
+            typeof opt.option_value === 'string' ? opt.option_value : '',
           type: opt.type,
         }));
     }

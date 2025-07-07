@@ -9,7 +9,7 @@ import {
 import { Subnet } from './subnet.entity';
 import { RangeDhcpOption } from './range-dhcp-option.entity';
 import { RangeExclusion } from './range-exclusion.entity';
-import { RangeOptionGroup } from './range-option-group.entity'; // NEU: Import
+import { RangeOptionGroup } from './range-option-group.entity';
 
 @Entity({ name: 'range' })
 export class Range {
@@ -44,20 +44,6 @@ export class Range {
   @OneToMany(() => RangeExclusion, (ex) => ex.range, { cascade: true })
   exclusionRanges: RangeExclusion[];
 
-  // NEU: OptionGroups für diesen Range
   @OneToMany(() => RangeOptionGroup, (rog) => rog.range)
   optionGroups: RangeOptionGroup[];
-
-  @Column({ type: 'jsonb', nullable: true })
-  inheritance_sources?: Record<string, any>;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
-
-  @Column({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt: Date;
 }

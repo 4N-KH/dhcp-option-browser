@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { IpSpace } from './ip-space.entity';
 import { OptionCodeEntity } from './option-code.entity';
+import { OptionSpace } from './option-space.entity';
 
 @Entity({ name: 'ip_space_dhcp_option' })
 export class IpSpaceDhcpOption {
@@ -22,17 +23,14 @@ export class IpSpaceDhcpOption {
   @Column()
   ipSpaceId: number;
 
-  @Column({ type: 'varchar', nullable: true }) // <- HIER ÄNDERN!
-  group?: string | null;
-
   @Column()
   option_code: string;
 
   @Column()
   option_value: string;
 
-  @Column()
-  type: string;
+  @Column({ type: 'varchar', nullable: true })
+  type?: string | null;
 
   @ManyToOne(() => OptionCodeEntity, { nullable: true })
   @JoinColumn({ name: 'optionCodeId' })
@@ -40,4 +38,11 @@ export class IpSpaceDhcpOption {
 
   @Column({ nullable: true })
   optionCodeId?: number;
+
+  @ManyToOne(() => OptionSpace, { nullable: true })
+  @JoinColumn({ name: 'optionSpaceId' })
+  optionSpace?: OptionSpace;
+
+  @Column({ nullable: true })
+  optionSpaceId?: number;
 }

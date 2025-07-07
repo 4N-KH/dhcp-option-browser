@@ -9,7 +9,7 @@ export default function Page() {
 
   const handleLogin = (dto: AuthCredentialDto, remember: boolean) => {
     console.log("LOGIN OK", dto, remember);
-    router.push("/overview"); // Weiterleitung nach erfolgreichem Login
+    router.push("/overview");
   };
 
   return <LoginPage onLogin={handleLogin} />;

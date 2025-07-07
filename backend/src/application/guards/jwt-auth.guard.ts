@@ -44,7 +44,10 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     // Payload is now strictly typed and safe
-    req.user = { id: (payload as JwtPayload).id, region: (payload as JwtPayload).region };
+    req.user = {
+      id: payload.id,
+      region: payload.region,
+    };
     return true;
   }
 }

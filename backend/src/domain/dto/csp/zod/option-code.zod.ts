@@ -8,7 +8,6 @@ export const CspOptionCodeSchema = z.object({
   option_space: z.string().nullable().optional(),
   comment: z.string().nullable().optional(),
 
-  // Neu
   source: z.string().nullable().optional(),
   array: z.boolean().nullable().optional(),
 

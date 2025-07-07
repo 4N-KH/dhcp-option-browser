@@ -3,12 +3,13 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  OneToMany,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
-import { IpSpace } from './ip-space.entity';
 import { Subnet } from './subnet.entity';
+import { Range } from './range.entity';
 import { FixedDhcpOption } from './fixed-dhcp-option.entity';
+import { FixedAddressOptionGroup } from './fixed-address-option-group.entity';
 
 @Entity({ name: 'fixed_address' })
 export class FixedAddress {
@@ -24,12 +25,19 @@ export class FixedAddress {
   @Column()
   address: string;
 
-  @ManyToOne(() => IpSpace, { nullable: false })
-  @JoinColumn({ name: 'ipSpaceId' })
-  ipSpace: IpSpace;
+  @ManyToOne(() => Subnet, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'subnetId' })
+  subnet?: Subnet;
 
-  @Column()
-  ipSpaceId: number;
+  @Column({ nullable: true })
+  subnetId?: number | null;
+
+  @ManyToOne(() => Range, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'rangeId' })
+  range?: Range;
+
+  @Column({ nullable: true })
+  rangeId?: number | null;
 
   @Column()
   match_type: string;
@@ -37,31 +45,16 @@ export class FixedAddress {
   @Column()
   match_value: string;
 
-  @Column({ nullable: true, type: 'text' })
+  @Column({ type: 'text', nullable: true })
   comment?: string | null;
-
-  @ManyToOne(() => Subnet, { nullable: true })
-  @JoinColumn({ name: 'parentId' })
-  parent?: Subnet;
-
-  @Column({ nullable: true })
-  parentId?: number;
 
   @OneToMany(() => FixedDhcpOption, (opt) => opt.fixedAddress, {
     cascade: true,
   })
   dhcpOptions: FixedDhcpOption[];
 
-  @Column({ type: 'jsonb', nullable: true })
-  inheritance_sources?: Record<string, any>;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
-
-  @Column({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
+  @OneToMany(() => FixedAddressOptionGroup, (faog) => faog.fixedAddress, {
+    cascade: true,
   })
-  updatedAt: Date;
+  optionGroups: FixedAddressOptionGroup[];
 }

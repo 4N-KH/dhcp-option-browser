@@ -32,6 +32,7 @@ import { CspFullImportController } from './controller/csp-full-import.controller
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspSubnetImportService } from './application/services/import/csp/subnet-import.service';
 import { CspOptionGroupImportService } from './application/services/import/csp/option-group-import.service';
+import { CspOptionGroupDhcpOptionImportService } from './application/services/import/csp/option-group-dhcp-option-import.service';
 import { CspIpSpaceImportService } from './application/services/import/csp/ip-space-import.service';
 import { CspAddressBlockImportService } from './application/services/import/csp/address-block-import.service';
 import { CspRangeImportService } from './application/services/import/csp/range-import.service';
@@ -52,9 +53,10 @@ import { DhcpGlobalConfigOption } from './infrastructure/database/csp/global-con
 import { DhcpGlobalConfigOptionGroup } from './infrastructure/database/csp/global-config-option-group.entity';
 import { FixedAddress } from './infrastructure/database/csp/fixed-address.entity';
 import { FixedDhcpOption } from './infrastructure/database/csp/fixed-dhcp-option.entity';
+import { FixedAddressOptionGroup } from './infrastructure/database/csp/fixed-address-option-group.entity'; // NEU!
 import { IpSpace } from './infrastructure/database/csp/ip-space.entity';
 import { IpSpaceDhcpOption } from './infrastructure/database/csp/ip-space-dhcp-option.entity';
-import { IpSpaceOptionGroup } from './infrastructure/database/csp/ip-space-option-group.entity'; // NEU: für OptionGroup-Zuordnung an IpSpace!
+import { IpSpaceOptionGroup } from './infrastructure/database/csp/ip-space-option-group.entity';
 import { OptionCodeEntity } from './infrastructure/database/csp/option-code.entity';
 import { OptionFilter } from './infrastructure/database/csp/option-filter.entity';
 import { OptionGroup } from './infrastructure/database/csp/option-group.entity';
@@ -81,40 +83,32 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       entities: [
-        // User/Auth
         CspCredentialEntity,
         UserEntity,
-        // Address Block
         AddressBlock,
         AddressBlockDhcpOption,
         AddressBlockOptionGroup,
-        // Subnet
         Subnet,
         SubnetDhcpOption,
         SubnetOptionGroup,
-        // Range
         Range,
         RangeDhcpOption,
         RangeExclusion,
         RangeOptionGroup,
-        // Option Group
         OptionGroup,
         OptionGroupDhcpOption,
-        // Option Code, Space, Filter
         OptionCodeEntity,
         OptionSpace,
         OptionFilter,
-        // IpSpace
         IpSpace,
         IpSpaceDhcpOption,
         IpSpaceOptionGroup,
-        // DHCP Global Config
         DhcpGlobalConfig,
         DhcpGlobalConfigOption,
         DhcpGlobalConfigOptionGroup,
-        // Fixed Address
         FixedAddress,
         FixedDhcpOption,
+        FixedAddressOptionGroup,
       ],
       synchronize: true,
     }),
@@ -144,6 +138,7 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
       DhcpGlobalConfigOptionGroup,
       FixedAddress,
       FixedDhcpOption,
+      FixedAddressOptionGroup,
     ]),
   ],
   controllers: [
@@ -153,6 +148,7 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CredentialsCspController,
     AuthController,
     CspFullImportController,
+    // OptionHierarchyController, // For future use
   ],
   providers: [
     CredentialCspService,
@@ -167,6 +163,7 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     DhcpCspImportOrchestratorService,
     CspSubnetImportService,
     CspOptionGroupImportService,
+    CspOptionGroupDhcpOptionImportService,
     CspIpSpaceImportService,
     CspAddressBlockImportService,
     CspRangeImportService,
@@ -176,6 +173,12 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CspOptionCodeImportService,
     CspOptionSpaceImportService,
     CspOptionFilterImportService,
+    // OptionAggregationService,
+    // ResolveEffectiveOptionsUseCase,
+    /**{
+      provide: OPTION_HIERARCHY_REPOSITORY,
+      useClass: OptionHierarchyRepositoryImpl,
+    },*/
   ],
 })
 export class AppModule {}

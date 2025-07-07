@@ -1,5 +1,3 @@
-// src/domain/dto/csp/zod/option-filter.zod.ts
-
 import { z } from 'zod';
 
 export const CspOptionFilterSchema = z.object({
@@ -16,7 +14,6 @@ export const CspOptionFilterSchema = z.object({
   header_option_server_name: z.string().nullable().optional(),
   vendor_specific_option_option_space: z.string().nullable().optional(),
 
-  // DHCP-Optionen als Array von Objekten
   dhcp_options: z
     .array(
       z.object({
@@ -28,7 +25,6 @@ export const CspOptionFilterSchema = z.object({
     )
     .optional(),
 
-  // Rules-Objekt mit rules-Array
   rules: z
     .object({
       match: z.string(),
@@ -43,7 +39,6 @@ export const CspOptionFilterSchema = z.object({
     })
     .optional(),
 
-  // Tags als beliebiges Record (API liefert "{}" oder leeres Objekt)
   tags: z.record(z.unknown()).optional(),
 });
 

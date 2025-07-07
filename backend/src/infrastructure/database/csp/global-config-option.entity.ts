@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { DhcpGlobalConfig } from './global-config.entity';
 import { OptionCodeEntity } from './option-code.entity';
+import { OptionSpace } from './option-space.entity';
 
 @Entity({ name: 'dhcp_global_config_option' })
 export class DhcpGlobalConfigOption {
@@ -21,9 +22,6 @@ export class DhcpGlobalConfigOption {
 
   @Column()
   globalConfigId: number;
-
-  @Column({ type: 'varchar', nullable: true })
-  group?: string | null;
 
   @Column()
   option_code: string;
@@ -40,4 +38,11 @@ export class DhcpGlobalConfigOption {
 
   @Column({ nullable: true })
   optionCodeId?: number | null;
+
+  @ManyToOne(() => OptionSpace, { nullable: true })
+  @JoinColumn({ name: 'optionSpaceId' })
+  optionSpace?: OptionSpace | null;
+
+  @Column({ nullable: true })
+  optionSpaceId?: number | null;
 }
