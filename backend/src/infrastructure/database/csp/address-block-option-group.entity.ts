@@ -5,7 +5,7 @@ import {
   JoinColumn,
   Column,
 } from 'typeorm';
-import { AddressBlock } from './adress-block.entity';
+import { AddressBlock } from './address-block.entity';
 import { OptionGroup } from './option-group.entity';
 
 @Entity({ name: 'address_block_option_group' })

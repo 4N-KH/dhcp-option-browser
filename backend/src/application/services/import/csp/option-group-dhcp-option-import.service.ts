@@ -1,5 +1,3 @@
-// backend/src/application/services/import/csp/option-group-dhcp-option-import.service.ts
-
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,6 +7,11 @@ import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionGroupDhcpOption } from '@/infrastructure/database/csp/option-group-dhcp-option.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
+
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
 
 @Injectable()
 export class CspOptionGroupDhcpOptionImportService {
@@ -28,9 +31,23 @@ export class CspOptionGroupDhcpOptionImportService {
     private readonly optionSpaceRepo: Repository<OptionSpace>,
   ) {}
 
-  async importOptionGroupDhcpOptions(): Promise<void> {
+  /**
+   * Imports all OptionGroupDhcpOption assignments from CSP,
+   * links codes and spaces, avoids duplicates, and is interrupt/progress capable.
+   */
+  async importOptionGroupDhcpOptions(
+    opts?: InterruptibleImportOptions,
+  ): Promise<void> {
     this.logger.log('Importiere OptionGroupDhcpOption-Zuordnungen aus CSP...');
 
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('OptionGroupDhcpOption import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    checkCancel();
     const groups = await this.cspDataClient.fetchOptionGroups();
     const allCodes = await this.optionCodeRepo.find({
       relations: ['optionSpace'],
@@ -39,9 +56,20 @@ export class CspOptionGroupDhcpOptionImportService {
       allCodes.map((code) => [code.externalId, code]),
     );
 
+    // Gesamtprogress = Summe aller group.dhcp_options-Elemente
+    const total = groups.reduce(
+      (acc, group) => acc + (group.dhcp_options?.length || 0),
+      0,
+    );
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
+
     let created = 0,
       skipped = 0;
+
     for (const group of groups) {
+      checkCancel();
+
       if (!group.dhcp_options?.length) continue;
 
       const groupEntity = await this.optionGroupRepo.findOne({
@@ -51,10 +79,14 @@ export class CspOptionGroupDhcpOptionImportService {
         this.logger.warn(
           `OptionGroup mit externalId=${group.id} nicht in DB gefunden – überspringe.`,
         );
+        progress += group.dhcp_options.length;
+        report();
         continue;
       }
 
       for (const opt of group.dhcp_options) {
+        checkCancel();
+
         const codeEntity = codeMap.get(opt.option_code);
         const optionSpaceRef = codeEntity?.optionSpace ?? undefined;
         const optionSpaceId = optionSpaceRef?.id ?? undefined;
@@ -64,6 +96,8 @@ export class CspOptionGroupDhcpOptionImportService {
             `OptionCode mit externalId=${opt.option_code} nicht gefunden – überspringe.`,
           );
           skipped++;
+          progress++;
+          report();
           continue;
         }
 
@@ -89,6 +123,8 @@ export class CspOptionGroupDhcpOptionImportService {
           await this.ogdoRepo.save(entity);
           created++;
         }
+        progress++;
+        report();
       }
     }
 

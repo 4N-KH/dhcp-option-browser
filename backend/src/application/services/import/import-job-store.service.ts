@@ -1,3 +1,4 @@
+// src/application/services/import/import-job-store.service.ts
 import { Injectable } from '@nestjs/common';
 import {
   ImportJobState,
@@ -18,12 +19,22 @@ export class ImportJobStoreService {
     this.jobs.set(id, job);
     return job;
   }
+
   getJob(id: string) {
     return this.jobs.get(id);
   }
+
   updateJob(id: string, data: Partial<ImportJobState>) {
     const job = this.jobs.get(id);
     if (!job) return;
     this.jobs.set(id, { ...job, ...data });
+  }
+
+  markCancelled(id: string) {
+    this.updateJob(id, { status: ImportJobStatus.CANCELLED });
+  }
+
+  getAllJobs() {
+    return Array.from(this.jobs.values());
   }
 }

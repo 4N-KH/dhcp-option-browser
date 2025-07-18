@@ -1,10 +1,14 @@
-// backend/src/application/services/import/csp/option-space-import.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
+
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
 
 @Injectable()
 export class CspOptionSpaceImportService {
@@ -19,9 +23,20 @@ export class CspOptionSpaceImportService {
   /**
    * Imports all Option Spaces from CSP and persists them in the database.
    * Updates existing records where applicable.
+   * Interrupt- und progress-fähig!
    */
-  async importOptionSpaces(): Promise<OptionSpace[]> {
+  async importOptionSpaces(
+    opts?: InterruptibleImportOptions,
+  ): Promise<OptionSpace[]> {
     this.logger.log('Commencing import of DHCP Option Spaces from CSP...');
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('OptionSpace import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    checkCancel();
     const spaces = await this.cspDataClient.fetchOptionSpaces();
 
     if (!spaces?.length) {
@@ -30,7 +45,12 @@ export class CspOptionSpaceImportService {
     }
 
     const importedEntities: OptionSpace[] = [];
+    const total = spaces.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
+
     for (const dto of spaces) {
+      checkCancel();
       let entity = await this.optionSpaceRepo.findOne({
         where: { externalId: dto.id },
       });
@@ -45,6 +65,9 @@ export class CspOptionSpaceImportService {
 
       await this.optionSpaceRepo.save(entity);
       importedEntities.push(entity);
+
+      progress++;
+      report();
     }
     this.logger.log(
       `Import complete: ${importedEntities.length} Option Spaces have been saved.`,

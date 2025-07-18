@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { IpSpaceDhcpOption } from './ip-space-dhcp-option.entity';
 import { IpSpaceOptionGroup } from './ip-space-option-group.entity';
-import { AddressBlock } from './adress-block.entity';
+import { AddressBlock } from './address-block.entity';
 
 @Entity({ name: 'ip_space' })
 export class IpSpace {

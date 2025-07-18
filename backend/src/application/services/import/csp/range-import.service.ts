@@ -17,6 +17,11 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
+
 @Injectable()
 export class CspRangeImportService {
   private readonly logger = new Logger(CspRangeImportService.name);
@@ -40,10 +45,20 @@ export class CspRangeImportService {
   ) {}
 
   /**
-   * Imports all Ranges from CSP, including OptionGroups and DHCP options, and stores them in the database.
+   * Imports all Ranges from CSP, including OptionGroups, DHCP options and exclusions, and stores them in the database.
+   * Interrupt- und Progress-fähig!
    */
-  async importRanges(): Promise<Range[]> {
+  async importRanges(opts?: InterruptibleImportOptions): Promise<Range[]> {
     this.logger.log('Importing Ranges from CSP...');
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('Range import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    // 1. Ranges laden
+    checkCancel();
     const dtos = await this.cspDataClient.fetchRanges();
 
     if (!dtos?.length) {
@@ -51,14 +66,18 @@ export class CspRangeImportService {
       return [];
     }
 
-    // Build lookup maps for subnets and option groups
-    const subnets = await this.subnetRepo.find();
-    const subnetMap = new Map<string, Subnet>();
-    for (const s of subnets) {
-      if (s.externalId) subnetMap.set(s.externalId, s);
-    }
+    const total = dtos.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
 
-    const allOptionGroups = await this.optionGroupRepo.find();
+    // 2. Hilfstabellen aufbauen (Subnets, OptionGroups, OptionCodes)
+    checkCancel();
+    const [subnets, allOptionGroups, optionCodes] = await Promise.all([
+      this.subnetRepo.find(),
+      this.optionGroupRepo.find(),
+      this.optionCodeRepo.find({ relations: ['optionSpace'] }),
+    ]);
+    const subnetMap = new Map(subnets.map((s) => [s.externalId, s]));
     const optionGroupMap = new Map<string, OptionGroup>();
     for (const og of allOptionGroups) {
       if (!og) continue;
@@ -72,20 +91,22 @@ export class CspRangeImportService {
       if (og.name) optionGroupMap.set(og.name.trim().toLowerCase(), og);
       if (og.id) optionGroupMap.set(String(og.id), og);
     }
-
-    const optionCodeMap = buildOptionCodeMap(
-      await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
-    );
+    const optionCodeMap = buildOptionCodeMap(optionCodes);
 
     const importedRanges: Range[] = [];
 
+    // 3. Ranges iterieren und anlegen/updaten
     for (const dto of dtos) {
+      checkCancel();
+
       // Parent assignment (subnetId)
       const parentSubnet = dto.parent ? subnetMap.get(dto.parent) : undefined;
       if (!parentSubnet) {
         this.logger.warn(
           `No parent subnet found for Range ${dto.id} (parent: ${dto.parent}). Skipping.`,
         );
+        progress++;
+        report();
         continue;
       }
 
@@ -224,6 +245,8 @@ export class CspRangeImportService {
       }
 
       importedRanges.push(range);
+      progress++;
+      report();
     }
 
     this.logger.log(

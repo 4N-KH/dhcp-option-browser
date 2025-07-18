@@ -12,7 +12,7 @@ import { DhcpGlobalConfig } from '@/infrastructure/database/csp/global-config.en
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-// --- JOB STATE MODELLING ---
+// --- Job State Modelling ---
 enum ImportJobStatus {
   QUEUED = 'queued',
   RUNNING = 'running',
@@ -30,7 +30,7 @@ interface ImportJobState {
   error?: string;
 }
 
-// --- In-memory Job Store (für MVP) ---
+// --- In-memory Job Store (for MVP) ---
 const importJobs: Map<string, ImportJobState> = new Map();
 
 function createJob(): ImportJobState {
@@ -44,15 +44,15 @@ function createJob(): ImportJobState {
   importJobs.set(id, job);
   return job;
 }
-function getJob(id: string) {
+function getJob(id: string): ImportJobState | undefined {
   return importJobs.get(id);
 }
-function updateJob(id: string, data: Partial<ImportJobState>) {
+function updateJob(id: string, data: Partial<ImportJobState>): void {
   const job = importJobs.get(id);
   if (!job) return;
   importJobs.set(id, { ...job, ...data });
 }
-function markCancelled(id: string) {
+function markCancelled(id: string): void {
   updateJob(id, { cancelled: true, status: ImportJobStatus.CANCELLED });
 }
 
@@ -67,25 +67,28 @@ export class CspFullImportController {
 
   /**
    * POST /api/csp/import/all
-   * Triggers the full import as async job. Returns jobId immediately.
+   * Triggers the full import as an asynchronous job. Returns jobId immediately.
    */
   @Post('all')
   @HttpCode(HttpStatus.ACCEPTED)
   startFullImport(): { jobId: string } {
     const job = createJob();
 
-    // Importprozess im Hintergrund starten (ESLint-konform, non-blocking)
+    // Start import process in background (ESLint-compliant, non-blocking)
     setImmediate(() => {
       void (async () => {
         try {
           updateJob(job.id, { status: ImportJobStatus.RUNNING, progress: 1 });
 
-          // Import mit Fortschritts-Callback und Cancel-Check
+          // Run full import with progress callback and cancellation check
           await this.orchestrator.runFullImport({
             onProgress: (percent: number) => {
               const current = getJob(job.id);
               if (current?.cancelled) {
-                updateJob(job.id, { status: ImportJobStatus.CANCELLED });
+                updateJob(job.id, {
+                  status: ImportJobStatus.CANCELLED,
+                  progress: 100,
+                });
                 throw new Error('Import aborted by user');
               }
               updateJob(job.id, { progress: percent });
@@ -93,16 +96,20 @@ export class CspFullImportController {
             isCancelled: () => !!getJob(job.id)?.cancelled,
           });
 
-          // Nur setzen, falls nicht abgebrochen
+          // Double-check cancellation before marking success
           if (getJob(job.id)?.cancelled) {
             updateJob(job.id, {
               status: ImportJobStatus.CANCELLED,
               progress: 100,
             });
           } else {
+            // Optional: Load final import result or confirmation if needed
+            // const result = await this.globalConfigRepo.findOne({ ... });
+
             updateJob(job.id, {
               status: ImportJobStatus.SUCCESS,
               progress: 100,
+              // result, // optionally store result data here
             });
           }
         } catch (e) {
@@ -115,7 +122,7 @@ export class CspFullImportController {
             updateJob(job.id, {
               status: ImportJobStatus.ERROR,
               progress: 100,
-              error: (e as Error).message,
+              error: (e as Error)?.message || 'Unknown error',
             });
           }
         }

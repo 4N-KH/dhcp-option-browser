@@ -8,7 +8,6 @@ import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 
 /**
  * Baut eine Map aller OptionCodes, schlüsselt nach externalId und code (beides String).
- * Diese Hilfsfunktion kannst du für andere Import-Services mitverwenden!
  */
 export function buildOptionCodeMap(
   optionCodes: OptionCodeEntity[],
@@ -21,6 +20,11 @@ export function buildOptionCodeMap(
   }
   return map;
 }
+
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
 
 @Injectable()
 export class CspOptionCodeImportService {
@@ -36,9 +40,21 @@ export class CspOptionCodeImportService {
 
   /**
    * Importiert alle OptionCodes inkl. OptionSpace-Mapping (über externalId UND name!).
+   * Interrupt- und progress-fähig.
    */
-  async importOptionCodes(): Promise<OptionCodeEntity[]> {
+  async importOptionCodes(
+    opts?: InterruptibleImportOptions,
+  ): Promise<OptionCodeEntity[]> {
     this.logger.log('Commencing import of DHCP Option Codes from CSP...');
+
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('OptionCode import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    checkCancel();
     const codes = await this.cspDataClient.fetchOptionCodes();
 
     if (!codes?.length) {
@@ -55,7 +71,13 @@ export class CspOptionCodeImportService {
     }
 
     const importedEntities: OptionCodeEntity[] = [];
+    const total = codes.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
+
     for (const dto of codes) {
+      checkCancel();
+
       // Versuche zuerst nach externalId, dann nach Name
       let optionSpace: OptionSpace | undefined = undefined;
       if (dto.option_space && optionSpaceMap.has(dto.option_space)) {
@@ -85,6 +107,9 @@ export class CspOptionCodeImportService {
 
       await this.optionCodeRepo.save(entity);
       importedEntities.push(entity);
+
+      progress++;
+      report();
     }
     this.logger.log(
       `Import complete: ${importedEntities.length} Option Codes have been saved.`,

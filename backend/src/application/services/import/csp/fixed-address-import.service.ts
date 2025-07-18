@@ -18,6 +18,11 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
+
 @Injectable()
 export class CspFixedAddressImportService {
   private readonly logger = new Logger(CspFixedAddressImportService.name);
@@ -42,8 +47,18 @@ export class CspFixedAddressImportService {
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
   ) {}
 
-  async importFixedAddresses(): Promise<FixedAddress[]> {
+  async importFixedAddresses(
+    opts?: InterruptibleImportOptions,
+  ): Promise<FixedAddress[]> {
     this.logger.log('Importing Fixed Addresses from CSP...');
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('FixedAddress import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    checkCancel();
     const dtos = await this.cspDataClient.fetchFixedAddresses();
 
     if (!dtos?.length) {
@@ -84,8 +99,13 @@ export class CspFixedAddressImportService {
     }
 
     const imported: FixedAddress[] = [];
+    const total = dtos.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
 
     for (const dto of dtos) {
+      checkCancel();
+
       // Parent Zuordnung
       let parentSubnet: Subnet | undefined;
       let parentRange: Range | undefined;
@@ -210,6 +230,9 @@ export class CspFixedAddressImportService {
       }
 
       imported.push(fixed);
+
+      progress++;
+      report();
     }
 
     this.logger.log(

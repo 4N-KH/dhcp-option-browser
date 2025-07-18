@@ -28,9 +28,10 @@ import { CredentialsCspController } from './controller/auth/csp/credentials-csp.
 import { AuthController } from './controller/auth/auth.controller';
 import { CspFullImportController } from './controller/csp-full-import.controller';
 
-// --- DHCP Hierarchy (NEU) ---
-import { CspDhcpHierarchyController } from './controller/csp-dhcp-tree.controller';
-import { CspDhcpHierarchyService } from './application/services/option-hierarchy/csp/dhcp-hierarchy.service';
+// --- DHCP Hierarchy/Option Controllers ---
+import { CspLightTreeController } from './controller/csp-light-tree.controller';
+import { EffectiveDhcpOptionStackController } from './controller/effective-dhcp-option-stack.controller'; // <-- NEU
+import { DebugController } from './controller/csp-debug.controller';
 
 // --- Import Services ---
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
@@ -48,7 +49,7 @@ import { CspOptionSpaceImportService } from './application/services/import/csp/o
 import { CspOptionFilterImportService } from './application/services/import/csp/option-filter-import.service';
 
 // --- Entities ---
-import { AddressBlock } from './infrastructure/database/csp/adress-block.entity';
+import { AddressBlock } from './infrastructure/database/csp/address-block.entity';
 import { AddressBlockDhcpOption } from './infrastructure/database/csp/address-block-dhcp-option.entity';
 import { AddressBlockOptionGroup } from './infrastructure/database/csp/address-block-option-group.entity';
 import { CspCredentialEntity } from './infrastructure/database/csp/csp-credential.entity';
@@ -74,6 +75,29 @@ import { Subnet } from './infrastructure/database/csp/subnet.entity';
 import { SubnetDhcpOption } from './infrastructure/database/csp/subnet-dhcp-option.entity';
 import { SubnetOptionGroup } from './infrastructure/database/csp/subnet-option-group.entity';
 import { UserEntity } from './infrastructure/database/csp/user.entity';
+
+// --- DHCP Hierarchy Services ---
+import { GlobalLightTreeLoaderService } from './application/services/option-hierarchy/csp/mappers/light-tree/global-light-tree-loader.service';
+
+// --- Option Repositories (provide them for DI) ---
+import {
+  GlobalConfigOptionRepository,
+  IpSpaceDhcpOptionRepository,
+  AddressBlockDhcpOptionRepository,
+  SubnetDhcpOptionRepository,
+  RangeDhcpOptionRepository,
+  FixedDhcpOptionRepository,
+} from './infrastructure/database/csp';
+
+// --- EFFECTIVE STACK SERVICES (SOLID) ---
+import { EffectiveDhcpOptionStackService } from './application/services/option-hierarchy/csp/effective-dhcp-option-stack.service';
+import { ContextChainBuilder } from './application/services/option-hierarchy/csp/context-chain.builder';
+import { ExplicitOptionsLoader } from './application/services/option-hierarchy/csp/types/explicit-options.loader';
+import { OptionGroupsLoader } from './application/services/option-hierarchy/csp/types/option-groups.loader';
+import { OptionStackAssembler } from './application/services/option-hierarchy/csp/types/option-stack.assembler';
+import { OptionInheritanceStackEntryFactory } from './application/services/option-hierarchy/csp/option-stack-entry.factory';
+import { OptionGroupMetaFactory } from './application/services/option-hierarchy/csp/option-group-meta.factory';
+import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp/dhcp-option-raw.mapper';
 
 @Module({
   imports: [
@@ -152,9 +176,12 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CredentialsCspController,
     AuthController,
     CspFullImportController,
-    CspDhcpHierarchyController,
+    CspLightTreeController,
+    EffectiveDhcpOptionStackController,
+    DebugController, // <-- NEU
   ],
   providers: [
+    // Auth + Clients
     CredentialCspService,
     GridAuthProvider,
     CspAuthProvider,
@@ -164,6 +191,7 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CspAuthClient,
     CspDataClient,
     ApiConfigService,
+    // Import
     DhcpCspImportOrchestratorService,
     CspSubnetImportService,
     CspOptionGroupImportService,
@@ -177,7 +205,23 @@ import { UserEntity } from './infrastructure/database/csp/user.entity';
     CspOptionCodeImportService,
     CspOptionSpaceImportService,
     CspOptionFilterImportService,
-    CspDhcpHierarchyService,
+    // Tree Loader
+    GlobalLightTreeLoaderService,
+    GlobalConfigOptionRepository,
+    IpSpaceDhcpOptionRepository,
+    AddressBlockDhcpOptionRepository,
+    SubnetDhcpOptionRepository,
+    RangeDhcpOptionRepository,
+    FixedDhcpOptionRepository,
+    // EFFECTIVE STACK SERVICES (SOLID!)
+    EffectiveDhcpOptionStackService,
+    ContextChainBuilder,
+    ExplicitOptionsLoader,
+    OptionGroupsLoader,
+    OptionStackAssembler,
+    OptionInheritanceStackEntryFactory,
+    OptionGroupMetaFactory,
+    DhcpOptionRawMapper,
   ],
 })
 export class AppModule {}

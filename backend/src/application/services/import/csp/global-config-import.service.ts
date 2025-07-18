@@ -18,6 +18,11 @@ import {
 
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
+
 @Injectable()
 export class CspGlobalConfigImportService {
   private readonly logger = new Logger(CspGlobalConfigImportService.name);
@@ -38,8 +43,22 @@ export class CspGlobalConfigImportService {
     private readonly optionSpaceRepo: Repository<OptionSpace>,
   ) {}
 
-  async importGlobalDhcpConfig(): Promise<DhcpGlobalConfig | null> {
+  /**
+   * Imports the global DHCPv4 configuration from CSP (with progress/cancel support).
+   */
+  async importGlobalDhcpConfig(
+    opts?: InterruptibleImportOptions,
+  ): Promise<DhcpGlobalConfig | null> {
     this.logger.log('Importing global DHCPv4 configuration from CSP...');
+
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('GlobalConfig import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    checkCancel();
     const rawGlobalConfig = await this.cspDataClient.fetchGlobalDhcpConfig();
 
     this.logger.verbose(
@@ -97,7 +116,15 @@ export class CspGlobalConfigImportService {
       (opt) => opt.type !== 'group',
     );
 
+    // Anzahl Steps: Optionen + Gruppen
+    const total =
+      realOptions.length +
+      (Array.isArray(normalisedDhcpOptions) ? normalisedDhcpOptions.length : 0);
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
+
     // Create new config
+    checkCancel();
     const globalConfig = this.globalConfigRepo.create({
       comment: rawGlobalConfig?.comment ?? null,
     });
@@ -110,14 +137,17 @@ export class CspGlobalConfigImportService {
 
     // Save all DHCP options (only non-group!)
     if (realOptions.length > 0) {
-      const dhcpOptionEntities = realOptions.map((opt) =>
-        this.globalConfigOptionRepo.create({
+      for (const opt of realOptions) {
+        checkCancel();
+        const dhcpOptionEntity = this.globalConfigOptionRepo.create({
           globalConfig,
           globalConfigId: globalConfig.id,
           ...mapDhcpOptionToEntity<DhcpGlobalConfigOption>(opt, optionCodeMap),
-        }),
-      );
-      await this.globalConfigOptionRepo.save(dhcpOptionEntities);
+        });
+        await this.globalConfigOptionRepo.save(dhcpOptionEntity);
+        progress++;
+        report();
+      }
     }
 
     // OptionGroup map (by externalId, name, id)
@@ -137,15 +167,18 @@ export class CspGlobalConfigImportService {
       null,
     );
     if (foundGroups.length > 0) {
-      const gcogEntities = foundGroups.map((optionGroup) =>
-        this.globalConfigOptionGroupRepo.create({
+      for (const optionGroup of foundGroups) {
+        checkCancel();
+        const gcogEntity = this.globalConfigOptionGroupRepo.create({
           globalConfig,
           globalConfigId: globalConfig.id,
           optionGroup,
           optionGroupId: optionGroup.id,
-        }),
-      );
-      await this.globalConfigOptionGroupRepo.save(gcogEntities);
+        });
+        await this.globalConfigOptionGroupRepo.save(gcogEntity);
+        progress++;
+        report();
+      }
     }
 
     // Return result (with eager relations)

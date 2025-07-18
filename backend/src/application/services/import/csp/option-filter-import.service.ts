@@ -6,6 +6,11 @@ import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionFilter } from '@/infrastructure/database/csp/option-filter.entity';
 import { CspOptionFilterDto } from '@/domain/dto/csp/option-filter.dto';
 
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
+
 @Injectable()
 export class CspOptionFilterImportService {
   private readonly logger = new Logger(CspOptionFilterImportService.name);
@@ -16,10 +21,20 @@ export class CspOptionFilterImportService {
     private readonly optionFilterRepo: Repository<OptionFilter>,
   ) {}
 
-  async importOptionFilters(): Promise<OptionFilter[]> {
+  async importOptionFilters(
+    opts?: InterruptibleImportOptions,
+  ): Promise<OptionFilter[]> {
     this.logger.log('Starte Import der Option Filter von CSP...');
 
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('OptionFilter import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
     // Schritt 1: Rohdaten abrufen
+    checkCancel();
     const rawFilters = await this.cspDataClient.fetchOptionFilters();
 
     if (!rawFilters?.length) {
@@ -37,8 +52,13 @@ export class CspOptionFilterImportService {
       (f) => f.id,
     );
     const persistedIds: string[] = [];
+    const total = rawFilters.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
 
     for (const dto of rawFilters as CspOptionFilterDto[]) {
+      checkCancel();
+
       // Grundvalidierung
       if (!dto.id || !dto.name) {
         skipped.push({
@@ -46,6 +66,8 @@ export class CspOptionFilterImportService {
           name: dto.name || '',
           reason: 'Fehlende ID oder Name',
         });
+        progress++;
+        report();
         continue;
       }
 
@@ -105,6 +127,9 @@ export class CspOptionFilterImportService {
       this.logger.debug(
         `[${dto.id}] Persistiert: name="${dto.name}", dhcpOptions: ${JSON.stringify(entity.dhcpOptions)}`,
       );
+
+      progress++;
+      report();
     }
 
     // Logging: Skipped und fehlende IDs

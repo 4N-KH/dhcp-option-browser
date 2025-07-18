@@ -1,5 +1,3 @@
-// backend/src/controller/import.controller.ts
-
 import { Controller, Get } from '@nestjs/common';
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { fetchAllPaginated } from '@/infrastructure/api-clients/csp/http-paginator.util';

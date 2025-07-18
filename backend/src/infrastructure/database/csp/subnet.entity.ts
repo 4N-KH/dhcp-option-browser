@@ -7,7 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { IpSpace } from './ip-space.entity';
-import { AddressBlock } from './adress-block.entity';
+import { AddressBlock } from './address-block.entity';
 import { SubnetDhcpOption } from './subnet-dhcp-option.entity';
 import { SubnetOptionGroup } from './subnet-option-group.entity';
 

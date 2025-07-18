@@ -12,11 +12,31 @@ import { CspOptionCodeImportService } from './option-code-import.service';
 import { CspOptionSpaceImportService } from './option-space-import.service';
 import { CspOptionGroupDhcpOptionImportService } from './option-group-dhcp-option-import.service';
 
-/**
- * Orchestrator for CSP DHCP imports.
- * Calls all domain import services in dependency-safe order.
- * Can be triggered as a scheduled job, on demand, or via controller.
- */
+// Anzahl der Schritte: Hier exakt nach Importservices!
+const IMPORT_PHASES = [
+  'optionSpaces',
+  'optionCodes',
+  'optionGroups',
+  'optionGroupDhcpOptions',
+  'globalConfig',
+  'configProfiles',
+  'ipSpaces',
+  'addressBlocks',
+  'subnets',
+  'ranges',
+  'fixedAddresses',
+] as const;
+type ImportPhase = (typeof IMPORT_PHASES)[number];
+
+type OrchestratorOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (
+    percent: number,
+    phase?: ImportPhase,
+    sub?: { current: number; total: number },
+  ) => void;
+};
+
 @Injectable()
 export class DhcpCspImportOrchestratorService {
   private readonly logger = new Logger(DhcpCspImportOrchestratorService.name);
@@ -36,16 +56,12 @@ export class DhcpCspImportOrchestratorService {
   ) {}
 
   /**
-   * Runs a full import in correct order, including error handling, logging and cancellation support.
-   * Optionally accepts an onProgress callback (0...100) and an isCancelled checker.
+   * Runs a full import in correct order, including fine-grained error handling, progress and cancellation support.
    */
-  async runFullImport(opts?: {
-    onProgress?: (percent: number) => void;
-    isCancelled?: () => boolean;
-  }): Promise<void> {
+  async runFullImport(opts?: OrchestratorOptions): Promise<void> {
     this.logger.log('--- Starting full CSP DHCP import sequence ---');
-    const totalSteps = 11;
-    let currentStep = 0;
+    const totalPhases = IMPORT_PHASES.length;
+    let currentPhase = 0;
 
     const checkCancel = () => {
       if (opts?.isCancelled?.()) {
@@ -54,59 +70,158 @@ export class DhcpCspImportOrchestratorService {
       }
     };
 
-    const progress = (step: number) => {
+    const updatePhaseProgress = (
+      phaseIndex: number,
+      phase: ImportPhase,
+      subProgress?: { current: number; total: number },
+    ) => {
       checkCancel();
-      const percent = Math.round((step / totalSteps) * 100);
-      if (opts?.onProgress) opts.onProgress(percent);
+      // Global progress: bis zu diesem Schritt + evtl. Subfortschritt
+      let percent = Math.floor(
+        ((phaseIndex +
+          (subProgress ? subProgress.current / subProgress.total : 0)) /
+          totalPhases) *
+          100,
+      );
+      if (percent > 100) percent = 100;
+      if (opts?.onProgress) opts.onProgress(percent, phase, subProgress);
     };
 
     try {
+      // 1. Option Spaces
       checkCancel();
-      await this.optionSpaceImport.importOptionSpaces();
-      progress(++currentStep);
+      await this.optionSpaceImport.importOptionSpaces({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'optionSpaces', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'optionSpaces');
 
+      // 2. Option Codes
       checkCancel();
-      await this.optionCodeImport.importOptionCodes();
-      progress(++currentStep);
+      await this.optionCodeImport.importOptionCodes({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'optionCodes', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'optionCodes');
 
+      // 3. Option Groups
       checkCancel();
-      await this.optionGroupImport.importOptionGroups();
-      progress(++currentStep);
+      await this.optionGroupImport.importOptionGroups({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'optionGroups', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'optionGroups');
 
+      // 4. OptionGroup DHCP Options
       checkCancel();
-      await this.optionGroupDhcpOptionImport.importOptionGroupDhcpOptions();
-      progress(++currentStep);
+      await this.optionGroupDhcpOptionImport.importOptionGroupDhcpOptions({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'optionGroupDhcpOptions', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'optionGroupDhcpOptions');
 
+      // 5. Global Config
       checkCancel();
-      await this.globalConfigImport.importGlobalDhcpConfig();
-      progress(++currentStep);
+      await this.globalConfigImport.importGlobalDhcpConfig({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'globalConfig', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'globalConfig');
 
+      // 6. Config Profiles
       checkCancel();
-      await this.configProfileImport.importConfigProfiles();
-      progress(++currentStep);
+      await this.configProfileImport.importConfigProfiles({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'configProfiles', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'configProfiles');
 
+      // 7. IpSpaces
       checkCancel();
-      await this.ipSpaceImport.importIpSpaces();
-      progress(++currentStep);
+      await this.ipSpaceImport.importIpSpaces({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'ipSpaces', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'ipSpaces');
 
+      // 8. AddressBlocks
       checkCancel();
-      await this.addressBlockImport.importAddressBlocks();
-      progress(++currentStep);
+      await this.addressBlockImport.importAddressBlocks({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'addressBlocks', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'addressBlocks');
 
+      // 9. Subnets
       checkCancel();
-      await this.subnetImport.importSubnets();
-      progress(++currentStep);
+      await this.subnetImport.importSubnets({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'subnets', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'subnets');
 
+      // 10. Ranges
       checkCancel();
-      await this.rangeImport.importRanges();
-      progress(++currentStep);
+      await this.rangeImport.importRanges({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'ranges', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'ranges');
 
+      // 11. Fixed Addresses
       checkCancel();
-      await this.fixedAddressImport.importFixedAddresses();
-      progress(++currentStep);
+      await this.fixedAddressImport.importFixedAddresses({
+        isCancelled: opts?.isCancelled,
+        onProgress: (cur, tot) =>
+          updatePhaseProgress(currentPhase, 'fixedAddresses', {
+            current: cur,
+            total: tot,
+          }),
+      });
+      updatePhaseProgress(++currentPhase, 'fixedAddresses');
 
       this.logger.log('--- CSP DHCP full import completed successfully ---');
-      progress(totalSteps);
+      if (opts?.onProgress) opts.onProgress(100, 'fixedAddresses');
     } catch (error) {
       this.logger.error(
         'CSP DHCP full import failed:',

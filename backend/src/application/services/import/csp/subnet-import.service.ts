@@ -7,7 +7,7 @@ import { Subnet } from '@/infrastructure/database/csp/subnet.entity';
 import { SubnetDhcpOption } from '@/infrastructure/database/csp/subnet-dhcp-option.entity';
 import { SubnetOptionGroup } from '@/infrastructure/database/csp/subnet-option-group.entity';
 import { IpSpace } from '@/infrastructure/database/csp/ip-space.entity';
-import { AddressBlock } from '@/infrastructure/database/csp/adress-block.entity';
+import { AddressBlock } from '@/infrastructure/database/csp/address-block.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
@@ -17,6 +17,11 @@ import {
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
 
 @Injectable()
 export class CspSubnetImportService {
@@ -44,33 +49,42 @@ export class CspSubnetImportService {
 
   /**
    * Imports all Subnets including DHCP options, OptionGroups and correct parent assignment (CSP-conform).
+   * Interrupt- und Progress-fähig!
    */
-  async importSubnets(): Promise<Subnet[]> {
+  async importSubnets(opts?: InterruptibleImportOptions): Promise<Subnet[]> {
     this.logger.log('Importing Subnets from CSP...');
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('Subnet import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
 
-    // Fetch Subnet DTOs from CSP
+    // 1. Subnet DTOs laden
+    checkCancel();
     const dtos = await this.cspDataClient.fetchSubnets();
     if (!dtos?.length) {
       this.logger.warn('No Subnets found in CSP.');
       return [];
     }
+    const total = dtos.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
 
-    // Prepare lookup maps for parents
-    const spaceMap = new Map<string, IpSpace>();
-    for (const s of await this.ipSpaceRepo.find()) {
-      if (s.externalId) spaceMap.set(s.externalId, s);
-    }
-    const addressBlockMap = new Map<string, AddressBlock>();
-    for (const ab of await this.addressBlockRepo.find()) {
-      if (ab.externalId) addressBlockMap.set(ab.externalId, ab);
-    }
-
-    // OptionCodes und OptionGroups als Maps (beide Utilities)
-    const optionCodeMap = buildOptionCodeMap(
-      await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
+    // 2. Hilfstabellen aufbauen (Parents, Optionen, Gruppen)
+    checkCancel();
+    const [spaces, addressBlocks, optionCodes, allOptionGroups] =
+      await Promise.all([
+        this.ipSpaceRepo.find(),
+        this.addressBlockRepo.find(),
+        this.optionCodeRepo.find({ relations: ['optionSpace'] }),
+        this.optionGroupRepo.find(),
+      ]);
+    const spaceMap = new Map(spaces.map((s) => [s.externalId, s]));
+    const addressBlockMap = new Map(
+      addressBlocks.map((ab) => [ab.externalId, ab]),
     );
-
-    const allOptionGroups = await this.optionGroupRepo.find();
+    const optionCodeMap = buildOptionCodeMap(optionCodes);
     const optionGroupMap = new Map<string, OptionGroup>();
     for (const og of allOptionGroups) {
       if (!og) continue;
@@ -85,9 +99,11 @@ export class CspSubnetImportService {
       if (og.id) optionGroupMap.set(String(og.id), og);
     }
 
-    // Create or update Subnets
+    // 3. Subnets speichern/anlegen
     const subnetMap = new Map<string, Subnet>();
     for (const dto of dtos) {
+      checkCancel();
+
       let subnet = await this.subnetRepo.findOne({
         where: { externalId: dto.id },
         relations: ['dhcpOptions', 'optionGroups'],
@@ -99,54 +115,49 @@ export class CspSubnetImportService {
       subnet.cidr = dto.cidr;
       subnet.comment = dto.comment ?? null;
 
-      // Parent logic: AddressBlock or IpSpace
+      // Parent-Assignment
       if (dto.parent?.startsWith('ipam/address_block/')) {
         const addressBlock = addressBlockMap.get(dto.parent);
-        if (!addressBlock) {
-          this.logger.warn(
-            `AddressBlock parent not found for Subnet ${dto.id}: ${dto.parent}`,
-          );
-        }
         subnet.addressBlock = addressBlock;
         subnet.addressBlockId = addressBlock?.id;
         subnet.space = undefined;
         subnet.spaceId = undefined;
       } else if (dto.parent?.startsWith('ipam/ip_space/')) {
         const space = spaceMap.get(dto.parent);
-        if (!space) {
-          this.logger.warn(
-            `IpSpace parent not found for Subnet ${dto.id}: ${dto.parent}`,
-          );
-        }
         subnet.space = space;
         subnet.spaceId = space?.id;
         subnet.addressBlock = undefined;
         subnet.addressBlockId = undefined;
       } else if (dto.space && spaceMap.has(dto.space)) {
-        // Legacy fallback: explicit space
         const space = spaceMap.get(dto.space);
         subnet.space = space;
         subnet.spaceId = space?.id;
         subnet.addressBlock = undefined;
         subnet.addressBlockId = undefined;
       } else {
-        this.logger.warn(
-          `No valid parent found for Subnet ${dto.id}: parent=${dto.parent} space=${dto.space}`,
-        );
         subnet.addressBlock = undefined;
         subnet.addressBlockId = undefined;
         subnet.space = undefined;
         subnet.spaceId = undefined;
+        this.logger.warn(
+          `No valid parent found for Subnet ${dto.id}: parent=${dto.parent} space=${dto.space}`,
+        );
       }
 
       subnet.dhcpOptions = [];
       subnet.optionGroups = [];
       await this.subnetRepo.save(subnet);
       subnetMap.set(dto.id, subnet);
+
+      progress++;
+      report();
     }
 
-    // DHCP Options für jedes Subnet importieren (NUR Optionen, KEINE Gruppen)
+    // 4. DHCP Options importieren
+    progress = 0;
     for (const dto of dtos) {
+      checkCancel();
+
       const subnet = subnetMap.get(dto.id);
       if (!subnet) continue;
 
@@ -166,7 +177,7 @@ export class CspSubnetImportService {
             typeof opt.option_code === 'string' &&
             typeof opt.option_value === 'string' &&
             typeof opt.type === 'string' &&
-            opt.type !== 'group', // NUR echte Optionen!
+            opt.type !== 'group',
         );
         const entities = validOptions.map((opt) =>
           this.subnetDhcpOptionRepo.create({
@@ -179,13 +190,16 @@ export class CspSubnetImportService {
           await this.subnetDhcpOptionRepo.save(entities);
         }
       }
+
+      progress++;
+      report();
     }
 
-    // OptionGroups-Zuordnung für jedes Subnet (analog AddressBlock)
-    let totalAssigned = 0;
-    let totalSubnetsWithGroups = 0;
-
+    // 5. OptionGroups zuweisen
+    progress = 0;
     for (const dto of dtos) {
+      checkCancel();
+
       const subnet = subnetMap.get(dto.id);
       if (!subnet) continue;
 
@@ -208,38 +222,6 @@ export class CspSubnetImportService {
         null,
       );
 
-      // Optionale Kurzlogik wie bei AddressBlock
-      let resolveLog = '';
-      let logCount = 0;
-      for (const groupKey of groupKeys) {
-        const og =
-          optionGroupMap.get(groupKey) ||
-          optionGroupMap.get(groupKey.replace(/^dhcp\/option_group\//, '')) ||
-          Array.from(optionGroupMap.values()).find(
-            (g) =>
-              g.externalId?.trim().toLowerCase() === groupKey ||
-              g.name?.trim().toLowerCase() === groupKey,
-          );
-        if (logCount < 3) {
-          if (og) {
-            resolveLog += `  ✔ [${subnet.address ?? subnet.externalId}] groupKey='${groupKey}' -> OptionGroup='${og.name}' (id=${og.id})\n`;
-          } else {
-            resolveLog += `  ✘ [${subnet.address ?? subnet.externalId}] groupKey='${groupKey}' -> NOT FOUND\n`;
-          }
-        }
-        logCount++;
-      }
-      if (resolveLog) {
-        this.logger.log(
-          `[OptionGroup-Resolve] Subnet: ${subnet.address ?? subnet.externalId} (id=${subnet.id})\n${resolveLog}${
-            logCount > 3 ? '  ...' : ''
-          }`,
-        );
-      }
-
-      if (foundGroups.length > 0) {
-        totalSubnetsWithGroups++;
-      }
       for (const optionGroup of foundGroups) {
         await this.subnetOptionGroupRepo.save(
           this.subnetOptionGroupRepo.create({
@@ -249,17 +231,14 @@ export class CspSubnetImportService {
             optionGroupId: optionGroup.id,
           }),
         );
-        totalAssigned++;
       }
-      if (foundGroups.length === 0 && groupKeys.length > 0) {
-        this.logger.warn(
-          `[NO_MATCH] Subnet '${subnet.address ?? subnet.externalId}' (ID=${subnet.id}) - keine OptionGroups gefunden für: ${groupKeys.join(', ')}`,
-        );
-      }
+
+      progress++;
+      report();
     }
 
     this.logger.log(
-      `Import complete: ${subnetMap.size} Subnets including DHCP options and OptionGroups (with OptionSpace) and correct AddressBlock/IpSpace parents saved. Zuordnungen gespeichert: ${totalAssigned} Subnet-OptionGroups (${totalSubnetsWithGroups} Subnets mit mindestens einer Zuordnung).`,
+      `Import complete: ${subnetMap.size} Subnets including DHCP options and OptionGroups, fully interrupt- and progress-capable.`,
     );
     return Array.from(subnetMap.values());
   }

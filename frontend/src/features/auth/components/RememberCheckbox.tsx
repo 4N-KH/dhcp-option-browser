@@ -1,4 +1,4 @@
-// Renders Remember me checkbox with custom styling
+// Renders Remember me checkbox
 import React from "react";
 
 interface RememberCheckboxProps {
@@ -9,7 +9,7 @@ interface RememberCheckboxProps {
 const RememberCheckbox: React.FC<RememberCheckboxProps> = ({ checked, onChange }) => {
   return (
     <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)] cursor-pointer select-none">
-      {/* Custom checkbox input */}
+      {/* checkbox input */}
       <div className="relative">
         <input
           type="checkbox"

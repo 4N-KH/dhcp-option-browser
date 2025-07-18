@@ -5,7 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { AddressBlock } from './adress-block.entity';
+import { AddressBlock } from './address-block.entity';
 import { OptionCodeEntity } from './option-code.entity';
 import { OptionSpace } from './option-space.entity';
 

@@ -7,7 +7,10 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   try {
-    const app = await NestFactory.create(AppModule);
+    // <--- Hier: Logger-Level setzen!
+    const app = await NestFactory.create(AppModule, {
+      logger: ['debug', 'log', 'warn', 'error', 'verbose'],
+    });
 
     // Enable CORS for local frontend
     app.enableCors({

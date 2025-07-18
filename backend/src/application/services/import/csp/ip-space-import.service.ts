@@ -18,6 +18,11 @@ import {
 
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
+
 @Injectable()
 export class CspIpSpaceImportService {
   private readonly logger = new Logger(CspIpSpaceImportService.name);
@@ -38,10 +43,19 @@ export class CspIpSpaceImportService {
     private readonly optionSpaceRepo: Repository<OptionSpace>,
   ) {}
 
-  async importIpSpaces(): Promise<IpSpace[]> {
+  async importIpSpaces(opts?: InterruptibleImportOptions): Promise<IpSpace[]> {
     this.logger.log(
       'Importing IP Spaces and their DHCP options/groups from CSP...',
     );
+
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('IpSpace import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
+    checkCancel();
     const rawIpSpaces = await this.cspDataClient.fetchIpSpaces();
 
     if (!Array.isArray(rawIpSpaces) || rawIpSpaces.length === 0) {
@@ -65,8 +79,13 @@ export class CspIpSpaceImportService {
     }
 
     const importedSpaces: IpSpace[] = [];
+    const total = rawIpSpaces.length;
+    let progress = 0;
+    const report = () => opts?.onProgress?.(progress, total);
 
     for (const dto of rawIpSpaces) {
+      checkCancel();
+
       // Upsert IpSpace by externalId
       let entity = await this.ipSpaceRepo.findOne({
         where: { externalId: dto.id },
@@ -84,6 +103,8 @@ export class CspIpSpaceImportService {
         this.logger.error(
           `Critical error: No ID returned after save for IpSpace with externalId=${dto.id}. Skipping import.`,
         );
+        progress++;
+        report();
         continue;
       }
 
@@ -124,6 +145,9 @@ export class CspIpSpaceImportService {
       }
 
       importedSpaces.push(entity);
+
+      progress++;
+      report();
     }
 
     this.logger.log(

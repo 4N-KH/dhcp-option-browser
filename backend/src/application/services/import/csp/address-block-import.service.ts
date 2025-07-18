@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
-import { AddressBlock } from '@/infrastructure/database/csp/adress-block.entity';
+import { AddressBlock } from '@/infrastructure/database/csp/address-block.entity';
 import { AddressBlockDhcpOption } from '@/infrastructure/database/csp/address-block-dhcp-option.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { AddressBlockOptionGroup } from '@/infrastructure/database/csp/address-block-option-group.entity';
@@ -17,6 +17,11 @@ import {
   buildOptionCodeMap,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+
+type InterruptibleImportOptions = {
+  isCancelled?: () => boolean;
+  onProgress?: (current: number, total: number) => void;
+};
 
 @Injectable()
 export class CspAddressBlockImportService {
@@ -42,23 +47,32 @@ export class CspAddressBlockImportService {
   ) {}
 
   /**
-   * Robustly imports all Address Blocks from the CSP API –
-   * transactional, rollback-capable, idempotent.
-   * All related Address Block tables are fully replaced within a transaction using TRUNCATE CASCADE.
+   * Interruptible & progress-reporting import for all Address Blocks.
+   * Transactional, rollback-capable, idempotent.
    */
-  async importAddressBlocks(): Promise<AddressBlock[]> {
+  async importAddressBlocks(
+    opts?: InterruptibleImportOptions,
+  ): Promise<AddressBlock[]> {
+    const checkCancel = () => {
+      if (opts?.isCancelled?.()) {
+        this.logger.warn('AddressBlock import interrupted by user.');
+        throw new Error('Import cancelled by user');
+      }
+    };
+
     return this.dataSource.transaction(async (manager) => {
       this.logger.warn(
         'FULL REPLACE: All AddressBlock-related tables will be truncated using CASCADE within this transaction and freshly rebuilt.',
       );
 
-      // 0. TRUNCATE with CASCADE for all dependent tables (adjust the list if there are more dependencies!)
+      // 0. TRUNCATE with CASCADE for all dependent tables
       const queryRunner = manager.queryRunner!;
       await queryRunner.query(
         'TRUNCATE TABLE "address_block_option_group", "address_block_dhcp_option", "address_block" CASCADE;',
       );
 
       // 1. Fetch and normalise data
+      checkCancel();
       const rawDtos = await this.cspDataClient.fetchAddressBlocks();
       const dtos = normalizeAddressBlockDtos(rawDtos);
 
@@ -85,9 +99,16 @@ export class CspAddressBlockImportService {
       }
       const ipSpaceMap = new Map(allIpSpaces.map((i) => [i.externalId, i]));
 
+      // Progress config
+      const total = dtos.length;
+      let progress = 0;
+      const report = () => opts?.onProgress?.(progress, total);
+
       // 3. Create AddressBlocks (without parent linkage yet, for IDs to be set)
       const blockMap = new Map<string, AddressBlock>();
       for (const dto of dtos) {
+        checkCancel();
+
         const block = manager.create(AddressBlock, { externalId: dto.id });
         block.name = dto.name;
         block.address = dto.address;
@@ -104,16 +125,19 @@ export class CspAddressBlockImportService {
           block.ipSpaceId = undefined;
         }
 
-        // Initialise empty relations
         block.dhcpOptions = [];
         block.optionGroups = [];
 
         const saved = await manager.save(block);
         blockMap.set(dto.id, saved);
+
+        progress++;
+        report();
       }
 
       // 4. Establish parent-child relations now that all blocks have IDs
       for (const dto of dtos) {
+        checkCancel();
         if (dto.parent) {
           const childBlock = blockMap.get(dto.id);
           const parentBlock = blockMap.get(dto.parent);
@@ -131,6 +155,7 @@ export class CspAddressBlockImportService {
 
       // 5. Save DHCP options per block
       for (const dto of dtos) {
+        checkCancel();
         const block = blockMap.get(dto.id);
         if (!block || !block.id) {
           this.logger.warn(
@@ -155,6 +180,7 @@ export class CspAddressBlockImportService {
               opt.type !== 'group',
           );
           for (const opt of validOptions) {
+            checkCancel();
             if (!block.id) {
               this.logger.error(
                 `[FATAL] Block entity for option_code=${opt.option_code} on dto.id=${dto.id} is missing id. Skipping.`,
@@ -182,6 +208,7 @@ export class CspAddressBlockImportService {
 
       // 6. Assign option groups to each block
       for (const dto of dtos) {
+        checkCancel();
         const block = blockMap.get(dto.id);
         if (!block || !block.id) continue;
 
@@ -203,6 +230,7 @@ export class CspAddressBlockImportService {
           null,
         );
         for (const optionGroup of foundGroups) {
+          checkCancel();
           if (!block.id || !optionGroup?.id) continue;
           await manager.save(AddressBlockOptionGroup, {
             addressBlock: block,
