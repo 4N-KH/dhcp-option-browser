@@ -8,6 +8,15 @@ import { DhcpOptionRaw } from './types/dhcp-option-raw.type';
 import { OptionStackAssembler } from './types/option-stack.assembler';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 
+// Importiere die Entities für die Label-Maps:
+import { IpSpace } from '@/infrastructure/database/csp/ip-space.entity';
+import { AddressBlock } from '@/infrastructure/database/csp/address-block.entity';
+import { Subnet } from '@/infrastructure/database/csp/subnet.entity';
+import { Range } from '@/infrastructure/database/csp/range.entity';
+import { DhcpGlobalConfig } from '@/infrastructure/database/csp/global-config.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
 type ContextObj = {
   level: ObjectType;
   levelId: number;
@@ -24,6 +33,17 @@ export class EffectiveDhcpOptionStackService {
     private readonly explicitOptionsLoader: ExplicitOptionsLoader,
     private readonly optionGroupsLoader: OptionGroupsLoader,
     private readonly optionStackAssembler: OptionStackAssembler,
+    // Für die sprechenden Labels:
+    @InjectRepository(IpSpace)
+    private readonly ipSpaceRepo: Repository<IpSpace>,
+    @InjectRepository(AddressBlock)
+    private readonly addressBlockRepo: Repository<AddressBlock>,
+    @InjectRepository(Subnet)
+    private readonly subnetRepo: Repository<Subnet>,
+    @InjectRepository(Range)
+    private readonly rangeRepo: Repository<Range>,
+    @InjectRepository(DhcpGlobalConfig)
+    private readonly globalConfigRepo: Repository<DhcpGlobalConfig>,
   ) {}
 
   async getEffectiveOptionsForObject(
@@ -123,6 +143,37 @@ export class EffectiveDhcpOptionStackService {
       });
     }
 
+    // ---------- NEU: Label-Maps für Kontext-Labels bauen (ohne FixedAddress!) ----------
+    const [ipSpaces, addressBlocks, subnets, ranges, globalConfig] =
+      await Promise.all([
+        this.ipSpaceRepo.find(),
+        this.addressBlockRepo.find(),
+        this.subnetRepo.find(),
+        this.rangeRepo.find(),
+        this.globalConfigRepo.findOne({ where: {} }),
+      ]);
+
+    const contextTreeMaps = {
+      globalConfigId: globalConfig?.id,
+      ipSpacesById: new Map(ipSpaces.map((x) => [x.id, { name: x.name }])),
+      addressBlocksById: new Map(
+        addressBlocks.map((x) => [
+          x.id,
+          { name: x.name, address: x.address, cidr: x.cidr },
+        ]),
+      ),
+      subnetsById: new Map(
+        subnets.map((x) => [
+          x.id,
+          { name: x.name, address: x.address, cidr: x.cidr },
+        ]),
+      ),
+      rangesById: new Map(
+        ranges.map((x) => [x.id, { name: x.name, start: x.start, end: x.end }]),
+      ),
+      // KEIN fixedAddressesById!
+    };
+
     // 4. Stacks bauen (inkl. OptionGroup-Inheritance) UND allGroups weitergeben!
     const { stacks, allGroups: fullAllGroups } =
       this.optionStackAssembler.assemble(allContexts);
@@ -131,11 +182,12 @@ export class EffectiveDhcpOptionStackService {
       this.logger.warn(`[DEBUG] OptionStacks assembled, begin DTO mapping...`);
     }
 
-    // 5. Slim-DTOs für das Frontend (alle drei Parameter übergeben!)
+    // 5. Slim-DTOs für das Frontend (alle Parameter übergeben!)
     const slimDtos = this.optionStackAssembler.buildSlimDtoForAll(
       stacks,
       allContexts,
       fullAllGroups,
+      contextTreeMaps, // <<--- LABEL-MAPS für sprechende Labels
     );
 
     if (enableDebugLogging) {

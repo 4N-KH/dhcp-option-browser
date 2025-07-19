@@ -40,6 +40,8 @@ export class EffectiveDhcpOptionSlimDto {
       isGroupInherited?: boolean;
       groupOriginLevel?: string;
       groupOriginLevelId?: number;
+      /** NEU: Sprechendes Label für die Ursprungs-Ebene, z.B. "ipSpace KH", "address block 192.168.0.0/16" etc. */
+      originLevelLabel?: string;
     };
   };
   overridden?: {

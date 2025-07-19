@@ -7,6 +7,73 @@ import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 
+// === Hilfsfunktion für sprechende OriginLabels (jetzt vollständig!) ===
+function getOriginLevelLabel(
+  originLevel: string | undefined,
+  originLevelId: number | undefined,
+  contextTreeMaps?: {
+    globalConfigId?: number;
+    ipSpacesById?: Map<number, { name?: string }>;
+    addressBlocksById?: Map<
+      number,
+      { name?: string; address?: string; cidr?: number }
+    >;
+    subnetsById?: Map<
+      number,
+      { name?: string; address?: string; cidr?: number }
+    >;
+    rangesById?: Map<number, { name?: string; start?: string; end?: string }>;
+    fixedAddressesById?: Map<number, { address?: string; name?: string }>;
+  },
+): string | undefined {
+  if (!originLevel || originLevelId == null) return undefined;
+  // GlobalConfig
+  if (
+    originLevel === 'global' &&
+    contextTreeMaps?.globalConfigId === originLevelId
+  ) {
+    return 'Global DHCP Configuration';
+  }
+  // IpSpace
+  if (originLevel === 'ipSpace' && contextTreeMaps?.ipSpacesById) {
+    const ipSpace = contextTreeMaps.ipSpacesById.get(originLevelId);
+    return ipSpace?.name
+      ? `ipSpace ${ipSpace.name}`
+      : `ipSpace #${originLevelId}`;
+  }
+  // AddressBlock
+  if (originLevel === 'addressBlock' && contextTreeMaps?.addressBlocksById) {
+    const ab = contextTreeMaps.addressBlocksById.get(originLevelId);
+    if (ab?.name && ab.name.trim().length > 0) return ab.name;
+    if (ab?.address && ab.cidr != null) return `${ab.address}/${ab.cidr}`;
+    return `address block #${originLevelId}`;
+  }
+  // Subnet
+  if (originLevel === 'subnet' && contextTreeMaps?.subnetsById) {
+    const sn = contextTreeMaps.subnetsById.get(originLevelId);
+    if (sn?.name && sn.name.trim().length > 0) return sn.name;
+    if (sn?.address && sn.cidr != null) return `${sn.address}/${sn.cidr}`;
+    if (sn?.address) return sn.address;
+    return `subnet #${originLevelId}`;
+  }
+  // Range
+  if (originLevel === 'range' && contextTreeMaps?.rangesById) {
+    const rg = contextTreeMaps.rangesById.get(originLevelId);
+    if (rg?.name && rg.name.trim().length > 0) return rg.name;
+    if (rg?.start && rg?.end) return `${rg.start} – ${rg.end}`;
+    return `range #${originLevelId}`;
+  }
+  // FixedAddress
+  if (originLevel === 'fixedAddress' && contextTreeMaps?.fixedAddressesById) {
+    const fa = contextTreeMaps.fixedAddressesById.get(originLevelId);
+    if (fa?.name && fa.name.trim().length > 0) return fa.name;
+    if (fa?.address) return fa.address;
+    return `fixed address #${originLevelId}`;
+  }
+  // Fallback
+  return `${originLevel} #${originLevelId}`;
+}
+
 type ContextObj = {
   level: ObjectType;
   levelId: number;
@@ -184,7 +251,7 @@ export class OptionStackAssembler {
           continue;
         }
 
-        // inherited – WENN eine Option auf Child überschrieben wurde, ist diese jetzt die neue Quelle!
+        // inherited
         if (lastExplicit && lastExplicitIdx !== null) {
           let shouldBeInherited = true;
           if (
@@ -229,13 +296,11 @@ export class OptionStackAssembler {
         for (let j = i + 1; j < stack.length; ++j) {
           const next = stack[j];
           if (next.isExplicit) {
-            // Einzeloption
             if (!current.optionGroup && !next.optionGroup) {
               overridden = true;
               overriddenBy = next;
               break;
             }
-            // Gruppenoption – gleiche Gruppe und Code
             if (
               current.optionGroup &&
               next.optionGroup &&
@@ -277,7 +342,6 @@ export class OptionStackAssembler {
     return { stacks, allGroups };
   }
 
-  // Hilfsmethode: Letzte explizite Ebene im Stack vor der Vererbung finden
   private getOriginLevel(
     stack: OptionInheritanceStackEntryDto[],
   ): { originLevel: string; originLevelId: number } | undefined {
@@ -298,6 +362,20 @@ export class OptionStackAssembler {
     code: string,
     stack: OptionInheritanceStackEntryDto[],
     contexts?: ContextObj[],
+    contextTreeMaps?: {
+      globalConfigId?: number;
+      ipSpacesById?: Map<number, { name?: string }>;
+      addressBlocksById?: Map<
+        number,
+        { name?: string; address?: string; cidr?: number }
+      >;
+      subnetsById?: Map<
+        number,
+        { name?: string; address?: string; cidr?: number }
+      >;
+      rangesById?: Map<number, { name?: string; start?: string; end?: string }>;
+      fixedAddressesById?: Map<number, { address?: string; name?: string }>;
+    },
   ): EffectiveDhcpOptionSlimDto {
     const top = stack[stack.length - 1];
     const isInherited = !!top.isInherited;
@@ -331,7 +409,14 @@ export class OptionStackAssembler {
       }
     }
 
-    // OptionGroup-Details **rückwärts alle Kontexte durchsuchen**
+    // ==== OriginLabel generieren! ====
+    const originLevelLabel = getOriginLevelLabel(
+      originInfo.originLevel as string,
+      originInfo.originLevelId as number,
+      contextTreeMaps,
+    );
+
+    // OptionGroup-Details mit originLevelLabel
     let optionGroupDetails:
       | EffectiveDhcpOptionSlimDto['source']['optionGroup']
       | undefined;
@@ -347,7 +432,6 @@ export class OptionStackAssembler {
         optionSpace: any;
       }[] = [];
 
-      // Suche von unten nach oben: Erste explizite Optionsliste für diese Group finden
       for (let k = contexts.length - 1; k >= 0; --k) {
         const ctx = contexts[k];
         const g = ctx.optionGroups.find(
@@ -385,10 +469,10 @@ export class OptionStackAssembler {
           isInherited && stack.some((s) => s.isExplicit)
             ? (originInfo.originLevelId as number)
             : top.levelId,
+        originLevelLabel: originLevelLabel,
       };
     }
 
-    // Overridden wie gehabt
     let overridden: EffectiveDhcpOptionSlimDto['overridden'] | undefined =
       undefined;
     if (stack.length > 1 && !isInherited && top.isExplicit) {
@@ -466,58 +550,33 @@ export class OptionStackAssembler {
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
     >,
+    contextTreeMaps?: {
+      globalConfigId?: number;
+      ipSpacesById?: Map<number, { name?: string }>;
+      addressBlocksById?: Map<
+        number,
+        { name?: string; address?: string; cidr?: number }
+      >;
+      subnetsById?: Map<
+        number,
+        { name?: string; address?: string; cidr?: number }
+      >;
+      rangesById?: Map<number, { name?: string; start?: string; end?: string }>;
+      fixedAddressesById?: Map<number, { address?: string; name?: string }>;
+    },
   ): EffectiveDhcpOptionSlimDto[] {
     const dtos: EffectiveDhcpOptionSlimDto[] = [];
 
-    // --- DEBUG: Start-Log für Übersicht der Inputs
-    // (deaktiviere für riesige Datenmengen, oder nutze logLevel)
-    console.warn('[DEBUG] buildSlimDtoForAll called');
-    console.warn(
-      '[DEBUG] All stacks:',
-      Array.from(stacks.entries()).map(([code, stack]) => ({
-        code,
-        stack: stack.map((s) => ({
-          level: s.level,
-          levelId: s.levelId,
-          isExplicit: s.isExplicit,
-          isInherited: s.isInherited,
-          optionGroup: s.optionGroup?.name || null,
-          value: s.value,
-        })),
-      })),
-    );
-    console.warn('[DEBUG] Contexts:', JSON.stringify(contexts, null, 2));
-    console.warn(
-      '[DEBUG] allGroups:',
-      Array.from(allGroups.values()).map((g) => ({
-        id: g.group.id,
-        name: g.group.name,
-        ctxIdx: g.ctxIdx,
-        ctxLevel: g.ctx.level,
-        ctxLevelId: g.ctx.levelId,
-      })),
-    );
-
-    // --- Alle Options-Dtos (direct + group)
     for (const [code, stack] of stacks.entries()) {
-      const dto = this.buildSlimDtoFromStack(code, stack, contexts);
+      const dto = this.buildSlimDtoFromStack(
+        code,
+        stack,
+        contexts,
+        contextTreeMaps,
+      );
       dtos.push(dto);
-
-      // --- DEBUG: Einzel-DTO ausgeben (v.a. für inherited Gruppen interessant)
-      if (dto.source?.optionGroup && !dto.effectiveValue) {
-        // Nur leere Gruppenpanels
-        console.warn(
-          `[DEBUG] DTO leeres Gruppenpanel: code=${dto.code} group=${dto.source.optionGroup.name} type=${dto.source.type} originLevel=${dto.source.optionGroup.groupOriginLevel} options=${(dto.source.optionGroup.options ?? []).length}`,
-        );
-      } else {
-        // Einzeloptionen und Gruppenoptionen mit Wert
-        console.warn(
-          `[DEBUG] DTO Option: code=${dto.code} name=${dto.name} group=${dto.source?.optionGroup?.name || '-'} type=${dto.source.type} value=${dto.effectiveValue}`,
-        );
-      }
     }
 
-    // --- Ergänze leere Gruppenpanels am Target (UI) --- VERBESSERT ---
     const lastContext = contexts[contexts.length - 1];
     for (const { group, ctxIdx } of allGroups.values()) {
       const already = dtos.some(
@@ -534,7 +593,6 @@ export class OptionStackAssembler {
           ? 'GROUP_EXPLICIT'
           : 'GROUP_INHERITED';
 
-        // *** PATCH: letzte explizite Optionsliste der Gruppe suchen (von ctxIdx rückwärts!) ***
         let groupOptions: {
           code: string;
           name?: string;
@@ -565,6 +623,19 @@ export class OptionStackAssembler {
           }
         }
 
+        // === originLevel/Label für leeres Gruppenpanel bestimmen ===
+        const originLevel = !isExplicit
+          ? contexts[ctxIdx].level
+          : lastContext.level;
+        const originLevelId = !isExplicit
+          ? contexts[ctxIdx].levelId
+          : lastContext.levelId;
+        const originLevelLabel = getOriginLevelLabel(
+          originLevel as string,
+          originLevelId,
+          contextTreeMaps,
+        );
+
         const groupDto: EffectiveDhcpOptionSlimDto = {
           code: '',
           name: undefined,
@@ -585,12 +656,9 @@ export class OptionStackAssembler {
               options: groupOptions,
               groupInheritanceType: type,
               isGroupInherited: !isExplicit,
-              groupOriginLevel: !isExplicit
-                ? contexts[ctxIdx].level
-                : lastContext.level,
-              groupOriginLevelId: !isExplicit
-                ? contexts[ctxIdx].levelId
-                : lastContext.levelId,
+              groupOriginLevel: originLevel,
+              groupOriginLevelId: originLevelId,
+              originLevelLabel: originLevelLabel,
             },
           },
           overridden: undefined,
@@ -618,29 +686,8 @@ export class OptionStackAssembler {
           ],
         };
         dtos.push(groupDto);
-
-        // --- DEBUG: Panel für leere/inherited Gruppen
-        const optionsLength =
-          groupDto.source?.optionGroup?.options?.length ?? 0;
-        console.warn(
-          `[DEBUG] Add leeres Gruppenpanel am Target: group=${group.name} (ID=${group.id}), type=${type}, ctxIdx=${ctxIdx}, contextLevel=${lastContext.level}, options=${optionsLength}`,
-        );
       }
     }
-
-    // --- DEBUG: Endgültige DTO-Übersicht
-    console.warn(
-      '[DEBUG] Alle SlimDTOs (final):\n' +
-        dtos
-          .map(
-            (dto) =>
-              `  - ${dto.code || '[GROUP]'} | ${dto.name || dto.source?.optionGroup?.name || ''} | type=${dto.source.type} | value=${dto.effectiveValue || '[leer]'} | options=${dto.source?.optionGroup?.options?.length ?? 0}`,
-          )
-          .join('\n'),
-    );
-    // Optional: Komplett als JSON, falls du in VSCode/JQ weiterarbeiten willst
-    // console.warn(JSON.stringify(dtos, null, 2));
-
     return dtos;
   }
 }

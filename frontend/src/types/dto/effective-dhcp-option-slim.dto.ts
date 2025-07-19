@@ -22,6 +22,8 @@ export interface OptionGroupInSource {
   isGroupInherited?: boolean;
   groupOriginLevel?: string;
   groupOriginLevelId?: number;
+  /** Klartext-Label, z. B. "ipSpace KH" oder "labor_vm" (direkt vom Backend geliefert) */
+  originLevelLabel?: string;
 }
 
 export interface EffectiveDhcpOptionSlimDto {

@@ -34,6 +34,11 @@ export class ContextChainBuilder {
     private readonly globalConfigRepo: Repository<DhcpGlobalConfig>,
   ) {}
 
+  /**
+   * Baut die Vererbungskette (ContextChain) für ein beliebiges DHCP-Objekt
+   * - Von FIXEDADDRESS/RANGE/SUBNET/... immer bis zur globalen Config
+   * - Reihenfolge: [GlobalConfig, IpSpace, ggf. AddressBlock, ggf. Subnet, ggf. Range, ggf. FixedAddress]
+   */
   async build(
     objectType: ObjectType,
     objectId: number,
@@ -51,7 +56,7 @@ export class ContextChainBuilder {
       [ObjectType.FIXEDADDRESS]: async (id) => {
         const fixed = await this.fixedAddressRepo.findOne({ where: { id } });
         if (!fixed) return null;
-        // Immer zuerst Range prüfen, dann Subnet
+        // Priorität: Range → Subnet (niemals AddressBlock direkt!)
         if (typeof fixed.rangeId === 'number' && fixed.rangeId !== null)
           return { type: ObjectType.RANGE, id: fixed.rangeId };
         if (typeof fixed.subnetId === 'number' && fixed.subnetId !== null)
@@ -61,7 +66,7 @@ export class ContextChainBuilder {
       [ObjectType.RANGE]: async (id) => {
         const range = await this.rangeRepo.findOne({ where: { id } });
         if (!range) return null;
-        // Range ist immer Teil eines Subnet (nie AddressBlock direkt!)
+        // Range ist IMMER Teil eines Subnets (nie AddressBlock direkt!)
         if (typeof range.subnetId === 'number' && range.subnetId !== null)
           return { type: ObjectType.SUBNET, id: range.subnetId };
         return null;
@@ -69,7 +74,7 @@ export class ContextChainBuilder {
       [ObjectType.SUBNET]: async (id) => {
         const subnet = await this.subnetRepo.findOne({ where: { id } });
         if (!subnet) return null;
-        // Subnet kann Teil eines AddressBlock oder direkt im IpSpace liegen
+        // Subnet: AddressBlock → IpSpace (je nach Typ)
         if (
           typeof subnet.addressBlockId === 'number' &&
           subnet.addressBlockId !== null
@@ -82,7 +87,7 @@ export class ContextChainBuilder {
       [ObjectType.ADDRESSBLOCK]: async (id) => {
         const ab = await this.addressBlockRepo.findOne({ where: { id } });
         if (!ab) return null;
-        // AddressBlock kann parentId (verschachtelt) ODER ipSpaceId (top-level) haben
+        // AddressBlock: parentId (verschachtelt) → ipSpaceId (Top-Level)
         if (typeof ab.parentId === 'number' && ab.parentId !== null)
           return { type: ObjectType.ADDRESSBLOCK, id: ab.parentId };
         if (typeof ab.ipSpaceId === 'number' && ab.ipSpaceId !== null)
@@ -100,7 +105,7 @@ export class ContextChainBuilder {
 
       chain.push({ level: currentType, levelId: currentId });
 
-      // Typsicher casten:
+      // Typsicher casten
       const parentGetter = parentGetters[currentType] as (
         id: number,
       ) => Promise<ParentPointer>;
@@ -123,7 +128,7 @@ export class ContextChainBuilder {
       }
     }
 
-    // Die Chain muss von oben nach unten laufen (Global → Target)
+    // Reihenfolge: von global bis Zielobjekt (Global → Target)
     return chain.reverse();
   }
 }

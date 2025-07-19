@@ -5,16 +5,16 @@ interface OptionGroupPanelProps {
   group: OptionGroupInSource;
   status: "GROUP_EXPLICIT" | "GROUP_INHERITED";
   originLevel?: string;
+  originLevelLabel?: string;
   options: OptionGroupInSource["options"];
-  // effectiveCodes: Set<string>;   // <-- NICHT MEHR BENÖTIGT!
 }
 
 const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
   group,
   status,
   originLevel,
+  originLevelLabel,
   options,
-  // effectiveCodes,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -28,7 +28,18 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
           <span className="font-bold text-blue-200">{group.name}</span>
           {status === "GROUP_INHERITED" ? (
             <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold">
-              Inherited{originLevel ? <> from <b>{originLevel}</b></> : ""}
+              Inherited
+              {originLevelLabel
+                ? <>
+                  {" from "}
+                  <b>{originLevelLabel}</b>
+                </>
+                : originLevel
+                  ? <>
+                    {" from "}
+                    <b>{originLevel}</b>
+                  </>
+                  : ""}
             </span>
           ) : (
             <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold">
