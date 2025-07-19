@@ -14,6 +14,12 @@ type ContextObj = {
   optionGroups: { group: OptionGroup; options: DhcpOptionRaw[] }[];
 };
 
+type GroupStatus = {
+  group: OptionGroup;
+  explicitAt: number;
+  overriddenAt?: number;
+};
+
 @Injectable()
 export class OptionStackAssembler {
   private readonly logger = new Logger(OptionStackAssembler.name);
@@ -30,22 +36,10 @@ export class OptionStackAssembler {
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
     >;
   } {
-    this.logger.warn(
-      '[DEBUG] ContextChain: ' +
-        contexts
-          .map(
-            (c, idx) =>
-              `[${idx}] ${c.level} (ID:${c.levelId}) - Optionen: ${c.options.length}, Gruppen: ${c.optionGroups.length}`,
-          )
-          .join(' -> '),
-    );
-
-    // Sammle alle Option-Codes + OptionGroup-Metadaten
+    // 1. Codes und Gruppen sammeln
     const allCodes = new Set<string>();
-    const allGroups = new Map<
-      number,
-      { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
-    >();
+    const groupStatus = new Map<number, GroupStatus>();
+
     for (let i = 0; i < contexts.length; ++i) {
       const ctx = contexts[i];
       ctx.options.forEach((opt) =>
@@ -55,47 +49,83 @@ export class OptionStackAssembler {
         groupObj.options.forEach((opt) =>
           allCodes.add(String(opt.code ?? opt.option_code)),
         );
-        if (!allGroups.has(groupObj.group.id)) {
-          allGroups.set(groupObj.group.id, {
+        if (
+          groupObj.options.length > 0 &&
+          !groupStatus.has(groupObj.group.id)
+        ) {
+          groupStatus.set(groupObj.group.id, {
             group: groupObj.group,
-            ctxIdx: i,
-            ctx,
+            explicitAt: i,
           });
         }
       });
     }
 
-    // Gruppen als inherited für nachfolgende Ebenen sichtbar machen
-    for (let i = 0; i < contexts.length; ++i) {
-      const ctx = contexts[i];
-      const explicitGroupIds = new Set(ctx.optionGroups.map((g) => g.group.id));
-      const inheritedGroups: { group: OptionGroup; inheritedFrom: number }[] =
-        [];
-      for (const [gid, gInfo] of allGroups.entries()) {
-        if (gInfo.ctxIdx < i && !explicitGroupIds.has(gid)) {
-          inheritedGroups.push({
-            group: gInfo.group,
-            inheritedFrom: gInfo.ctxIdx,
-          });
+    // 2. Overridden suchen
+    for (const [groupId, stat] of groupStatus.entries()) {
+      for (let j = stat.explicitAt + 1; j < contexts.length; ++j) {
+        const nextCtx = contexts[j];
+        const existsExplicit =
+          nextCtx.optionGroups.find(
+            (g) => g.group.id === groupId && g.options.length > 0,
+          ) !== undefined;
+        if (existsExplicit) {
+          stat.overriddenAt = j;
+          break;
         }
-      }
-      for (const inh of inheritedGroups) {
-        ctx.optionGroups.push({
-          group: inh.group,
-          options: [], // inherited Gruppen sind immer leer!
-        });
       }
     }
 
-    const stacks = new Map<string, OptionInheritanceStackEntryDto[]>();
+    // 3. Explizite Gruppen als inherited sichtbar machen
+    for (const [groupId, stat] of groupStatus.entries()) {
+      for (let i = stat.explicitAt + 1; i < contexts.length; ++i) {
+        const ctx = contexts[i];
+        const alreadyExplicit =
+          ctx.optionGroups.find(
+            (g) => g.group.id === groupId && g.options.length > 0,
+          ) !== undefined;
+        const alreadyInherited =
+          ctx.optionGroups.find(
+            (g) => g.group.id === groupId && g.options.length === 0,
+          ) !== undefined;
+        if (!alreadyExplicit && !alreadyInherited) {
+          ctx.optionGroups.push({
+            group: stat.group,
+            options: [], // inherited
+          });
+        }
+      }
+    }
 
-    // Für jede Option einen Stack bilden (root→target)
+    // 4. Map für alle Groups am Target für buildSlimDtoForAll
+    const allGroups = new Map<
+      number,
+      { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
+    >();
+    for (let i = 0; i < contexts.length; ++i) {
+      for (const g of contexts[i].optionGroups) {
+        if (!allGroups.has(g.group.id)) {
+          allGroups.set(g.group.id, {
+            group: g.group,
+            ctxIdx: i,
+            ctx: contexts[i],
+          });
+        }
+      }
+    }
+
+    // 5. Stack für jede Option (HIER ist die robuste Logik)
+    const stacks = new Map<string, OptionInheritanceStackEntryDto[]>();
     for (const code of allCodes) {
       const stack: OptionInheritanceStackEntryDto[] = [];
       let lastExplicit: OptionInheritanceStackEntryDto | null = null;
+      let lastExplicitIdx: number | null = null;
+      let lastExplicitGroupId: number | null = null;
 
-      for (const ctx of contexts) {
-        // 1. Explizite Einzeloption
+      for (let i = 0; i < contexts.length; ++i) {
+        const ctx = contexts[i];
+
+        // Einzeloption explizit?
         const foundOpt = ctx.options.find(
           (opt) => String(opt.code ?? opt.option_code) === code,
         );
@@ -109,14 +139,16 @@ export class OptionStackAssembler {
             false,
             null,
             foundOpt.comment ?? null,
-            foundOpt.name ?? undefined,
+            foundOpt.name ?? null,
           );
           stack.push(entry);
           lastExplicit = entry;
+          lastExplicitIdx = i;
+          lastExplicitGroupId = null;
           continue;
         }
 
-        // 2. Explizite Gruppenoption
+        // Gruppenoption explizit?
         let groupMeta:
           | ReturnType<OptionGroupMetaFactory['fromEntity']>
           | undefined;
@@ -148,64 +180,99 @@ export class OptionStackAssembler {
             false,
             groupMeta,
             foundGroupOpt.comment ?? null,
-            foundGroupOpt.name ?? undefined,
+            foundGroupOpt.name ?? null,
           );
           stack.push(entry);
           lastExplicit = entry;
+          lastExplicitIdx = i;
+          lastExplicitGroupId = foundGroup.id;
           continue;
         }
 
-        // 3. Inherited: Wenn vorher explizit gesetzt
-        if (lastExplicit) {
-          const inherited: OptionInheritanceStackEntryDto = {
-            ...lastExplicit,
-            level: ctx.level,
-            levelId: ctx.levelId,
-            isExplicit: false,
-            isInherited: true,
-            isOverridden: false,
-            overriddenBy: undefined,
-          };
-          stack.push(inherited);
+        // inherited – aber: WENN eine Option auf Child überschrieben wurde, ist diese jetzt die neue Quelle!
+        if (lastExplicit && lastExplicitIdx !== null) {
+          let shouldBeInherited = true;
+          if (
+            lastExplicitGroupId !== null &&
+            ctx.optionGroups.some(
+              (g) => g.group.id === lastExplicitGroupId && g.options.length > 0,
+            )
+          ) {
+            // Hier wird OptionGroup überschrieben, also keine weitere Vererbung ab hier
+            shouldBeInherited = false;
+            lastExplicit = null;
+            lastExplicitIdx = null;
+            lastExplicitGroupId = null;
+          }
+          if (shouldBeInherited && lastExplicit) {
+            const inherited: OptionInheritanceStackEntryDto = {
+              ...lastExplicit,
+              level: ctx.level,
+              levelId: ctx.levelId,
+              isExplicit: false,
+              isInherited: true,
+              isOverridden: false,
+              overriddenBy: undefined,
+              value: lastExplicit.value ?? null,
+              name: lastExplicit.name ?? null,
+            };
+            stack.push(inherited);
+          }
         }
       }
 
-      // Override-Logik: Markiere NUR echte Overrides (späteres explizites Setzen auf Kind-Ebene)
+      // Override-Logik
       for (let i = 0; i < stack.length; ++i) {
         const current = stack[i];
-        let nextExplicitIdx = -1;
+        if (!current.isExplicit) {
+          current.isOverridden = false;
+          current.overriddenBy = undefined;
+          continue;
+        }
+        let overridden = false;
+        let overriddenBy: OptionInheritanceStackEntryDto | undefined =
+          undefined;
         for (let j = i + 1; j < stack.length; ++j) {
-          if (stack[j].isExplicit) {
-            nextExplicitIdx = j;
-            break;
+          const next = stack[j];
+          if (next.isExplicit) {
+            // Einzeloption
+            if (!current.optionGroup && !next.optionGroup) {
+              overridden = true;
+              overriddenBy = next;
+              break;
+            }
+            // Gruppenoption – gleiche Gruppe und Code
+            if (
+              current.optionGroup &&
+              next.optionGroup &&
+              current.optionGroup.id === next.optionGroup.id &&
+              (current.level !== next.level || current.levelId !== next.levelId)
+            ) {
+              overridden = true;
+              overriddenBy = next;
+              break;
+            }
           }
         }
-        const next =
-          nextExplicitIdx !== -1 ? stack[nextExplicitIdx] : undefined;
-        if (
-          current.isExplicit &&
-          next &&
-          (current.level !== next.level || current.levelId !== next.levelId)
-        ) {
-          current.isOverridden = true;
+        current.isOverridden = overridden;
+        if (overridden && overriddenBy) {
           let optionGroupMeta:
             | { id: number; name: string; comment?: string | null }
             | undefined;
-          if (next.optionGroup) {
+          if (overriddenBy.optionGroup) {
             optionGroupMeta = {
-              id: next.optionGroup.id,
-              name: next.optionGroup.name ?? '',
-              comment: next.optionGroup.comment ?? null,
+              id: overriddenBy.optionGroup.id,
+              name: overriddenBy.optionGroup.name ?? '',
+              comment: overriddenBy.optionGroup.comment ?? null,
             };
           }
           current.overriddenBy = {
-            level: next.level,
-            levelId: next.levelId,
-            value: next.value,
+            level: overriddenBy.level,
+            levelId: overriddenBy.levelId,
+            value: overriddenBy.value,
             ...(optionGroupMeta ? { optionGroup: optionGroupMeta } : {}),
           };
         } else {
-          current.isOverridden = false;
           current.overriddenBy = undefined;
         }
       }
@@ -216,6 +283,24 @@ export class OptionStackAssembler {
     return { stacks, allGroups };
   }
 
+  // Hilfsmethode: Erste explizite Ebene im Stack finden (für originLevel)
+  private getOriginLevel(
+    stack: OptionInheritanceStackEntryDto[],
+  ): { originLevel: string; originLevelId: number } | undefined {
+    // Suche vom Ende nach der letzten expliziten Option, die vor einer Vererbung stand
+    let lastOrigin: { originLevel: string; originLevelId: number } | undefined;
+    for (let i = 0; i < stack.length; ++i) {
+      const entry = stack[i];
+      if (entry.isExplicit) {
+        lastOrigin = {
+          originLevel: entry.level,
+          originLevelId: entry.levelId,
+        };
+      }
+    }
+    return lastOrigin;
+  }
+
   buildSlimDtoFromStack(
     code: string,
     stack: OptionInheritanceStackEntryDto[],
@@ -224,7 +309,7 @@ export class OptionStackAssembler {
     const top = stack[stack.length - 1];
     const isInherited = !!top.isInherited;
 
-    // OriginChain aufbauen
+    // OriginChain
     const originChain = stack.map((s) => ({
       level: s.level,
       levelId: s.levelId,
@@ -241,7 +326,19 @@ export class OptionStackAssembler {
       optionGroupName: s.optionGroup?.name ?? '',
     }));
 
-    // Gruppen-Details: KEIN inherited/explicit pro Option innerhalb der Gruppe, nur Metadaten!
+    // originLevel/Id = letzte explizite Quelle vor der Vererbung!
+    let originInfo: Partial<EffectiveDhcpOptionSlimDto['source']> = {};
+    if (isInherited && stack.some((s) => s.isExplicit)) {
+      const firstExplicit = this.getOriginLevel(stack);
+      if (firstExplicit) {
+        originInfo = {
+          originLevel: firstExplicit.originLevel,
+          originLevelId: firstExplicit.originLevelId,
+        };
+      }
+    }
+
+    // OptionGroup-Details
     let optionGroupDetails:
       | EffectiveDhcpOptionSlimDto['source']['optionGroup']
       | undefined;
@@ -271,12 +368,18 @@ export class OptionStackAssembler {
           ? 'GROUP_INHERITED'
           : 'GROUP_EXPLICIT',
         isGroupInherited: top.isInherited,
-        groupOriginLevel: top.level,
-        groupOriginLevelId: top.levelId,
+        groupOriginLevel:
+          isInherited && stack.some((s) => s.isExplicit)
+            ? (originInfo.originLevel as string)
+            : top.level,
+        groupOriginLevelId:
+          isInherited && stack.some((s) => s.isExplicit)
+            ? (originInfo.originLevelId as number)
+            : top.levelId,
       };
     }
 
-    // Overridden: Nur auf Stack-Ebene relevant
+    // Overridden wie gehabt
     let overridden: EffectiveDhcpOptionSlimDto['overridden'] | undefined =
       undefined;
     if (stack.length > 1 && !isInherited && top.isExplicit) {
@@ -299,18 +402,6 @@ export class OptionStackAssembler {
           };
           break;
         }
-      }
-    }
-
-    // originLevel: Nur bei inherited!
-    let originInfo: Partial<EffectiveDhcpOptionSlimDto['source']> = {};
-    if (isInherited && stack.some((s) => s.isExplicit)) {
-      const origin = stack.find((s) => s.isExplicit);
-      if (origin) {
-        originInfo = {
-          originLevel: origin.level,
-          originLevelId: origin.levelId,
-        };
       }
     }
 
@@ -369,23 +460,24 @@ export class OptionStackAssembler {
   ): EffectiveDhcpOptionSlimDto[] {
     const dtos: EffectiveDhcpOptionSlimDto[] = [];
 
-    // 1. Alle Options-Dtos
+    // Alle Options-Dtos (direct + group)
     for (const [code, stack] of stacks.entries()) {
       dtos.push(this.buildSlimDtoFromStack(code, stack, contexts));
     }
 
+    // Ergänze leere Gruppenpanels am Target (UI)
     const lastContext = contexts[contexts.length - 1];
     for (const { group, ctxIdx } of allGroups.values()) {
       const already = dtos.some(
         (dto) =>
           dto.source.optionGroup &&
           dto.source.optionGroup.id === group.id &&
-          dto.source.level === lastContext.level.toString() && // FIX: Enum zu String
+          dto.source.level === lastContext.level.toString() &&
           dto.source.levelId === lastContext.levelId,
       );
 
       if (!already) {
-        // Hier explizit als string-Typ setzen, um den Enum-Lint-Fehler zu vermeiden:
+        // explizit/inherited korrekt markieren:
         const isExplicit = ctxIdx === contexts.length - 1;
         const type: 'GROUP_EXPLICIT' | 'GROUP_INHERITED' = isExplicit
           ? 'GROUP_EXPLICIT'
@@ -411,8 +503,12 @@ export class OptionStackAssembler {
               options: [],
               groupInheritanceType: type,
               isGroupInherited: !isExplicit,
-              groupOriginLevel: contexts[ctxIdx].level,
-              groupOriginLevelId: contexts[ctxIdx].levelId,
+              groupOriginLevel: !isExplicit
+                ? contexts[ctxIdx].level
+                : lastContext.level,
+              groupOriginLevelId: !isExplicit
+                ? contexts[ctxIdx].levelId
+                : lastContext.levelId,
             },
           },
           overridden: undefined,
