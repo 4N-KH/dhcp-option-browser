@@ -6,13 +6,13 @@ import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionGroupDhcpOption } from '@/infrastructure/database/csp/option-group-dhcp-option.entity';
 import { DhcpOptionRaw } from './dhcp-option-raw.type';
 import { OptionGroupMetaFactory } from '../option-group-meta.factory';
-import { DhcpOptionRawMapper } from '../dhcp-option-raw.mapper';
 import { DhcpGlobalConfigOptionGroup } from '@/infrastructure/database/csp/global-config-option-group.entity';
 import { IpSpaceOptionGroup } from '@/infrastructure/database/csp/ip-space-option-group.entity';
 import { AddressBlockOptionGroup } from '@/infrastructure/database/csp/address-block-option-group.entity';
 import { SubnetOptionGroup } from '@/infrastructure/database/csp/subnet-option-group.entity';
 import { RangeOptionGroup } from '@/infrastructure/database/csp/range-option-group.entity';
 import { FixedAddressOptionGroup } from '@/infrastructure/database/csp/fixed-address-option-group.entity';
+import { DhcpOptionRawMapper } from '../dhcp-option-raw.mapper';
 
 @Injectable()
 export class OptionGroupsLoader {
@@ -76,36 +76,32 @@ export class OptionGroupsLoader {
     }
     if (!groupLinks.length) return [];
 
-    // Alle Gruppen samt Optionen laden
-    const results: { group: OptionGroup; options: DhcpOptionRaw[] }[] = [];
-    for (const link of groupLinks) {
-      const group = await this.optionGroupDhcpOptionRepo.manager.findOne(
-        OptionGroup,
-        {
-          where: { id: link.optionGroupId },
-          relations: [
-            'dhcpOptions',
-            'dhcpOptions.optionCode',
-            'dhcpOptions.optionCode.optionSpace',
-          ],
-        },
-      );
-      if (!group) continue;
+    // NEU: Lade alle OptionGroups mit allen Optionen in einem Query
+    const allGroupIds = groupLinks.map((gl) => gl.optionGroupId);
+    if (!allGroupIds.length) return [];
 
-      const options = await this.optionGroupDhcpOptionRepo.find({
-        where: { optionGroupId: group.id },
-        relations: ['optionCode', 'optionCode.optionSpace'],
-      });
-      const mappedOptions: DhcpOptionRaw[] = options.map((o) =>
+    const groups = await this.optionGroupDhcpOptionRepo.manager.find(
+      OptionGroup,
+      {
+        where: allGroupIds.map((id) => ({ id })),
+        relations: [
+          'dhcpOptions',
+          'dhcpOptions.optionCode',
+          'dhcpOptions.optionCode.optionSpace',
+        ],
+      },
+    );
+
+    return groups.map((group) => ({
+      group,
+      options: (group.dhcpOptions ?? []).map((ogdo) =>
         this.dhcpOptionRawMapper.map({
-          ...o,
-          option_code: o.optionCode?.code || '',
-          option_value: o.option_value,
-          type: o.optionCode?.type ?? null,
+          option_code: ogdo.optionCode?.code || '',
+          option_value: ogdo.option_value,
+          type: ogdo.optionCode?.type ?? null,
+          optionCode: ogdo.optionCode ?? null,
         }),
-      );
-      results.push({ group, options: mappedOptions });
-    }
-    return results;
+      ),
+    }));
   }
 }

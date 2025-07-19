@@ -13,7 +13,10 @@ type GroupPanelMeta = {
   group: OptionGroupInSource;
   status: "GROUP_EXPLICIT" | "GROUP_INHERITED";
   originLevel?: string;
-  options: EffectiveDhcpOptionSlimDto[];
+  // Alle Optionen der Gruppe, wie im Group-Objekt!
+  allOptions: OptionGroupInSource["options"];
+  // Effektive Optionen dieser Gruppe für das Objekt (zur Markierung)
+  effectiveCodes: Set<string>;
 };
 
 const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
@@ -21,40 +24,43 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
   options,
   error,
 }) => {
-  // Bessere Gruppierung (zeigt JEDES Group-Panel, auch wenn keine Option in diesem Objekt zur Gruppe gehört)
+  // Panel-Logik: Immer alle Options pro Gruppe anzeigen!
   const { directOptions, groupPanels } = useMemo(() => {
     if (!options) return { directOptions: [], groupPanels: [] as GroupPanelMeta[] };
 
     const directOptions: EffectiveDhcpOptionSlimDto[] = [];
-    // Hilfsspeicher für ALLE Gruppen
     const groupMap = new Map<number, GroupPanelMeta>();
 
-    // 1. Sammle alle Group-Metadaten (egal, ob Optionen darin enthalten sind!)
+    // 1. Für alle Optionen: Panel-Meta bauen (alle Groups!)
     for (const opt of options) {
       const group = opt.source.optionGroup;
       if (group && typeof group.id === "number") {
         if (!groupMap.has(group.id)) {
+          // Finde alle effektiven Codes dieser Gruppe für späteres Markieren
+          const effCodes = new Set(
+            options
+              .filter(o => o.source.optionGroup?.id === group.id && o.code)
+              .map(o => o.code)
+          );
           groupMap.set(group.id, {
             group,
             status: (group.groupInheritanceType || opt.source.type) as "GROUP_EXPLICIT" | "GROUP_INHERITED",
             originLevel: group.groupOriginLevel || opt.source.originLevel,
-            options: [],
+            allOptions: group.options ?? [],
+            effectiveCodes: effCodes,
           });
         }
       }
     }
 
-    // 2. Ordne jede Gruppenoption der passenden Gruppe zu
+    // 2. Direkte Optionen (ohne OptionGroup)
     for (const opt of options) {
       const group = opt.source.optionGroup;
-      if (group && typeof group.id === "number") {
-        groupMap.get(group.id)!.options.push(opt);
-      } else {
+      if (!group || typeof group.id !== "number") {
         directOptions.push(opt);
       }
     }
 
-    // 3. Wenn eine Gruppe KEINE Optionen enthält, wird sie trotzdem als leeres Panel angezeigt (korrekt!)
     return { directOptions, groupPanels: Array.from(groupMap.values()) };
   }, [options]);
 
@@ -96,13 +102,13 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
       {/* Option Groups */}
       <div>
         <div className="text-blue-300 font-semibold mb-2 text-base">Option Groups</div>
-        {groupPanels.length > 0 ? groupPanels.map(({ group, status, originLevel, options }) => (
+        {groupPanels.length > 0 ? groupPanels.map(({ group, status, originLevel, allOptions }) => (
           <OptionGroupPanel
             key={group.id}
             group={group}
             status={status}
             originLevel={originLevel}
-            options={options}
+            options={allOptions}
           />
         )) : (
           <div className="text-gray-500 py-2 px-4">No option groups</div>

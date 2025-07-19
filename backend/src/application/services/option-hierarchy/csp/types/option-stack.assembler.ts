@@ -36,7 +36,6 @@ export class OptionStackAssembler {
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
     >;
   } {
-    // 1. Codes und Gruppen sammeln
     const allCodes = new Set<string>();
     const groupStatus = new Map<number, GroupStatus>();
 
@@ -61,7 +60,6 @@ export class OptionStackAssembler {
       });
     }
 
-    // 2. Overridden suchen
     for (const [groupId, stat] of groupStatus.entries()) {
       for (let j = stat.explicitAt + 1; j < contexts.length; ++j) {
         const nextCtx = contexts[j];
@@ -76,7 +74,6 @@ export class OptionStackAssembler {
       }
     }
 
-    // 3. Explizite Gruppen als inherited sichtbar machen
     for (const [groupId, stat] of groupStatus.entries()) {
       for (let i = stat.explicitAt + 1; i < contexts.length; ++i) {
         const ctx = contexts[i];
@@ -97,7 +94,6 @@ export class OptionStackAssembler {
       }
     }
 
-    // 4. Map für alle Groups am Target für buildSlimDtoForAll
     const allGroups = new Map<
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
@@ -114,7 +110,6 @@ export class OptionStackAssembler {
       }
     }
 
-    // 5. Stack für jede Option (HIER ist die robuste Logik)
     const stacks = new Map<string, OptionInheritanceStackEntryDto[]>();
     for (const code of allCodes) {
       const stack: OptionInheritanceStackEntryDto[] = [];
@@ -189,7 +184,7 @@ export class OptionStackAssembler {
           continue;
         }
 
-        // inherited – aber: WENN eine Option auf Child überschrieben wurde, ist diese jetzt die neue Quelle!
+        // inherited – WENN eine Option auf Child überschrieben wurde, ist diese jetzt die neue Quelle!
         if (lastExplicit && lastExplicitIdx !== null) {
           let shouldBeInherited = true;
           if (
@@ -198,7 +193,6 @@ export class OptionStackAssembler {
               (g) => g.group.id === lastExplicitGroupId && g.options.length > 0,
             )
           ) {
-            // Hier wird OptionGroup überschrieben, also keine weitere Vererbung ab hier
             shouldBeInherited = false;
             lastExplicit = null;
             lastExplicitIdx = null;
@@ -283,11 +277,10 @@ export class OptionStackAssembler {
     return { stacks, allGroups };
   }
 
-  // Hilfsmethode: Erste explizite Ebene im Stack finden (für originLevel)
+  // Hilfsmethode: Letzte explizite Ebene im Stack vor der Vererbung finden
   private getOriginLevel(
     stack: OptionInheritanceStackEntryDto[],
   ): { originLevel: string; originLevelId: number } | undefined {
-    // Suche vom Ende nach der letzten expliziten Option, die vor einer Vererbung stand
     let lastOrigin: { originLevel: string; originLevelId: number } | undefined;
     for (let i = 0; i < stack.length; ++i) {
       const entry = stack[i];
@@ -338,26 +331,42 @@ export class OptionStackAssembler {
       }
     }
 
-    // OptionGroup-Details
+    // OptionGroup-Details **rückwärts alle Kontexte durchsuchen**
     let optionGroupDetails:
       | EffectiveDhcpOptionSlimDto['source']['optionGroup']
       | undefined;
     if (top.optionGroup && contexts) {
-      const groupContext = contexts
-        .find((ctx) => ctx.level === top.level && ctx.levelId === top.levelId)
-        ?.optionGroups.find((g) => g.group.id === top.optionGroup!.id);
+      let groupOptions: {
+        code: string;
+        name?: string;
+        value: string | null;
+        type: string | null;
+        array: boolean | null;
+        optionCodeComment: string | null;
+        optionCodeSource: string | null;
+        optionSpace: any;
+      }[] = [];
 
-      const groupOptions =
-        groupContext?.options.map((opt) => ({
-          code: String(opt.code ?? opt.option_code),
-          name: opt.name ?? undefined,
-          value: opt.value ?? opt.option_value ?? null,
-          type: opt.type ?? null,
-          array: typeof opt.array === 'boolean' ? opt.array : null,
-          optionCodeComment: opt.optionCodeComment ?? null,
-          optionCodeSource: opt.optionCodeSource ?? null,
-          optionSpace: opt.optionSpace ?? null,
-        })) ?? [];
+      // Suche von unten nach oben: Erste explizite Optionsliste für diese Group finden
+      for (let k = contexts.length - 1; k >= 0; --k) {
+        const ctx = contexts[k];
+        const g = ctx.optionGroups.find(
+          (g) => g.group.id === top.optionGroup!.id && g.options.length > 0,
+        );
+        if (g) {
+          groupOptions = g.options.map((opt) => ({
+            code: String(opt.code ?? opt.option_code),
+            name: opt.name ?? undefined,
+            value: opt.value ?? opt.option_value ?? null,
+            type: opt.type ?? null,
+            array: typeof opt.array === 'boolean' ? opt.array : null,
+            optionCodeComment: opt.optionCodeComment ?? null,
+            optionCodeSource: opt.optionCodeSource ?? null,
+            optionSpace: opt.optionSpace ?? null,
+          }));
+          break;
+        }
+      }
 
       optionGroupDetails = {
         id: top.optionGroup.id,
@@ -460,30 +469,103 @@ export class OptionStackAssembler {
   ): EffectiveDhcpOptionSlimDto[] {
     const dtos: EffectiveDhcpOptionSlimDto[] = [];
 
-    // Alle Options-Dtos (direct + group)
+    // --- DEBUG: Start-Log für Übersicht der Inputs
+    // (deaktiviere für riesige Datenmengen, oder nutze logLevel)
+    console.warn('[DEBUG] buildSlimDtoForAll called');
+    console.warn(
+      '[DEBUG] All stacks:',
+      Array.from(stacks.entries()).map(([code, stack]) => ({
+        code,
+        stack: stack.map((s) => ({
+          level: s.level,
+          levelId: s.levelId,
+          isExplicit: s.isExplicit,
+          isInherited: s.isInherited,
+          optionGroup: s.optionGroup?.name || null,
+          value: s.value,
+        })),
+      })),
+    );
+    console.warn('[DEBUG] Contexts:', JSON.stringify(contexts, null, 2));
+    console.warn(
+      '[DEBUG] allGroups:',
+      Array.from(allGroups.values()).map((g) => ({
+        id: g.group.id,
+        name: g.group.name,
+        ctxIdx: g.ctxIdx,
+        ctxLevel: g.ctx.level,
+        ctxLevelId: g.ctx.levelId,
+      })),
+    );
+
+    // --- Alle Options-Dtos (direct + group)
     for (const [code, stack] of stacks.entries()) {
-      dtos.push(this.buildSlimDtoFromStack(code, stack, contexts));
+      const dto = this.buildSlimDtoFromStack(code, stack, contexts);
+      dtos.push(dto);
+
+      // --- DEBUG: Einzel-DTO ausgeben (v.a. für inherited Gruppen interessant)
+      if (dto.source?.optionGroup && !dto.effectiveValue) {
+        // Nur leere Gruppenpanels
+        console.warn(
+          `[DEBUG] DTO leeres Gruppenpanel: code=${dto.code} group=${dto.source.optionGroup.name} type=${dto.source.type} originLevel=${dto.source.optionGroup.groupOriginLevel} options=${(dto.source.optionGroup.options ?? []).length}`,
+        );
+      } else {
+        // Einzeloptionen und Gruppenoptionen mit Wert
+        console.warn(
+          `[DEBUG] DTO Option: code=${dto.code} name=${dto.name} group=${dto.source?.optionGroup?.name || '-'} type=${dto.source.type} value=${dto.effectiveValue}`,
+        );
+      }
     }
 
-    // Ergänze leere Gruppenpanels am Target (UI)
+    // --- Ergänze leere Gruppenpanels am Target (UI) --- VERBESSERT ---
     const lastContext = contexts[contexts.length - 1];
     for (const { group, ctxIdx } of allGroups.values()) {
       const already = dtos.some(
         (dto) =>
-          dto.source.optionGroup &&
+          dto.source?.optionGroup &&
           dto.source.optionGroup.id === group.id &&
           dto.source.level === lastContext.level.toString() &&
           dto.source.levelId === lastContext.levelId,
       );
 
       if (!already) {
-        // explizit/inherited korrekt markieren:
         const isExplicit = ctxIdx === contexts.length - 1;
         const type: 'GROUP_EXPLICIT' | 'GROUP_INHERITED' = isExplicit
           ? 'GROUP_EXPLICIT'
           : 'GROUP_INHERITED';
 
-        dtos.push({
+        // *** PATCH: letzte explizite Optionsliste der Gruppe suchen (von ctxIdx rückwärts!) ***
+        let groupOptions: {
+          code: string;
+          name?: string;
+          value: string | null;
+          type: string | null;
+          array: boolean | null;
+          optionCodeComment: string | null;
+          optionCodeSource: string | null;
+          optionSpace: any;
+        }[] = [];
+        for (let i = ctxIdx; i >= 0; --i) {
+          const ctx = contexts[i];
+          const g = ctx.optionGroups.find(
+            (og) => og.group.id === group.id && og.options.length > 0,
+          );
+          if (g) {
+            groupOptions = g.options.map((opt) => ({
+              code: String(opt.code ?? opt.option_code),
+              name: opt.name ?? undefined,
+              value: opt.value ?? opt.option_value ?? null,
+              type: opt.type ?? null,
+              array: typeof opt.array === 'boolean' ? opt.array : null,
+              optionCodeComment: opt.optionCodeComment ?? null,
+              optionCodeSource: opt.optionCodeSource ?? null,
+              optionSpace: opt.optionSpace ?? null,
+            }));
+            break;
+          }
+        }
+
+        const groupDto: EffectiveDhcpOptionSlimDto = {
           code: '',
           name: undefined,
           effectiveValue: null,
@@ -500,7 +582,7 @@ export class OptionStackAssembler {
               id: group.id,
               name: group.name ?? '',
               comment: group.comment ?? null,
-              options: [],
+              options: groupOptions,
               groupInheritanceType: type,
               isGroupInherited: !isExplicit,
               groupOriginLevel: !isExplicit
@@ -534,9 +616,31 @@ export class OptionStackAssembler {
               optionGroupName: group.name ?? '',
             },
           ],
-        });
+        };
+        dtos.push(groupDto);
+
+        // --- DEBUG: Panel für leere/inherited Gruppen
+        const optionsLength =
+          groupDto.source?.optionGroup?.options?.length ?? 0;
+        console.warn(
+          `[DEBUG] Add leeres Gruppenpanel am Target: group=${group.name} (ID=${group.id}), type=${type}, ctxIdx=${ctxIdx}, contextLevel=${lastContext.level}, options=${optionsLength}`,
+        );
       }
     }
+
+    // --- DEBUG: Endgültige DTO-Übersicht
+    console.warn(
+      '[DEBUG] Alle SlimDTOs (final):\n' +
+        dtos
+          .map(
+            (dto) =>
+              `  - ${dto.code || '[GROUP]'} | ${dto.name || dto.source?.optionGroup?.name || ''} | type=${dto.source.type} | value=${dto.effectiveValue || '[leer]'} | options=${dto.source?.optionGroup?.options?.length ?? 0}`,
+          )
+          .join('\n'),
+    );
+    // Optional: Komplett als JSON, falls du in VSCode/JQ weiterarbeiten willst
+    // console.warn(JSON.stringify(dtos, null, 2));
+
     return dtos;
   }
 }

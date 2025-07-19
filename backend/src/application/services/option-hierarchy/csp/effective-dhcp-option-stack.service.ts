@@ -57,9 +57,36 @@ export class EffectiveDhcpOptionStackService {
       allContexts.push({ ...ctx, options, optionGroups });
     }
 
+    // *** DEBUG: Ausführlicher Dump aller geladenen Kontexte ***
+    if (enableDebugLogging) {
+      this.logger.warn(
+        '[DEBUG] Dump of allContexts (incl. OptionGroups and Options):\n' +
+          JSON.stringify(
+            allContexts.map((ctx) => ({
+              level: ctx.level,
+              levelId: ctx.levelId,
+              options: ctx.options.map((o) => ({
+                code: o.code,
+                value: o.option_value,
+                name: o.name,
+              })),
+              optionGroups: ctx.optionGroups.map((g) => ({
+                group: g.group?.name ?? g.group?.id,
+                groupId: g.group?.id,
+                options: g.options.map((o) => ({
+                  code: o.code,
+                  value: o.option_value,
+                  name: o.name,
+                })),
+              })),
+            })),
+            null,
+            2,
+          ),
+      );
+    }
+
     // 3. OptionGroups robust mit Vererbung (explizit, inherited, nie doppelt!)
-    // - Alle expliziten Groups in Map: groupId -> {group, Ebene, ctx}
-    // - Für jede Ebene: inheritedGroups = alle Groups von vorherigen Ebenen, die hier nicht explizit gesetzt sind
     const allGroups = new Map<
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
@@ -78,12 +105,11 @@ export class EffectiveDhcpOptionStackService {
     for (let i = 0; i < allContexts.length; ++i) {
       const ctx = allContexts[i];
       const explicitIds = new Set(ctx.optionGroups.map((g) => g.group.id));
-      // inherited Groups: alle aus früheren Ebenen, die HIER NICHT explizit sind
       for (const [gid, gInfo] of allGroups.entries()) {
         if (gInfo.ctxIdx < i && !explicitIds.has(gid)) {
           ctx.optionGroups.push({
             group: gInfo.group,
-            options: [], // inherited always empty
+            options: [],
           });
         }
       }

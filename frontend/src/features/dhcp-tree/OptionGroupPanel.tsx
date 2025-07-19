@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { OptionGroupInSource } from "@/types/dto/effective-dhcp-option-slim.dto";
-import { StatusBadge } from "./OptionRowHelpers";
-import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
 
 interface OptionGroupPanelProps {
   group: OptionGroupInSource;
   status: "GROUP_EXPLICIT" | "GROUP_INHERITED";
   originLevel?: string;
-  options: EffectiveDhcpOptionSlimDto[];
+  options: OptionGroupInSource["options"];
+  // effectiveCodes: Set<string>;   // <-- NICHT MEHR BENÖTIGT!
 }
 
 const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
@@ -15,6 +14,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
   status,
   originLevel,
   options,
+  // effectiveCodes,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -26,7 +26,15 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
       >
         <div className="flex items-center gap-3">
           <span className="font-bold text-blue-200">{group.name}</span>
-          <StatusBadge status={status} originLevel={originLevel} />
+          {status === "GROUP_INHERITED" ? (
+            <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold">
+              Inherited{originLevel ? <> from <b>{originLevel}</b></> : ""}
+            </span>
+          ) : (
+            <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold">
+              Explicit
+            </span>
+          )}
           {group.comment && (
             <span className="text-xs text-gray-400 ml-2">{group.comment}</span>
           )}
@@ -56,7 +64,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
                 <tr key={opt.code}>
                   <td className="font-mono">{opt.code}</td>
                   <td>{opt.name ?? "–"}</td>
-                  <td>{opt.effectiveValue ?? "–"}</td>
+                  <td>{opt.value ?? "–"}</td>
                   <td>
                     {opt.optionSpace
                       ? `${opt.optionSpace.name}${opt.optionSpace.protocol ? " (" + opt.optionSpace.protocol + ")" : ""}`
