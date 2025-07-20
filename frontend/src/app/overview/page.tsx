@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { fetchDhcpLightTree } from "@/services/dhcp-hierarchy.service";
 import LightTreeView from "@/features/dhcp-tree/LightTreeView";
 import DhcpPropertiesPanel from "@/features/dhcp-tree/DhcpPropertiesPanel";
-import { getDefaultSelection } from "@/features/dhcp-tree/helpers";
+import { getDefaultSelection } from "@/features/dhcp-tree/helpers/tree-node-helpers";
 import { TreeSelection } from "@/features/dhcp-tree/types";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 import ImportWithProgress from "@/features/config-import/ImportWithProgress";

@@ -38,7 +38,8 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
             status: (group.groupInheritanceType || opt.source.type) as "GROUP_EXPLICIT" | "GROUP_INHERITED",
             originLevel: group.groupOriginLevel || opt.source.originLevel,
             originLevelId: group.groupOriginLevelId || opt.source.originLevelId,
-            originLevelLabel: group.originLevelLabel, // <<< Hier direkt vom Backend
+            // Präferenz: Group-Label (Backend), sonst undefined
+            originLevelLabel: group.originLevelLabel,
           });
         }
       }
@@ -93,13 +94,14 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
       {/* Option Groups */}
       <div>
         <div className="text-blue-300 font-semibold mb-2 text-base">Option Groups</div>
-        {groupPanels.length > 0 ? groupPanels.map(({ group, status, originLevel, originLevelLabel }) => (
+        {groupPanels.length > 0 ? groupPanels.map(({ group, status, originLevel, originLevelLabel, originLevelId }) => (
           <OptionGroupPanel
             key={group.id}
             group={group}
             status={status}
             originLevel={originLevel}
             originLevelLabel={originLevelLabel}
+            originLevelId={originLevelId}
             options={group.options}
           />
         )) : (

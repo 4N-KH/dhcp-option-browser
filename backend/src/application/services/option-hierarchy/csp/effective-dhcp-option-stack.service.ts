@@ -8,7 +8,6 @@ import { DhcpOptionRaw } from './types/dhcp-option-raw.type';
 import { OptionStackAssembler } from './types/option-stack.assembler';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 
-// Importiere die Entities für die Label-Maps:
 import { IpSpace } from '@/infrastructure/database/csp/ip-space.entity';
 import { AddressBlock } from '@/infrastructure/database/csp/address-block.entity';
 import { Subnet } from '@/infrastructure/database/csp/subnet.entity';
@@ -33,7 +32,6 @@ export class EffectiveDhcpOptionStackService {
     private readonly explicitOptionsLoader: ExplicitOptionsLoader,
     private readonly optionGroupsLoader: OptionGroupsLoader,
     private readonly optionStackAssembler: OptionStackAssembler,
-    // Für die sprechenden Labels:
     @InjectRepository(IpSpace)
     private readonly ipSpaceRepo: Repository<IpSpace>,
     @InjectRepository(AddressBlock)
@@ -77,7 +75,6 @@ export class EffectiveDhcpOptionStackService {
       allContexts.push({ ...ctx, options, optionGroups });
     }
 
-    // *** DEBUG: Ausführlicher Dump aller geladenen Kontexte ***
     if (enableDebugLogging) {
       this.logger.warn(
         '[DEBUG] Dump of allContexts (incl. OptionGroups and Options):\n' +
@@ -143,7 +140,7 @@ export class EffectiveDhcpOptionStackService {
       });
     }
 
-    // ---------- NEU: Label-Maps für Kontext-Labels bauen (ohne FixedAddress!) ----------
+    // ---------- Label-Maps für Kontext-Labels (auch für Einzeloptionen) ----------
     const [ipSpaces, addressBlocks, subnets, ranges, globalConfig] =
       await Promise.all([
         this.ipSpaceRepo.find(),
@@ -171,7 +168,7 @@ export class EffectiveDhcpOptionStackService {
       rangesById: new Map(
         ranges.map((x) => [x.id, { name: x.name, start: x.start, end: x.end }]),
       ),
-      // KEIN fixedAddressesById!
+      // KEIN fixedAddressesById nötig
     };
 
     // 4. Stacks bauen (inkl. OptionGroup-Inheritance) UND allGroups weitergeben!
@@ -182,12 +179,12 @@ export class EffectiveDhcpOptionStackService {
       this.logger.warn(`[DEBUG] OptionStacks assembled, begin DTO mapping...`);
     }
 
-    // 5. Slim-DTOs für das Frontend (alle Parameter übergeben!)
+    // 5. Slim-DTOs für das Frontend (alle Parameter übergeben! => auch für Einzeloptionen Labels!)
     const slimDtos = this.optionStackAssembler.buildSlimDtoForAll(
       stacks,
       allContexts,
       fullAllGroups,
-      contextTreeMaps, // <<--- LABEL-MAPS für sprechende Labels
+      contextTreeMaps,
     );
 
     if (enableDebugLogging) {

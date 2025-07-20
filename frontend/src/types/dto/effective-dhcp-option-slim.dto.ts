@@ -45,6 +45,8 @@ export interface EffectiveDhcpOptionSlimDto {
     type: "EXPLICIT" | "INHERITED" | "GROUP_EXPLICIT" | "GROUP_INHERITED";
     originLevel?: string;
     originLevelId?: number;
+    /** <-- DAS MUSS HIER STEHEN: */
+    originLevelLabel?: string;
     optionGroup?: OptionGroupInSource;
   };
   overridden?: {
@@ -60,7 +62,6 @@ export interface EffectiveDhcpOptionSlimDto {
   comment?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
-  // Zusätzliche Meta
   inheritanceType?: "EXPLICIT" | "INHERITED" | "GROUP_EXPLICIT" | "GROUP_INHERITED";
   isInherited?: boolean;
   isOverridden?: boolean;

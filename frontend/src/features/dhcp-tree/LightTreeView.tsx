@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 import { TreeSelection, DhcpObjectType } from "./types";
-import { getChildren, getNodeLabel } from "./helpers";
+import { getChildren, getNodeLabel } from "./helpers/tree-node-helpers";
 import { getIcon } from "./tree-icons";
 
 interface LightTreeViewProps {

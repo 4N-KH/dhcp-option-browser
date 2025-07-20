@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useDhcpHierarchy } from "@/hooks/useDhcpHierarchy";
 import LightTreeView from "./LightTreeView";
 import DhcpPropertiesPanel from "./DhcpPropertiesPanel";
-import { getDefaultSelection } from "./helpers";
+import { getDefaultSelection } from "./helpers/tree-node-helpers";
 import { TreeSelection } from "./types";
 import ImportWithProgress from "../config-import/ImportWithProgress";
 

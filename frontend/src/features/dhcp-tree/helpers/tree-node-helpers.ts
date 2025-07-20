@@ -6,7 +6,7 @@ import {
   LightRangeDto,
   LightFixedAddressDto,
 } from "@/types/dto/dhcp-light-tree.dto";
-import { TreeSelection } from "./types";
+import { TreeSelection } from "../types";
 
 // Initial selection for root node
 export function getDefaultSelection(tree: DhcpLightTreeDto): TreeSelection {

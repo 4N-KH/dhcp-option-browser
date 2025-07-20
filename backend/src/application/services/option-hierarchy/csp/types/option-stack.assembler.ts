@@ -1,3 +1,5 @@
+// backend/src/application/services/option-hierarchy/csp/types/option-stack.assembler.ts
+
 import { Injectable, Logger } from '@nestjs/common';
 import { OptionInheritanceStackEntryFactory } from '../option-stack-entry.factory';
 import { OptionGroupMetaFactory } from '../option-group-meta.factory';
@@ -44,30 +46,34 @@ function getOriginLevelLabel(
   // AddressBlock
   if (originLevel === 'addressBlock' && contextTreeMaps?.addressBlocksById) {
     const ab = contextTreeMaps.addressBlocksById.get(originLevelId);
-    if (ab?.name && ab.name.trim().length > 0) return ab.name;
-    if (ab?.address && ab.cidr != null) return `${ab.address}/${ab.cidr}`;
+    if (ab?.name && ab.name.trim().length > 0)
+      return `address block ${ab.name}`;
+    if (ab?.address && ab.cidr != null)
+      return `address block ${ab.address}/${ab.cidr}`;
     return `address block #${originLevelId}`;
   }
   // Subnet
   if (originLevel === 'subnet' && contextTreeMaps?.subnetsById) {
     const sn = contextTreeMaps.subnetsById.get(originLevelId);
-    if (sn?.name && sn.name.trim().length > 0) return sn.name;
-    if (sn?.address && sn.cidr != null) return `${sn.address}/${sn.cidr}`;
-    if (sn?.address) return sn.address;
+    if (sn?.name && sn.name.trim().length > 0) return `subnet ${sn.name}`;
+    if (sn?.address && sn.cidr != null)
+      return `subnet ${sn.address}/${sn.cidr}`;
+    if (sn?.address) return `subnet ${sn.address}`;
     return `subnet #${originLevelId}`;
   }
   // Range
   if (originLevel === 'range' && contextTreeMaps?.rangesById) {
     const rg = contextTreeMaps.rangesById.get(originLevelId);
-    if (rg?.name && rg.name.trim().length > 0) return rg.name;
-    if (rg?.start && rg?.end) return `${rg.start} – ${rg.end}`;
+    if (rg?.name && rg.name.trim().length > 0) return `range ${rg.name}`;
+    if (rg?.start && rg?.end) return `range ${rg.start} – ${rg.end}`;
     return `range #${originLevelId}`;
   }
   // FixedAddress
   if (originLevel === 'fixedAddress' && contextTreeMaps?.fixedAddressesById) {
     const fa = contextTreeMaps.fixedAddressesById.get(originLevelId);
-    if (fa?.name && fa.name.trim().length > 0) return fa.name;
-    if (fa?.address) return fa.address;
+    if (fa?.name && fa.name.trim().length > 0)
+      return `fixed address ${fa.name}`;
+    if (fa?.address) return `fixed address ${fa.address}`;
     return `fixed address #${originLevelId}`;
   }
   // Fallback
@@ -525,6 +531,7 @@ export class OptionStackAssembler {
             : 'EXPLICIT',
         ...(optionGroupDetails ? { optionGroup: optionGroupDetails } : {}),
         ...(originInfo ? originInfo : {}),
+        ...(originLevelLabel ? { originLevelLabel } : {}), // <-- Neu: Label immer auch für Einzeloptionen
       },
       ...(overridden ? { overridden } : {}),
       comment: top.comment ?? null,

@@ -1,15 +1,20 @@
 import React from "react";
 import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
+import { getInheritedLabel } from "./helpers/labels";
 
 // Status-Badge für Einzeloptionen und Gruppenpanel
 export function StatusBadge({
   status,
   overridden,
   originLevel,
+  originLevelId,
+  originLevelLabel,
 }: {
   status: EffectiveDhcpOptionSlimDto["source"]["type"];
   overridden?: EffectiveDhcpOptionSlimDto["overridden"];
   originLevel?: string;
+  originLevelId?: number;
+  originLevelLabel?: string;
 }) {
   if (overridden)
     return (
@@ -20,7 +25,9 @@ export function StatusBadge({
   if (status === "INHERITED" || status === "GROUP_INHERITED")
     return (
       <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold">
-        Inherited{originLevel ? <> from <b>{originLevel}</b></> : ""}
+        {originLevelLabel
+          ? <>Inherited from <b>{originLevelLabel}</b></>
+          : getInheritedLabel(originLevel, undefined, originLevelId)}
       </span>
     );
   return (
@@ -36,6 +43,14 @@ export function DhcpOptionRow({
 }: {
   option: EffectiveDhcpOptionSlimDto;
 }) {
+  // 1. Versuche originLevelLabel direkt vom Option-Objekt (neues Backend!).
+  // 2. Sonst fallback: originLevelLabel aus OptionGroup.
+  // 3. Sonst: Helper generiert Default.
+  const originLevelLabel =
+    option.source.originLevelLabel ||
+    option.source.optionGroup?.originLevelLabel ||
+    undefined;
+
   return (
     <tr>
       <td className="font-mono">{option.code}</td>
@@ -52,6 +67,8 @@ export function DhcpOptionRow({
           status={option.source.type}
           overridden={option.overridden}
           originLevel={option.source.originLevel}
+          originLevelId={option.source.originLevelId}
+          originLevelLabel={originLevelLabel}
         />
       </td>
       <td>{option.comment ?? "–"}</td>
