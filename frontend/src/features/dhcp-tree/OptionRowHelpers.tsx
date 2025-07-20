@@ -18,51 +18,54 @@ export function StatusBadge({
 }) {
   if (overridden)
     return (
-      <span className="bg-yellow-900 text-yellow-200 px-2 py-0.5 rounded text-xs font-semibold">
+      <span className="bg-yellow-900 text-yellow-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
         Overridden
       </span>
     );
   if (status === "INHERITED" || status === "GROUP_INHERITED")
     return (
-      <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold">
+      <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
         {originLevelLabel
           ? <>Inherited from <b>{originLevelLabel}</b></>
           : getInheritedLabel(originLevel, undefined, originLevelId)}
       </span>
     );
   return (
-    <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold">
+    <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
       Explicit
     </span>
   );
 }
 
-// Einzelne Optionszeile für Direct-Options
+// Einzelne Optionszeile für Options-Tabelle
 export function DhcpOptionRow({
   option,
+  rowIndex,
 }: {
   option: EffectiveDhcpOptionSlimDto;
+  rowIndex: number;
 }) {
-  // 1. Versuche originLevelLabel direkt vom Option-Objekt (neues Backend!).
-  // 2. Sonst fallback: originLevelLabel aus OptionGroup.
-  // 3. Sonst: Helper generiert Default.
   const originLevelLabel =
     option.source.originLevelLabel ||
     option.source.optionGroup?.originLevelLabel ||
     undefined;
 
   return (
-    <tr>
-      <td className="font-mono">{option.code}</td>
-      <td>{option.name ?? "–"}</td>
-      <td>{option.effectiveValue ?? "–"}</td>
-      <td>
+    <tr
+      className={`${
+        rowIndex % 2 === 0 ? "bg-blue-950/40" : ""
+      } hover:bg-blue-900/40 transition`}
+    >
+      <td className="font-mono px-3 py-1">{option.code}</td>
+      <td className="px-3 py-1">{option.name ?? "–"}</td>
+      <td className="font-mono px-3 py-1">{option.effectiveValue ?? "–"}</td>
+      <td className="px-3 py-1">
         {option.optionSpace
           ? `${option.optionSpace.name}${option.optionSpace.protocol ? " (" + option.optionSpace.protocol + ")" : ""}`
           : "–"}
       </td>
-      <td>{option.type ?? "–"}</td>
-      <td>
+      <td className="px-3 py-1">{option.type ?? "–"}</td>
+      <td className="px-3 py-1">
         <StatusBadge
           status={option.source.type}
           overridden={option.overridden}
@@ -71,7 +74,7 @@ export function DhcpOptionRow({
           originLevelLabel={originLevelLabel}
         />
       </td>
-      <td>{option.comment ?? "–"}</td>
+      <td className="px-3 py-1">{option.comment ?? "–"}</td>
     </tr>
   );
 }

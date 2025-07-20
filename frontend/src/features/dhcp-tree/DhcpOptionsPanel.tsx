@@ -38,7 +38,6 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
             status: (group.groupInheritanceType || opt.source.type) as "GROUP_EXPLICIT" | "GROUP_INHERITED",
             originLevel: group.groupOriginLevel || opt.source.originLevel,
             originLevelId: group.groupOriginLevelId || opt.source.originLevelId,
-            // Präferenz: Group-Label (Backend), sonst undefined
             originLevelLabel: group.originLevelLabel,
           });
         }
@@ -64,36 +63,38 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
     return <div className="p-6 text-gray-400">No options found for this object.</div>;
 
   return (
-    <div className="bg-blue-950/40 rounded-xl p-6 shadow-sm min-h-[120px] mt-2 overflow-x-auto">
-      {/* Direct Options */}
-      <div className="mb-8">
-        <div className="text-blue-300 font-semibold mb-2 text-base">Direct Options</div>
-        <table className="w-full text-sm border-separate border-spacing-y-1 mb-2">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Eff. Value</th>
-              <th>Option Space</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Comment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {directOptions.length > 0 ? directOptions.map((opt) => (
-              <DhcpOptionRow key={opt.code} option={opt} />
-            )) : (
-              <tr>
-                <td colSpan={7} className="text-gray-500 py-2 text-center">No direct options</td>
+    <div className="bg-blue-950/40 rounded-2xl p-6 shadow min-h-[120px] mt-2 overflow-x-auto">
+      {/* Direct Options as Table */}
+      <div className="mb-10">
+        <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">Options</div>
+        <div className="overflow-x-auto rounded-xl bg-blue-950/60">
+          <table className="min-w-[900px] w-full text-sm border-separate border-spacing-0">
+            <thead>
+              <tr className="text-blue-200 uppercase text-xs font-bold border-b border-blue-900">
+                <th className="py-3 px-3 text-left">Code</th>
+                <th className="py-3 px-3 text-left">Name</th>
+                <th className="py-3 px-3 text-left">Value</th>
+                <th className="py-3 px-3 text-left">Option Space</th>
+                <th className="py-3 px-3 text-left">Type</th>
+                <th className="py-3 px-3 text-left">Status</th>
+                <th className="py-3 px-3 text-left">Comment</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {directOptions.length > 0 ? directOptions.map((opt, i) => (
+                <DhcpOptionRow key={opt.code} option={opt} rowIndex={i} />
+              )) : (
+                <tr>
+                  <td colSpan={7} className="text-gray-500 py-4 text-center">No options</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       {/* Option Groups */}
       <div>
-        <div className="text-blue-300 font-semibold mb-2 text-base">Option Groups</div>
+        <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">Option Groups</div>
         {groupPanels.length > 0 ? groupPanels.map(({ group, status, originLevel, originLevelLabel, originLevelId }) => (
           <OptionGroupPanel
             key={group.id}

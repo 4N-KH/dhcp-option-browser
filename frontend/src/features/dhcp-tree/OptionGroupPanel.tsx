@@ -22,15 +22,15 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mb-4 border border-blue-900 rounded-lg bg-blue-950/30">
+    <div className="mb-5 border border-blue-900 rounded-2xl bg-blue-950/50 shadow">
       <div
-        className="flex items-center justify-between px-4 py-2 cursor-pointer"
+        className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-blue-900/30 rounded-t-2xl transition"
         onClick={() => setOpen((o) => !o)}
       >
         <div className="flex items-center gap-3">
-          <span className="font-bold text-blue-200">{group.name}</span>
+          <span className="font-bold text-blue-200 text-lg">{group.name}</span>
           {status === "GROUP_INHERITED" ? (
-            <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold">
+            <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
               {getInheritedLabel(
                 originLevel || group.groupOriginLevel,
                 originLevelLabel || group.originLevelLabel,
@@ -38,7 +38,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
               )}
             </span>
           ) : (
-            <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold">
+            <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
               Explicit
             </span>
           )}
@@ -47,7 +47,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
           )}
         </div>
         <button
-          className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-200"
+          className="text-xs px-3 py-1 rounded bg-blue-800 text-blue-200 shadow hover:bg-blue-700 transition"
           tabIndex={-1}
         >
           {open ? "Hide Options" : "Show Options"}
@@ -55,38 +55,40 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
       </div>
       {open && (
         <div className="pb-2 px-4">
-          <table className="w-full text-sm mt-1">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Value</th>
-                <th>Option Space</th>
-                <th>Type</th>
-                <th>Comment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {options.length > 0 ? options.map((opt) => (
-                <tr key={opt.code}>
-                  <td className="font-mono">{opt.code}</td>
-                  <td>{opt.name ?? "–"}</td>
-                  <td>{opt.value ?? "–"}</td>
-                  <td>
-                    {opt.optionSpace
-                      ? `${opt.optionSpace.name}${opt.optionSpace.protocol ? " (" + opt.optionSpace.protocol + ")" : ""}`
-                      : "–"}
-                  </td>
-                  <td>{opt.type ?? "–"}</td>
-                  <td>{opt.optionCodeComment ?? "–"}</td>
+          <div className="overflow-x-auto rounded-b-2xl bg-blue-950/70">
+            <table className="min-w-[750px] w-full text-sm border-separate border-spacing-0">
+              <thead>
+                <tr className="text-blue-200 uppercase text-xs font-bold border-b border-blue-900">
+                  <th className="py-2 px-3 text-left">Code</th>
+                  <th className="py-2 px-3 text-left">Name</th>
+                  <th className="py-2 px-3 text-left">Value</th>
+                  <th className="py-2 px-3 text-left">Option Space</th>
+                  <th className="py-2 px-3 text-left">Type</th>
+                  <th className="py-2 px-3 text-left">Comment</th>
                 </tr>
-              )) : (
-                <tr>
-                  <td colSpan={6} className="text-gray-500 py-2 text-center">No options in this group</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {options.length > 0 ? options.map((opt, i) => (
+                  <tr key={opt.code} className={i % 2 === 0 ? "bg-blue-950/40" : ""}>
+                    <td className="font-mono px-3 py-1">{opt.code}</td>
+                    <td className="px-3 py-1">{opt.name ?? "–"}</td>
+                    <td className="px-3 py-1">{opt.value ?? "–"}</td>
+                    <td className="px-3 py-1">
+                      {opt.optionSpace
+                        ? `${opt.optionSpace.name}${opt.optionSpace.protocol ? " (" + opt.optionSpace.protocol + ")" : ""}`
+                        : "–"}
+                    </td>
+                    <td className="px-3 py-1">{opt.type ?? "–"}</td>
+                    <td className="px-3 py-1">{opt.optionCodeComment ?? "–"}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={6} className="text-gray-500 py-2 text-center">No options in this group</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
