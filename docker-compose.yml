@@ -10,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./db/create_views.sql:/docker-entrypoint-initdb.d/create_views.sql
 
   backend:
     build: ./backend
@@ -20,7 +19,6 @@ services:
       DATABASE_USER: dhcpuser
       DATABASE_PASSWORD: dhcppass
       DATABASE_NAME: dhcpdb
-      # ggf. weitere .env Variablen!
     depends_on:
       - db
     ports:
