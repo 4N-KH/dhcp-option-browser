@@ -2,7 +2,34 @@ import React from "react";
 import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
 import { getInheritedLabel } from "./helpers/labels";
 
-// Status-Badge für Einzeloptionen und Gruppenpanel
+// Robust: Origin-Label-Ermittlung für Einzeloptionen
+function getOriginLevelLabel(option: EffectiveDhcpOptionSlimDto): string | undefined {
+  // 1. Primär: originLevelLabel direkt
+  if (option.source.originLevelLabel) return option.source.originLevelLabel;
+  // 2. Falls OptionGroup: originLevelLabel aus Group
+  if (option.source.optionGroup?.originLevelLabel)
+    return option.source.optionGroup.originLevelLabel;
+  // 3. Fallback: Group-OriginLevel (z.B. "ipSpace KH")
+  if (option.source.optionGroup?.groupOriginLevel)
+    return option.source.optionGroup.groupOriginLevel;
+  return undefined;
+}
+
+function getOriginLevelId(option: EffectiveDhcpOptionSlimDto): number | undefined {
+  if (option.source.originLevelId) return option.source.originLevelId;
+  if (option.source.optionGroup?.groupOriginLevelId)
+    return option.source.optionGroup.groupOriginLevelId;
+  return undefined;
+}
+
+function getOriginLevel(option: EffectiveDhcpOptionSlimDto): string | undefined {
+  if (option.source.originLevel) return option.source.originLevel;
+  if (option.source.optionGroup?.groupOriginLevel)
+    return option.source.optionGroup.groupOriginLevel;
+  return undefined;
+}
+
+// Badge-Status für explizit/vererbt/overridden
 export function StatusBadge({
   status,
   overridden,
@@ -45,17 +72,21 @@ export function DhcpOptionRow({
   option: EffectiveDhcpOptionSlimDto;
   rowIndex: number;
 }) {
-  const originLevelLabel =
-    option.source.originLevelLabel ||
-    option.source.optionGroup?.originLevelLabel ||
-    undefined;
+  // Einheitliche Klartext-Logik für Level-Label
+  const originLevelLabel = getOriginLevelLabel(option);
+  const originLevelId = getOriginLevelId(option);
+  const originLevel = getOriginLevel(option);
+
+  const isRedundant = option.redundant === true;
+
+  const trClass = [
+    rowIndex % 2 === 0 ? "bg-blue-950/40" : "",
+    "hover:bg-blue-900/40 transition",
+    isRedundant ? "bg-red-900/80 text-red-200 font-bold animate-pulse" : "",
+  ].join(" ");
 
   return (
-    <tr
-      className={`${
-        rowIndex % 2 === 0 ? "bg-blue-950/40" : ""
-      } hover:bg-blue-900/40 transition`}
-    >
+    <tr className={trClass}>
       <td className="font-mono px-3 py-1">{option.code}</td>
       <td className="px-3 py-1">{option.name ?? "–"}</td>
       <td className="font-mono px-3 py-1">{option.effectiveValue ?? "–"}</td>
@@ -69,10 +100,17 @@ export function DhcpOptionRow({
         <StatusBadge
           status={option.source.type}
           overridden={option.overridden}
-          originLevel={option.source.originLevel}
-          originLevelId={option.source.originLevelId}
+          originLevel={originLevel}
+          originLevelId={originLevelId}
           originLevelLabel={originLevelLabel}
         />
+        {isRedundant && (
+          <span
+            className="ml-2 bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold"
+          >
+            Redundant
+          </span>
+        )}
       </td>
       <td className="px-3 py-1">{option.comment ?? "–"}</td>
     </tr>

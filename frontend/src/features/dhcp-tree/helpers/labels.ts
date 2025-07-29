@@ -1,9 +1,3 @@
-/**
- * Gibt ein schönes Label für "Inherited from X Y" zurück.
- * @param originLevel Typ (z. B. 'subnet', 'ipSpace', 'addressBlock', ...)
- * @param originLevelLabel Label/Text aus dem Backend (z. B. 'ipSpace KH', 'subnet labor_vm', 'address block RFC1918')
- * @param originLevelId Fallback: ID falls Name fehlt
- */
 export function getInheritedLabel(
   originLevel?: string,
   originLevelLabel?: string,

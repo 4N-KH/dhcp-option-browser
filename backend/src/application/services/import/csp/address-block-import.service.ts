@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 
@@ -17,6 +17,8 @@ import {
   buildOptionCodeMap,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+
+import { EncodingSanitizer } from '@/application/services/import/transformers/encoding-sanitizer.interface';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -44,6 +46,8 @@ export class CspAddressBlockImportService {
     @InjectRepository(IpSpace)
     private readonly ipSpaceRepo: Repository<IpSpace>,
     private readonly dataSource: DataSource,
+    @Inject(EncodingSanitizer)
+    private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
   /**
@@ -93,11 +97,23 @@ export class CspAddressBlockImportService {
       for (const og of allOptionGroups) {
         if (!og) continue;
         if (og.externalId)
-          optionGroupMap.set(og.externalId.trim().toLowerCase(), og);
-        if (og.name) optionGroupMap.set(og.name.trim().toLowerCase(), og);
+          optionGroupMap.set(
+            this.encodingSanitizer.sanitize(og.externalId.trim().toLowerCase()),
+            og,
+          );
+        if (og.name)
+          optionGroupMap.set(
+            this.encodingSanitizer.sanitize(og.name.trim().toLowerCase()),
+            og,
+          );
         if (og.id) optionGroupMap.set(String(og.id), og);
       }
-      const ipSpaceMap = new Map(allIpSpaces.map((i) => [i.externalId, i]));
+      const ipSpaceMap = new Map(
+        allIpSpaces.map((i) => [
+          this.encodingSanitizer.sanitize(i.externalId),
+          i,
+        ]),
+      );
 
       // Progress config
       const total = dtos.length;
@@ -110,13 +126,18 @@ export class CspAddressBlockImportService {
         checkCancel();
 
         const block = manager.create(AddressBlock, { externalId: dto.id });
-        block.name = dto.name;
-        block.address = dto.address;
+        block.name = this.encodingSanitizer.sanitize(dto.name);
+        block.address = this.encodingSanitizer.sanitize(dto.address);
         block.cidr = dto.cidr;
-        block.comment = dto.comment ?? null;
+        block.comment =
+          dto.comment !== undefined && dto.comment !== null
+            ? this.encodingSanitizer.sanitize(dto.comment)
+            : null;
 
         // Assign ipSpace if available
-        const foundIpSpace = dto.space ? ipSpaceMap.get(dto.space) : undefined;
+        const foundIpSpace = dto.space
+          ? ipSpaceMap.get(this.encodingSanitizer.sanitize(dto.space))
+          : undefined;
         if (foundIpSpace) {
           block.ipSpace = foundIpSpace;
           block.ipSpaceId = foundIpSpace.id;
@@ -189,7 +210,13 @@ export class CspAddressBlockImportService {
             }
             const abOpt = manager.create(AddressBlockDhcpOption, {
               ...mapDhcpOptionToEntity<AddressBlockDhcpOption>(
-                opt,
+                {
+                  ...opt,
+                  option_code: this.encodingSanitizer.sanitize(opt.option_code),
+                  option_value: this.encodingSanitizer.sanitize(
+                    opt.option_value,
+                  ),
+                },
                 optionCodeMap,
               ),
               addressBlock: block,
@@ -217,7 +244,9 @@ export class CspAddressBlockImportService {
           ? dto.dhcp_options
               .map((opt) =>
                 typeof opt.group === 'string'
-                  ? opt.group.trim().toLowerCase()
+                  ? this.encodingSanitizer.sanitize(
+                      opt.group.trim().toLowerCase(),
+                    )
                   : null,
               )
               .filter((g): g is string => !!g)

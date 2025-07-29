@@ -1,4 +1,5 @@
 // src/domain/dto/csp/effective-dhcp-option-slim.dto.ts
+
 export class EffectiveDhcpOptionSlimDto {
   code: string;
   name?: string;
@@ -12,38 +13,45 @@ export class EffectiveDhcpOptionSlimDto {
     name: string;
     protocol?: string | null;
   } | null;
+
   source: {
     level: string;
     levelId: number;
     type: 'EXPLICIT' | 'INHERITED' | 'GROUP_EXPLICIT' | 'GROUP_INHERITED';
     originLevel?: string;
     originLevelId?: number;
+    originLevelLabel?: string;
     optionGroup?: {
       id: number;
       name: string;
       comment?: string | null;
       options: {
+        level: import('c:/implementation/dhcp-option-browser_2025-06-09_22-43/dhcp-option-browser/backend/src/domain/enums/csp/object-type.enum').ObjectType;
+        levelId: number;
         code: string;
         name?: string;
         value: string | null;
         type?: string | null;
         array?: boolean | null;
-        optionCodeComment?: string | null;
-        optionCodeSource?: string | null;
-        optionSpace?: {
-          id: number;
-          name: string;
-          protocol?: string | null;
-        } | null;
+        // === Redundanz-Felder für Optionen innerhalb Gruppen ===
+        redundant?: boolean;
+        redundantWith?: {
+          code: string;
+          level: string;
+          levelId: number;
+          groupId?: number;
+          groupName?: string;
+          value?: string | null;
+        };
       }[];
       groupInheritanceType?: 'GROUP_EXPLICIT' | 'GROUP_INHERITED';
       isGroupInherited?: boolean;
       groupOriginLevel?: string;
       groupOriginLevelId?: number;
-      /** NEU: Sprechendes Label für die Ursprungs-Ebene, z.B. "ipSpace KH", "address block 192.168.0.0/16" etc. */
       originLevelLabel?: string;
     };
   };
+
   overridden?: {
     level: string;
     levelId: number;
@@ -54,6 +62,7 @@ export class EffectiveDhcpOptionSlimDto {
       comment?: string | null;
     };
   };
+
   inheritanceType?:
     | 'EXPLICIT'
     | 'INHERITED'
@@ -61,6 +70,7 @@ export class EffectiveDhcpOptionSlimDto {
     | 'GROUP_INHERITED';
   isInherited?: boolean;
   isOverridden?: boolean;
+
   originChain?: {
     level: string;
     levelId: number;
@@ -68,7 +78,19 @@ export class EffectiveDhcpOptionSlimDto {
     optionGroupId?: number;
     optionGroupName?: string;
   }[];
+
   comment?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+
+  // === Redundanz-Felder für Einzeloptionen ===
+  redundant?: boolean;
+  redundantWith?: {
+    code: string;
+    level: string;
+    levelId: number;
+    groupId?: number;
+    groupName?: string;
+    value?: string | null;
+  };
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 
 import { CspGlobalConfigImportService } from './global-config-import.service';
 import { CspConfigProfileImportService } from './config-profile-import.service';
@@ -11,8 +11,8 @@ import { CspOptionGroupImportService } from './option-group-import.service';
 import { CspOptionCodeImportService } from './option-code-import.service';
 import { CspOptionSpaceImportService } from './option-space-import.service';
 import { CspOptionGroupDhcpOptionImportService } from './option-group-dhcp-option-import.service';
+import { EncodingSanitizer } from '@/application/services/import/transformers/encoding-sanitizer.interface';
 
-// Anzahl der Schritte: Hier exakt nach Importservices!
 const IMPORT_PHASES = [
   'optionSpaces',
   'optionCodes',
@@ -53,6 +53,8 @@ export class DhcpCspImportOrchestratorService {
     private readonly subnetImport: CspSubnetImportService,
     private readonly rangeImport: CspRangeImportService,
     private readonly fixedAddressImport: CspFixedAddressImportService,
+    @Inject(EncodingSanitizer)
+    private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
   /**
@@ -76,7 +78,6 @@ export class DhcpCspImportOrchestratorService {
       subProgress?: { current: number; total: number },
     ) => {
       checkCancel();
-      // Global progress: bis zu diesem Schritt + evtl. Subfortschritt
       let percent = Math.floor(
         ((phaseIndex +
           (subProgress ? subProgress.current / subProgress.total : 0)) /
@@ -97,6 +98,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer // Wenn Service angepasst wurde
       });
       updatePhaseProgress(++currentPhase, 'optionSpaces');
 
@@ -109,6 +111,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'optionCodes');
 
@@ -121,6 +124,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'optionGroups');
 
@@ -133,6 +137,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'optionGroupDhcpOptions');
 
@@ -145,6 +150,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'globalConfig');
 
@@ -157,6 +163,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'configProfiles');
 
@@ -169,6 +176,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'ipSpaces');
 
@@ -181,6 +189,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'addressBlocks');
 
@@ -193,6 +202,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'subnets');
 
@@ -205,6 +215,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'ranges');
 
@@ -217,6 +228,7 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
+        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'fixedAddresses');
 

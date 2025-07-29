@@ -6,6 +6,8 @@ import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionFilter } from '@/infrastructure/database/csp/option-filter.entity';
 import { CspOptionFilterDto } from '@/domain/dto/csp/option-filter.dto';
 
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
   onProgress?: (current: number, total: number) => void;
@@ -19,6 +21,8 @@ export class CspOptionFilterImportService {
     private readonly cspDataClient: CspDataClient,
     @InjectRepository(OptionFilter)
     private readonly optionFilterRepo: Repository<OptionFilter>,
+    // EncodingSanitizer wird injiziert
+    private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
   async importOptionFilters(
@@ -80,12 +84,14 @@ export class CspOptionFilterImportService {
         entity = this.optionFilterRepo.create({ externalId: dto.id });
       }
 
-      entity.name = dto.name;
+      // EncodingSanitizer anwenden auf string-Felder:
+      entity.name = this.encodingSanitizer.sanitize(dto.name);
       entity.protocol = dto.protocol ?? undefined;
       entity.role = dto.role ?? undefined;
-      entity.comment = dto.comment ?? undefined;
-      entity.vendorSpecificOptionOptionSpace =
-        dto.vendor_specific_option_option_space ?? undefined;
+      entity.comment = this.encodingSanitizer.sanitize(dto.comment ?? null);
+      entity.vendorSpecificOptionOptionSpace = this.encodingSanitizer.sanitize(
+        dto.vendor_specific_option_option_space ?? null,
+      );
       entity.createdAt = dto.created_at ?? undefined;
       entity.updatedAt = dto.updated_at ?? undefined;
 
@@ -105,7 +111,10 @@ export class CspOptionFilterImportService {
       // rules (optional, garantiert string für match)
       if (dto.rules && typeof dto.rules === 'object') {
         entity.rules = {
-          match: typeof dto.rules.match === 'string' ? dto.rules.match : '',
+          match:
+            typeof dto.rules.match === 'string'
+              ? this.encodingSanitizer.sanitize(dto.rules.match)
+              : '',
           rules: Array.isArray(dto.rules.rules)
             ? dto.rules.rules.map((r) => ({
                 compare: r.compare,
@@ -125,7 +134,7 @@ export class CspOptionFilterImportService {
       persistedIds.push(dto.id);
 
       this.logger.debug(
-        `[${dto.id}] Persistiert: name="${dto.name}", dhcpOptions: ${JSON.stringify(entity.dhcpOptions)}`,
+        `[${dto.id}] Persistiert: name="${entity.name}", dhcpOptions: ${JSON.stringify(entity.dhcpOptions)}`,
       );
 
       progress++;

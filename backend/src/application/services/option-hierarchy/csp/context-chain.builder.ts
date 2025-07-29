@@ -17,6 +17,14 @@ export interface ContextLevel {
 
 type ParentPointer = { type: ObjectType; id: number } | null;
 
+// Hier: ContextObj muss (wie im Service) bekannt sein!
+export type ContextObj = {
+  level: ObjectType;
+  levelId: number;
+  options: any[];
+  optionGroups: any[];
+};
+
 @Injectable()
 export class ContextChainBuilder {
   constructor(
@@ -36,8 +44,6 @@ export class ContextChainBuilder {
 
   /**
    * Baut die Vererbungskette (ContextChain) für ein beliebiges DHCP-Objekt
-   * - Von FIXEDADDRESS/RANGE/SUBNET/... immer bis zur globalen Config
-   * - Reihenfolge: [GlobalConfig, IpSpace, ggf. AddressBlock, ggf. Subnet, ggf. Range, ggf. FixedAddress]
    */
   async build(
     objectType: ObjectType,
@@ -48,7 +54,6 @@ export class ContextChainBuilder {
     let currentId: number | null = objectId;
     const visited = new Set<string>();
 
-    // Parent getter logic per type
     const parentGetters: Record<
       ObjectType,
       (id: number) => Promise<ParentPointer>
@@ -56,7 +61,6 @@ export class ContextChainBuilder {
       [ObjectType.FIXEDADDRESS]: async (id) => {
         const fixed = await this.fixedAddressRepo.findOne({ where: { id } });
         if (!fixed) return null;
-        // Priorität: Range → Subnet (niemals AddressBlock direkt!)
         if (typeof fixed.rangeId === 'number' && fixed.rangeId !== null)
           return { type: ObjectType.RANGE, id: fixed.rangeId };
         if (typeof fixed.subnetId === 'number' && fixed.subnetId !== null)
@@ -66,7 +70,6 @@ export class ContextChainBuilder {
       [ObjectType.RANGE]: async (id) => {
         const range = await this.rangeRepo.findOne({ where: { id } });
         if (!range) return null;
-        // Range ist IMMER Teil eines Subnets (nie AddressBlock direkt!)
         if (typeof range.subnetId === 'number' && range.subnetId !== null)
           return { type: ObjectType.SUBNET, id: range.subnetId };
         return null;
@@ -74,7 +77,6 @@ export class ContextChainBuilder {
       [ObjectType.SUBNET]: async (id) => {
         const subnet = await this.subnetRepo.findOne({ where: { id } });
         if (!subnet) return null;
-        // Subnet: AddressBlock → IpSpace (je nach Typ)
         if (
           typeof subnet.addressBlockId === 'number' &&
           subnet.addressBlockId !== null
@@ -87,7 +89,6 @@ export class ContextChainBuilder {
       [ObjectType.ADDRESSBLOCK]: async (id) => {
         const ab = await this.addressBlockRepo.findOne({ where: { id } });
         if (!ab) return null;
-        // AddressBlock: parentId (verschachtelt) → ipSpaceId (Top-Level)
         if (typeof ab.parentId === 'number' && ab.parentId !== null)
           return { type: ObjectType.ADDRESSBLOCK, id: ab.parentId };
         if (typeof ab.ipSpaceId === 'number' && ab.ipSpaceId !== null)
@@ -105,7 +106,6 @@ export class ContextChainBuilder {
 
       chain.push({ level: currentType, levelId: currentId });
 
-      // Typsicher casten
       const parentGetter = parentGetters[currentType] as (
         id: number,
       ) => Promise<ParentPointer>;
@@ -120,7 +120,6 @@ export class ContextChainBuilder {
       }
     }
 
-    // Füge DHCP Global Config am Ende der Chain hinzu, falls noch nicht enthalten
     if (!chain.some((c) => c.level === ObjectType.GLOBAL)) {
       const globalConfig = await this.globalConfigRepo.findOne({ where: {} });
       if (globalConfig) {
@@ -128,7 +127,19 @@ export class ContextChainBuilder {
       }
     }
 
-    // Reihenfolge: von global bis Zielobjekt (Global → Target)
     return chain.reverse();
   }
+}
+
+// Utility-Funktion zur Filterung NUR AddressBlock-relevanter Kontexte (für Redundanz)
+export function filterContextsForAddressBlock(
+  allContexts: ContextObj[],
+  addressBlockId: number,
+): ContextObj[] {
+  return allContexts.filter(
+    (ctx) =>
+      ctx.level === ObjectType.GLOBAL ||
+      ctx.level === ObjectType.IPSPACE ||
+      (ctx.level === ObjectType.ADDRESSBLOCK && ctx.levelId === addressBlockId),
+  );
 }

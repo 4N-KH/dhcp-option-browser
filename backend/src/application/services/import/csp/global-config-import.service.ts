@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -17,6 +17,8 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -24,6 +26,7 @@ type InterruptibleImportOptions = {
 };
 
 @Injectable()
+// Service for importing global DHCPv4 configuration from CSP
 export class CspGlobalConfigImportService {
   private readonly logger = new Logger(CspGlobalConfigImportService.name);
 
@@ -41,16 +44,17 @@ export class CspGlobalConfigImportService {
     private readonly optionGroupRepo: Repository<OptionGroup>,
     @InjectRepository(OptionSpace)
     private readonly optionSpaceRepo: Repository<OptionSpace>,
+    @Inject(DefaultEncodingSanitizerService)
+    private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
-  /**
-   * Imports the global DHCPv4 configuration from CSP (with progress/cancel support).
-   */
+  // Imports the global DHCPv4 configuration, supporting progress and cancellation
   async importGlobalDhcpConfig(
     opts?: InterruptibleImportOptions,
   ): Promise<DhcpGlobalConfig | null> {
     this.logger.log('Importing global DHCPv4 configuration from CSP...');
 
+    // Cancellation check
     const checkCancel = () => {
       if (opts?.isCancelled?.()) {
         this.logger.warn('GlobalConfig import interrupted by user.');
@@ -59,13 +63,14 @@ export class CspGlobalConfigImportService {
     };
 
     checkCancel();
+    // Fetch global config from CSP
     const rawGlobalConfig = await this.cspDataClient.fetchGlobalDhcpConfig();
 
     this.logger.verbose(
       `Received from CSP: ${JSON.stringify(rawGlobalConfig, null, 2)}`,
     );
 
-    // If empty, delete everything
+    // Check for empty configuration
     const isEmpty =
       !rawGlobalConfig ||
       typeof rawGlobalConfig !== 'object' ||
@@ -79,7 +84,7 @@ export class CspGlobalConfigImportService {
       this.logger.log(
         'No global options and no comment – nothing to store as central configuration.',
       );
-      // Delete all config data (and relations)
+      // Remove all previous global config and related data
       const configs = await this.globalConfigRepo.find();
       for (const config of configs) {
         await this.globalConfigOptionRepo.delete({ globalConfigId: config.id });
@@ -91,7 +96,7 @@ export class CspGlobalConfigImportService {
       return null;
     }
 
-    // Remove any previous config (and relations)
+    // Remove old config and relations
     const existing = await this.globalConfigRepo.findOne({
       relations: ['dhcpOptions', 'optionGroups'],
       where: {},
@@ -104,45 +109,57 @@ export class CspGlobalConfigImportService {
       await this.globalConfigRepo.delete(existing.id);
     }
 
-    // Normalise DHCP options
+    // Normalise all DHCP options
     const normalisedDhcpOptions = normalizeDhcpOptions(
       Array.isArray(rawGlobalConfig.dhcp_options)
         ? rawGlobalConfig.dhcp_options
         : [],
     );
 
-    // Split in echte Optionen und Gruppen
+    // Select only real (non-group) options
     const realOptions = normalisedDhcpOptions.filter(
       (opt) => opt.type !== 'group',
     );
 
-    // Anzahl Steps: Optionen + Gruppen
+    // Progress reporting setup
     const total =
       realOptions.length +
       (Array.isArray(normalisedDhcpOptions) ? normalisedDhcpOptions.length : 0);
     let progress = 0;
     const report = () => opts?.onProgress?.(progress, total);
 
-    // Create new config
+    // Sanitize config comment
+    const sanitizedComment = this.encodingSanitizer.sanitize(
+      rawGlobalConfig?.comment ?? '',
+    );
+
     checkCancel();
+    // Create and store new config entity
     const globalConfig = this.globalConfigRepo.create({
-      comment: rawGlobalConfig?.comment ?? null,
+      comment: sanitizedComment,
     });
     await this.globalConfigRepo.save(globalConfig);
 
-    // Build OptionCode map
+    // Prepare map for option code resolution
     const optionCodeMap = buildOptionCodeMap(
       await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
     );
 
-    // Save all DHCP options (only non-group!)
+    // Save all real DHCP options
     if (realOptions.length > 0) {
       for (const opt of realOptions) {
         checkCancel();
+        const sanitizedOpt = {
+          ...opt,
+          option_value: this.encodingSanitizer.sanitize(opt.option_value ?? ''),
+        };
         const dhcpOptionEntity = this.globalConfigOptionRepo.create({
           globalConfig,
           globalConfigId: globalConfig.id,
-          ...mapDhcpOptionToEntity<DhcpGlobalConfigOption>(opt, optionCodeMap),
+          ...mapDhcpOptionToEntity<DhcpGlobalConfigOption>(
+            sanitizedOpt,
+            optionCodeMap,
+          ),
         });
         await this.globalConfigOptionRepo.save(dhcpOptionEntity);
         progress++;
@@ -150,7 +167,7 @@ export class CspGlobalConfigImportService {
       }
     }
 
-    // OptionGroup map (by externalId, name, id)
+    // Build OptionGroup map for group assignment
     const optionGroupMap = new Map<string, OptionGroup>();
     for (const og of await this.optionGroupRepo.find()) {
       if (!og) continue;
@@ -160,7 +177,7 @@ export class CspGlobalConfigImportService {
       if (og.id) optionGroupMap.set(String(og.id), og);
     }
 
-    // Assign OptionGroups via utility (aus ALLEN Optionen, nicht nur den echten!)
+    // Assign option groups (from all options)
     const foundGroups = resolveOptionGroupsFromOptions(
       normalisedDhcpOptions,
       optionGroupMap,
@@ -181,7 +198,7 @@ export class CspGlobalConfigImportService {
       }
     }
 
-    // Return result (with eager relations)
+    // Load and return result with relations
     const result = await this.globalConfigRepo.findOneOrFail({
       where: { id: globalConfig.id },
       relations: ['dhcpOptions', 'optionGroups', 'optionGroups.optionGroup'],

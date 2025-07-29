@@ -30,8 +30,14 @@ import { CspFullImportController } from './controller/csp-full-import.controller
 
 // --- DHCP Hierarchy/Option Controllers ---
 import { CspLightTreeController } from './controller/csp-light-tree.controller';
-import { EffectiveDhcpOptionStackController } from './controller/effective-dhcp-option-stack.controller'; // <-- NEU
-import { DebugController } from './controller/csp-debug.controller';
+import { EffectiveDhcpOptionStackController } from './controller/effective-dhcp-option-stack.controller';
+
+// --- Option Overview Controller & Services ---
+import { OptionOverviewController } from './controller/option-overview.controller';
+import { OptionOverviewService } from './application/services/option-hierarchy/csp/option-overview.service';
+import { OptionValuesService } from './application/services/option-hierarchy/csp/option-values.service';
+import { OptionValueEffectivenessService } from './application/services/option-hierarchy/csp/option-value-effectiveness.service';
+import { OptionValueExplicitService } from './application/services/option-hierarchy/csp/option-value-explicit.service';
 
 // --- Import Services ---
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
@@ -49,37 +55,39 @@ import { CspOptionSpaceImportService } from './application/services/import/csp/o
 import { CspOptionFilterImportService } from './application/services/import/csp/option-filter-import.service';
 
 // --- Entities ---
-import { AddressBlock } from './infrastructure/database/csp/address-block.entity';
-import { AddressBlockDhcpOption } from './infrastructure/database/csp/address-block-dhcp-option.entity';
-import { AddressBlockOptionGroup } from './infrastructure/database/csp/address-block-option-group.entity';
-import { CspCredentialEntity } from './infrastructure/database/csp/csp-credential.entity';
-import { DhcpGlobalConfig } from './infrastructure/database/csp/global-config.entity';
-import { DhcpGlobalConfigOption } from './infrastructure/database/csp/global-config-option.entity';
-import { DhcpGlobalConfigOptionGroup } from './infrastructure/database/csp/global-config-option-group.entity';
-import { FixedAddress } from './infrastructure/database/csp/fixed-address.entity';
-import { FixedDhcpOption } from './infrastructure/database/csp/fixed-dhcp-option.entity';
-import { FixedAddressOptionGroup } from './infrastructure/database/csp/fixed-address-option-group.entity';
-import { IpSpace } from './infrastructure/database/csp/ip-space.entity';
-import { IpSpaceDhcpOption } from './infrastructure/database/csp/ip-space-dhcp-option.entity';
-import { IpSpaceOptionGroup } from './infrastructure/database/csp/ip-space-option-group.entity';
-import { OptionCodeEntity } from './infrastructure/database/csp/option-code.entity';
-import { OptionFilter } from './infrastructure/database/csp/option-filter.entity';
-import { OptionGroup } from './infrastructure/database/csp/option-group.entity';
-import { OptionGroupDhcpOption } from './infrastructure/database/csp/option-group-dhcp-option.entity';
-import { OptionSpace } from './infrastructure/database/csp/option-space.entity';
-import { Range } from './infrastructure/database/csp/range.entity';
-import { RangeDhcpOption } from './infrastructure/database/csp/range-dhcp-option.entity';
-import { RangeExclusion } from './infrastructure/database/csp/range-exclusion.entity';
-import { RangeOptionGroup } from './infrastructure/database/csp/range-option-group.entity';
-import { Subnet } from './infrastructure/database/csp/subnet.entity';
-import { SubnetDhcpOption } from './infrastructure/database/csp/subnet-dhcp-option.entity';
-import { SubnetOptionGroup } from './infrastructure/database/csp/subnet-option-group.entity';
-import { UserEntity } from './infrastructure/database/csp/user.entity';
+import {
+  AddressBlock,
+  AddressBlockDhcpOption,
+  AddressBlockOptionGroup,
+  CspCredentialEntity,
+  DhcpGlobalConfig,
+  DhcpGlobalConfigOption,
+  DhcpGlobalConfigOptionGroup,
+  FixedAddress,
+  FixedDhcpOption,
+  FixedAddressOptionGroup,
+  IpSpace,
+  IpSpaceDhcpOption,
+  IpSpaceOptionGroup,
+  OptionCodeEntity,
+  OptionFilter,
+  OptionGroup,
+  OptionGroupDhcpOption,
+  OptionSpace,
+  Range,
+  RangeDhcpOption,
+  RangeExclusion,
+  RangeOptionGroup,
+  Subnet,
+  SubnetDhcpOption,
+  SubnetOptionGroup,
+  UserEntity,
+} from './infrastructure/database/csp';
 
 // --- DHCP Hierarchy Services ---
 import { GlobalLightTreeLoaderService } from './application/services/option-hierarchy/csp/mappers/light-tree/global-light-tree-loader.service';
 
-// --- Option Repositories (provide them for DI) ---
+// --- Option Repositories ---
 import {
   GlobalConfigOptionRepository,
   IpSpaceDhcpOptionRepository,
@@ -89,15 +97,25 @@ import {
   FixedDhcpOptionRepository,
 } from './infrastructure/database/csp';
 
-// --- EFFECTIVE STACK SERVICES (SOLID) ---
+import { AllDhcpOptionAssignmentRepository } from './infrastructure/database/csp/all-dhcp-option-assignment.repository';
+
+// --- EFFECTIVE STACK SERVICES (Neue Architektur) ---
 import { EffectiveDhcpOptionStackService } from './application/services/option-hierarchy/csp/effective-dhcp-option-stack.service';
 import { ContextChainBuilder } from './application/services/option-hierarchy/csp/context-chain.builder';
 import { ExplicitOptionsLoader } from './application/services/option-hierarchy/csp/types/explicit-options.loader';
 import { OptionGroupsLoader } from './application/services/option-hierarchy/csp/types/option-groups.loader';
-import { OptionStackAssembler } from './application/services/option-hierarchy/csp/types/option-stack.assembler';
+// Refaktoriert:
+import { OptionStackAssemblerService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/option-stack-assembler-orchestrator.service';
+import { StackBuilderService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/stack-builder.service';
+import { SlimDtoFactoryService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/slim-dto-factory.service';
+
 import { OptionInheritanceStackEntryFactory } from './application/services/option-hierarchy/csp/option-stack-entry.factory';
 import { OptionGroupMetaFactory } from './application/services/option-hierarchy/csp/option-group-meta.factory';
 import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp/dhcp-option-raw.mapper';
+
+// --- String Sanitizer (neu) ---
+import { EncodingSanitizer } from './application/services/import/transformers/encoding-sanitizer.interface';
+import { DefaultEncodingSanitizerService } from './application/services/import/transformers/default-encoding-sanitizer.service';
 
 @Module({
   imports: [
@@ -138,7 +156,7 @@ import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp
         FixedDhcpOption,
         FixedAddressOptionGroup,
       ],
-      synchronize: true,
+      synchronize: false,
     }),
     TypeOrmModule.forFeature([
       CspCredentialEntity,
@@ -178,7 +196,7 @@ import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp
     CspFullImportController,
     CspLightTreeController,
     EffectiveDhcpOptionStackController,
-    DebugController, // <-- NEU
+    OptionOverviewController,
   ],
   providers: [
     // Auth + Clients
@@ -191,6 +209,7 @@ import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp
     CspAuthClient,
     CspDataClient,
     ApiConfigService,
+
     // Import
     DhcpCspImportOrchestratorService,
     CspSubnetImportService,
@@ -205,23 +224,43 @@ import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp
     CspOptionCodeImportService,
     CspOptionSpaceImportService,
     CspOptionFilterImportService,
+
     // Tree Loader
     GlobalLightTreeLoaderService,
+
+    // Repositories
     GlobalConfigOptionRepository,
     IpSpaceDhcpOptionRepository,
     AddressBlockDhcpOptionRepository,
     SubnetDhcpOptionRepository,
     RangeDhcpOptionRepository,
     FixedDhcpOptionRepository,
-    // EFFECTIVE STACK SERVICES (SOLID!)
+    AllDhcpOptionAssignmentRepository,
+
+    // Stack Services (neue Architektur)
     EffectiveDhcpOptionStackService,
     ContextChainBuilder,
     ExplicitOptionsLoader,
     OptionGroupsLoader,
-    OptionStackAssembler,
+    OptionStackAssemblerService,
+    StackBuilderService,
+    SlimDtoFactoryService,
     OptionInheritanceStackEntryFactory,
     OptionGroupMetaFactory,
     DhcpOptionRawMapper,
+
+    // Option Overview & Explorer
+    OptionOverviewService,
+    OptionValuesService,
+    OptionValueEffectivenessService,
+    OptionValueExplicitService,
+
+    // ✨ String Sanitizer als Interface-Provider & als direkter Service ✨
+    DefaultEncodingSanitizerService,
+    {
+      provide: EncodingSanitizer,
+      useClass: DefaultEncodingSanitizerService,
+    },
   ],
 })
 export class AppModule {}

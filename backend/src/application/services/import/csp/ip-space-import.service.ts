@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -17,6 +17,8 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -41,6 +43,8 @@ export class CspIpSpaceImportService {
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
     @InjectRepository(OptionSpace)
     private readonly optionSpaceRepo: Repository<OptionSpace>,
+    @Inject(DefaultEncodingSanitizerService)
+    private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
   async importIpSpaces(opts?: InterruptibleImportOptions): Promise<IpSpace[]> {
@@ -94,8 +98,8 @@ export class CspIpSpaceImportService {
       if (!entity) {
         entity = this.ipSpaceRepo.create({ externalId: dto.id });
       }
-      entity.name = dto.name;
-      entity.comment = dto.comment ?? null;
+      entity.name = this.encodingSanitizer.sanitize(dto.name ?? '');
+      entity.comment = this.encodingSanitizer.sanitize(dto.comment ?? '');
 
       // Save to ensure .id is set
       entity = await this.ipSpaceRepo.save(entity);
@@ -119,7 +123,15 @@ export class CspIpSpaceImportService {
         const dhcpOptionEntities = normalizedOptions.map((opt) =>
           this.ipSpaceDhcpOptionRepo.create({
             ipSpaceId: entity.id,
-            ...mapDhcpOptionToEntity<IpSpaceDhcpOption>(opt, optionCodeMap),
+            ...mapDhcpOptionToEntity<IpSpaceDhcpOption>(
+              {
+                ...opt,
+                option_value: this.encodingSanitizer.sanitize(
+                  opt.option_value ?? '',
+                ),
+              },
+              optionCodeMap,
+            ),
           }),
         );
         await this.ipSpaceDhcpOptionRepo.save(dhcpOptionEntities);

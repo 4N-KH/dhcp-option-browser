@@ -4,33 +4,36 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap(): Promise<void> {
+  // Logger-Instanz für Bootstrap-Meldungen
   const logger = new Logger('Bootstrap');
 
   try {
-    // <--- Hier: Logger-Level setzen!
+    // ----- WICHTIG: Logger explizit für alle Level setzen! -----
     const app = await NestFactory.create(AppModule, {
-      logger: ['debug', 'log', 'warn', 'error', 'verbose'],
+      logger: ['log', 'error', 'warn', 'debug', 'verbose'],
     });
 
-    // Enable CORS for local frontend
+    // Damit wirklich JEDE Log-Message durchgeht (auch aus Services)
+    Logger.overrideLogger(['log', 'error', 'warn', 'debug', 'verbose']);
+
+    // Enable CORS für dein Frontend
     app.enableCors({
       origin: 'http://localhost:3000',
       credentials: true,
     });
 
-    // Global validation pipe for DTO validation
+    // Globale DTO-Validation aktivieren
     app.useGlobalPipes(
       new ValidationPipe({
-        whitelist: true, // Strip unknown fields
-        forbidNonWhitelisted: true, // Throw on unknown fields
-        transform: true, // Auto-transform payloads
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
       }),
     );
 
-    // Set application port
     const port = process.env.PORT ? Number(process.env.PORT) : 3001;
-
     await app.listen(port);
+
     logger.log(`Application is running on: http://localhost:${port}`);
   } catch (error: unknown) {
     if (error instanceof Error) {

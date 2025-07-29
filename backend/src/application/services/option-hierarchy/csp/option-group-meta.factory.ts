@@ -10,7 +10,7 @@ export class OptionGroupMetaFactory {
     group: OptionGroup,
     originLevel?: ObjectType,
     originLevelId?: number,
-    originLevelName?: string, // hier ist string | undefined erlaubt!
+    originLevelName?: string,
   ): OptionGroupMetaDto & {
     originLevel?: ObjectType;
     originLevelId?: number;
@@ -49,9 +49,7 @@ export class OptionGroupMetaFactory {
         ? {
             originLevel,
             originLevelId,
-            ...(originLevelName !== undefined
-              ? { originLevelName } // nur setzen, wenn definiert!
-              : {}),
+            ...(originLevelName !== undefined ? { originLevelName } : {}),
           }
         : {}),
     };

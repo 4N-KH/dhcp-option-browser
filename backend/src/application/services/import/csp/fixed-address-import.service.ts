@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -11,6 +11,7 @@ import { FixedDhcpOption } from '@/infrastructure/database/csp/fixed-dhcp-option
 import { FixedAddressOptionGroup } from '@/infrastructure/database/csp/fixed-address-option-group.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
+import { EncodingSanitizer } from '@/application/services/import/transformers/encoding-sanitizer.interface';
 
 import {
   buildOptionCodeMap,
@@ -45,6 +46,8 @@ export class CspFixedAddressImportService {
     private readonly optionGroupRepo: Repository<OptionGroup>,
     @InjectRepository(OptionCodeEntity)
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
+    @Inject(EncodingSanitizer)
+    private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
   async importFixedAddresses(
@@ -106,7 +109,13 @@ export class CspFixedAddressImportService {
     for (const dto of dtos) {
       checkCancel();
 
-      // Parent Zuordnung
+      const name = this.encodingSanitizer.sanitize(dto.name);
+      const address = this.encodingSanitizer.sanitize(dto.address);
+      const match_type = this.encodingSanitizer.sanitize(dto.match_type);
+      const match_value = this.encodingSanitizer.sanitize(dto.match_value);
+      const comment = this.encodingSanitizer.sanitize(dto.comment ?? '');
+
+      // Parent assignment
       let parentSubnet: Subnet | undefined;
       let parentRange: Range | undefined;
       if (dto.parent?.startsWith('ipam/subnet/')) {
@@ -123,11 +132,11 @@ export class CspFixedAddressImportService {
         fixed = this.fixedAddressRepo.create({ externalId: dto.id });
       }
 
-      fixed.name = dto.name;
-      fixed.address = dto.address;
-      fixed.match_type = dto.match_type;
-      fixed.match_value = dto.match_value;
-      fixed.comment = dto.comment ?? null;
+      fixed.name = name;
+      fixed.address = address;
+      fixed.match_type = match_type;
+      fixed.match_value = match_value;
+      fixed.comment = comment;
       fixed.subnet = parentSubnet;
       fixed.subnetId = parentSubnet?.id ?? null;
       fixed.range = parentRange;
@@ -135,7 +144,7 @@ export class CspFixedAddressImportService {
 
       await this.fixedAddressRepo.save(fixed);
 
-      // --- DHCP options (nur echte Optionen, keine Groups) ---
+      // --- DHCP options ---
       await this.dhcpOptionRepo.delete({ fixedAddressId: fixed.id });
       if (Array.isArray(dto.dhcp_options) && dto.dhcp_options.length > 0) {
         const validOptions = dto.dhcp_options.filter(
@@ -155,7 +164,18 @@ export class CspFixedAddressImportService {
         );
         const dhcpOptionEntities = validOptions.map((opt) =>
           this.dhcpOptionRepo.create({
-            ...mapDhcpOptionToEntity<FixedDhcpOption>(opt, optionCodeMap),
+            ...mapDhcpOptionToEntity<FixedDhcpOption>(
+              {
+                ...opt,
+                option_code: this.encodingSanitizer.sanitize(opt.option_code),
+                option_value: this.encodingSanitizer.sanitize(opt.option_value),
+                type: this.encodingSanitizer.sanitize(opt.type),
+                group: opt.group
+                  ? this.encodingSanitizer.sanitize(opt.group)
+                  : undefined,
+              },
+              optionCodeMap,
+            ),
             fixedAddress: fixed,
             fixedAddressId: fixed.id,
           }),
@@ -174,7 +194,9 @@ export class CspFixedAddressImportService {
         ? dto.dhcp_options
             .map((opt) =>
               typeof opt.group === 'string'
-                ? opt.group.trim().toLowerCase()
+                ? this.encodingSanitizer.sanitize(
+                    opt.group.trim().toLowerCase(),
+                  )
                 : null,
             )
             .filter((g): g is string => !!g)
@@ -182,7 +204,13 @@ export class CspFixedAddressImportService {
       groupKeys = Array.from(new Set(groupKeys));
 
       const foundGroups = resolveOptionGroupsFromOptions(
-        dto.dhcp_options,
+        dto.dhcp_options?.map((opt) => ({
+          ...opt,
+          group:
+            typeof opt.group === 'string'
+              ? this.encodingSanitizer.sanitize(opt.group)
+              : opt.group,
+        })),
         optionGroupMap,
         null,
       );

@@ -1,7 +1,11 @@
 import React, { useMemo } from "react";
-import { EffectiveDhcpOptionSlimDto, OptionGroupInSource } from "@/types/dto/effective-dhcp-option-slim.dto";
+import {
+  EffectiveDhcpOptionSlimDto,
+  OptionGroupInSource,
+} from "@/types/dto/effective-dhcp-option-slim.dto";
 import OptionGroupPanel from "./OptionGroupPanel";
-import { DhcpOptionRow } from "./OptionRowHelpers";
+import { getOptionKey } from "./helpers/redundancy-helpers";
+import { DhcpOptionRow } from "./OptionRowHelpers"; // <--- NEU!
 
 interface DhcpOptionsPanelProps {
   loading: boolean;
@@ -22,37 +26,72 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
   options,
   error,
 }) => {
-  const { directOptions, groupPanels } = useMemo(() => {
-    if (!options) return { directOptions: [], groupPanels: [] as GroupPanelMeta[] };
+  const { directOptions, groupPanels, partnerKeys } = useMemo(() => {
+    if (!options)
+      return {
+        directOptions: [],
+        groupPanels: [] as GroupPanelMeta[],
+        partnerKeys: new Set<string>(),
+      };
 
     const directOptions: EffectiveDhcpOptionSlimDto[] = [];
     const groupMap = new Map<number, GroupPanelMeta>();
+    const partnerKeys = new Set<string>();
 
-    // 1. Sammle alle Group-Metadaten (auch leere Gruppen)
+    // Option Groups extrahieren
     for (const opt of options) {
-      const group = opt.source.optionGroup;
+      const group = opt.source?.optionGroup;
       if (group && typeof group.id === "number") {
         if (!groupMap.has(group.id)) {
           groupMap.set(group.id, {
             group,
-            status: (group.groupInheritanceType || opt.source.type) as "GROUP_EXPLICIT" | "GROUP_INHERITED",
+            status:
+              (group.groupInheritanceType ||
+                opt.source.type) as "GROUP_EXPLICIT" | "GROUP_INHERITED",
             originLevel: group.groupOriginLevel || opt.source.originLevel,
             originLevelId: group.groupOriginLevelId || opt.source.originLevelId,
             originLevelLabel: group.originLevelLabel,
           });
         }
+        for (const gopt of group.options) {
+          if (gopt.redundantWith) {
+            partnerKeys.add(
+              getOptionKey(
+                gopt.redundantWith.code,
+                gopt.redundantWith.value ?? null,
+                gopt.redundantWith.level,
+                gopt.redundantWith.levelId,
+                gopt.redundantWith.groupId
+              )
+            );
+          }
+        }
       }
     }
-
-    // 2. Direkte Optionen (nicht aus einer Gruppe)
+    // Einzeloptionen (nicht aus einer Gruppe)
     for (const opt of options) {
-      const group = opt.source.optionGroup;
+      const group = opt.source?.optionGroup;
       if (!group || typeof group.id !== "number") {
         directOptions.push(opt);
       }
+      if (opt.redundantWith) {
+        partnerKeys.add(
+          getOptionKey(
+            opt.redundantWith.code,
+            opt.redundantWith.value ?? null,
+            opt.redundantWith.level,
+            opt.redundantWith.levelId,
+            opt.redundantWith.groupId
+          )
+        );
+      }
     }
 
-    return { directOptions, groupPanels: Array.from(groupMap.values()) };
+    return {
+      directOptions,
+      groupPanels: Array.from(groupMap.values()),
+      partnerKeys,
+    };
   }, [options]);
 
   if (loading)
@@ -60,13 +99,19 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
   if (error)
     return <div className="p-6 text-lg text-red-400">Error: {error}</div>;
   if (!options || (directOptions.length === 0 && groupPanels.length === 0))
-    return <div className="p-6 text-gray-400">No options found for this object.</div>;
+    return (
+      <div className="p-6 text-gray-400">
+        No options found for this object.
+      </div>
+    );
 
   return (
     <div className="bg-blue-950/40 rounded-2xl p-6 shadow min-h-[120px] mt-2 overflow-x-auto">
       {/* Direct Options as Table */}
       <div className="mb-10">
-        <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">Options</div>
+        <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">
+          Options
+        </div>
         <div className="overflow-x-auto rounded-xl bg-blue-950/60">
           <table className="min-w-[900px] w-full text-sm border-separate border-spacing-0">
             <thead>
@@ -81,11 +126,15 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
               </tr>
             </thead>
             <tbody>
-              {directOptions.length > 0 ? directOptions.map((opt, i) => (
-                <DhcpOptionRow key={opt.code} option={opt} rowIndex={i} />
-              )) : (
+              {directOptions.length > 0 ? (
+                directOptions.map((opt, i) => (
+                  <DhcpOptionRow key={opt.code + String(i)} option={opt} rowIndex={i} />
+                ))
+              ) : (
                 <tr>
-                  <td colSpan={7} className="text-gray-500 py-4 text-center">No options</td>
+                  <td colSpan={7} className="text-gray-500 py-4 text-center">
+                    No options
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -94,23 +143,37 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
       </div>
       {/* Option Groups */}
       <div>
-        <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">Option Groups</div>
-        {groupPanels.length > 0 ? groupPanels.map(({ group, status, originLevel, originLevelLabel, originLevelId }) => (
-          <OptionGroupPanel
-            key={group.id}
-            group={group}
-            status={status}
-            originLevel={originLevel}
-            originLevelLabel={originLevelLabel}
-            originLevelId={originLevelId}
-            options={group.options}
-          />
-        )) : (
+        <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">
+          Option Groups
+        </div>
+        {groupPanels.length > 0 ? (
+          groupPanels.map(
+            ({
+              group,
+              status,
+              originLevel,
+              originLevelLabel,
+              originLevelId,
+            }) => (
+              <OptionGroupPanel
+                key={group.id}
+                group={group}
+                status={status}
+                originLevel={originLevel}
+                originLevelLabel={originLevelLabel}
+                originLevelId={originLevelId}
+                options={group.options}
+                partnerKeys={partnerKeys}
+              />
+            )
+          )
+        ) : (
           <div className="text-gray-500 py-2 px-4">No option groups</div>
         )}
       </div>
       <div className="text-xs text-gray-500 mt-3 ml-2">
-        Tip: Click a group to expand. Status (Explicit / Inherited / Overridden) is shown for each group.
+        Tip: Click a group to expand. Status (Explicit / Inherited / Overridden)
+        is shown for each group.
       </div>
     </div>
   );

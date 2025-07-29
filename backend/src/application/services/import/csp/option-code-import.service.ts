@@ -1,10 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
+import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 /**
  * Baut eine Map aller OptionCodes, schlüsselt nach externalId und code (beides String).
@@ -36,6 +38,8 @@ export class CspOptionCodeImportService {
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
     @InjectRepository(OptionSpace)
     private readonly optionSpaceRepo: Repository<OptionSpace>,
+    @Inject(DefaultEncodingSanitizerService)
+    private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
   /**
@@ -93,17 +97,29 @@ export class CspOptionCodeImportService {
       }
 
       entity.code = String(dto.code); // Immer string, egal was geliefert wird!
-      entity.name = typeof dto.name === 'string' ? dto.name : '';
-      entity.type = typeof dto.type === 'string' ? dto.type : null;
+      entity.name = this.encodingSanitizer.sanitize(
+        typeof dto.name === 'string' ? dto.name : '',
+      );
+      entity.type = this.encodingSanitizer.sanitize(
+        typeof dto.type === 'string' ? dto.type : null,
+      );
       entity.optionSpace = optionSpace;
       entity.optionSpaceId = optionSpace?.id ?? null;
-      entity.comment = typeof dto.comment === 'string' ? dto.comment : null;
-      entity.source = typeof dto.source === 'string' ? dto.source : null;
+      entity.comment = this.encodingSanitizer.sanitize(
+        typeof dto.comment === 'string' ? dto.comment : null,
+      );
+      entity.source = this.encodingSanitizer.sanitize(
+        typeof dto.source === 'string' ? dto.source : null,
+      );
       entity.array = typeof dto.array === 'boolean' ? dto.array : null;
       entity.createdAt =
-        typeof dto.created_at === 'string' ? dto.created_at : null;
+        typeof dto.created_at === 'string'
+          ? this.encodingSanitizer.sanitize(dto.created_at)
+          : null;
       entity.updatedAt =
-        typeof dto.updated_at === 'string' ? dto.updated_at : null;
+        typeof dto.updated_at === 'string'
+          ? this.encodingSanitizer.sanitize(dto.updated_at)
+          : null;
 
       await this.optionCodeRepo.save(entity);
       importedEntities.push(entity);

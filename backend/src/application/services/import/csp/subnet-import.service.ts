@@ -17,6 +17,7 @@ import {
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -45,6 +46,7 @@ export class CspSubnetImportService {
     private readonly optionSpaceRepo: Repository<OptionSpace>,
     @InjectRepository(OptionGroup)
     private readonly optionGroupRepo: Repository<OptionGroup>,
+    private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
   /**
@@ -110,10 +112,12 @@ export class CspSubnetImportService {
       });
       if (!subnet) subnet = this.subnetRepo.create({ externalId: dto.id });
 
-      subnet.name = dto.name;
-      subnet.address = dto.address;
+      subnet.name = this.encodingSanitizer.sanitize(dto.name ?? '');
+      subnet.address = this.encodingSanitizer.sanitize(dto.address ?? '');
       subnet.cidr = dto.cidr;
-      subnet.comment = dto.comment ?? null;
+      subnet.comment = dto.comment
+        ? this.encodingSanitizer.sanitize(dto.comment)
+        : null;
 
       // Parent-Assignment
       if (dto.parent?.startsWith('ipam/address_block/')) {

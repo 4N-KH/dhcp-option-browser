@@ -23,6 +23,6 @@ export interface DhcpOptionRaw {
   optionSpace?: OptionSpaceMetaDto | null;
   optionCodeSource?: string | null;
   optionCodeComment?: string | null;
-  code?: string | null; // immer numerisch, falls möglich!
-  externalId?: string | null; // UUID, falls gebraucht
+  code?: string | null;
+  externalId?: string | null;
 }

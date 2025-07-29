@@ -1,3 +1,5 @@
+// src/domain/dto/csp/effective-dhcp-option-stack.dto.ts
+
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 import { OptionGroupMetaDto } from './option-group-meta.dto';
@@ -49,15 +51,32 @@ export class OptionInheritanceStackEntryDto {
   @ApiPropertyOptional()
   name: string | null;
 
-  // Neu:
   @ApiPropertyOptional()
   type?: string | null;
+
   @ApiPropertyOptional()
   array?: boolean | null;
+
   @ApiPropertyOptional()
   optionCodeComment?: string | null;
+
   @ApiPropertyOptional()
   optionCodeSource?: string | null;
+
   @ApiPropertyOptional({ type: OptionSpaceMetaDto })
   optionSpace?: OptionSpaceMetaDto | null;
+
+  // === Redundanz-Information ===
+  @ApiPropertyOptional()
+  redundant?: boolean;
+
+  @ApiPropertyOptional()
+  redundantWith?: {
+    code: string;
+    level: ObjectType;
+    levelId: number;
+    groupId?: number;
+    groupName?: string;
+    value?: string | null;
+  };
 }

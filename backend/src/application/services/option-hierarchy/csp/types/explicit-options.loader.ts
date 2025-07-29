@@ -1,4 +1,3 @@
-// src/application/services/option-hierarchy/csp/types/explicit-options.loader.ts
 import { Injectable } from '@nestjs/common';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 import { InjectRepository } from '@nestjs/typeorm';

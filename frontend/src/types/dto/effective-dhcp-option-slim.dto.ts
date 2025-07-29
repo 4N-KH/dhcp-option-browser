@@ -1,28 +1,34 @@
 // src/types/dto/effective-dhcp-option-slim.dto.ts
 
+export interface RedundantWithInfo {
+  code: string;
+  level: string;
+  levelId: number;
+  groupId?: number;
+  groupName?: string;
+  value?: string | null;
+}
+
+export interface OptionInGroupDto {
+  code: string;
+  name?: string;
+  value: string | null;
+  type?: string | null;
+  array?: boolean | null;
+  // === Redundanz-Felder für Optionen innerhalb Gruppen ===
+  redundant?: boolean;
+  redundantWith?: RedundantWithInfo;
+}
+
 export interface OptionGroupInSource {
   id: number;
   name: string;
   comment?: string | null;
-  options: {
-    code: string;
-    name?: string;
-    value: string | null;
-    type?: string | null;
-    array?: boolean | null;
-    optionCodeComment?: string | null;
-    optionCodeSource?: string | null;
-    optionSpace?: {
-      id: number;
-      name: string;
-      protocol?: string | null;
-    } | null;
-  }[];
+  options: OptionInGroupDto[];
   groupInheritanceType?: "GROUP_EXPLICIT" | "GROUP_INHERITED";
   isGroupInherited?: boolean;
   groupOriginLevel?: string;
   groupOriginLevelId?: number;
-  /** Klartext-Label, z. B. "ipSpace KH" oder "labor_vm" (direkt vom Backend geliefert) */
   originLevelLabel?: string;
 }
 
@@ -39,16 +45,17 @@ export interface EffectiveDhcpOptionSlimDto {
     name: string;
     protocol?: string | null;
   } | null;
+
   source: {
     level: string;
     levelId: number;
     type: "EXPLICIT" | "INHERITED" | "GROUP_EXPLICIT" | "GROUP_INHERITED";
     originLevel?: string;
     originLevelId?: number;
-    /** <-- DAS MUSS HIER STEHEN: */
     originLevelLabel?: string;
     optionGroup?: OptionGroupInSource;
   };
+
   overridden?: {
     level: string;
     levelId: number;
@@ -59,6 +66,7 @@ export interface EffectiveDhcpOptionSlimDto {
       comment?: string | null;
     };
   };
+
   comment?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -72,4 +80,7 @@ export interface EffectiveDhcpOptionSlimDto {
     optionGroupId?: number;
     optionGroupName?: string;
   }[];
+  // === Redundanz-Felder für Einzeloptionen ===
+  redundant?: boolean;
+  redundantWith?: RedundantWithInfo;
 }

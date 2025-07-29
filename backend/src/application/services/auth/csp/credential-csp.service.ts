@@ -22,7 +22,6 @@ export class CredentialCspService {
     region: Region,
     apiKey: string,
   ): Promise<CspCredentialEntity> {
-    // Encrypt API key, strictly typed
     const payload: EncryptedPayload = encrypt(apiKey);
     // Create and save entity
     const entity = this.credentialRepo.create({

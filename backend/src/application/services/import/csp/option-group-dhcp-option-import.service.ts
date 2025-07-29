@@ -7,6 +7,7 @@ import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionGroupDhcpOption } from '@/infrastructure/database/csp/option-group-dhcp-option.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -29,6 +30,8 @@ export class CspOptionGroupDhcpOptionImportService {
     private readonly ogdoRepo: Repository<OptionGroupDhcpOption>,
     @InjectRepository(OptionSpace)
     private readonly optionSpaceRepo: Repository<OptionSpace>,
+    // EncodingSanitizer injizieren
+    private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
   /**
@@ -101,12 +104,17 @@ export class CspOptionGroupDhcpOptionImportService {
           continue;
         }
 
+        // Sanitize Option Value!
+        const sanitizedValue = this.encodingSanitizer.sanitize(
+          opt.option_value,
+        );
+
         // Eindeutig prüfen NUR über optionGroupId, optionCodeId und option_value
         const exists = await this.ogdoRepo.findOne({
           where: {
             optionGroupId: groupEntity.id,
             optionCodeId: codeEntity.id,
-            option_value: opt.option_value,
+            option_value: sanitizedValue,
           },
         });
 
@@ -116,7 +124,7 @@ export class CspOptionGroupDhcpOptionImportService {
             optionGroupId: groupEntity.id,
             optionCode: codeEntity,
             optionCodeId: codeEntity.id,
-            option_value: opt.option_value,
+            option_value: sanitizedValue,
             optionSpace: optionSpaceRef,
             optionSpaceId: optionSpaceId,
           });

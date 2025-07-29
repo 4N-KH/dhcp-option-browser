@@ -1,3 +1,5 @@
+// csp-light-tree.types.ts
+
 import {
   IpSpace,
   AddressBlock,
@@ -6,25 +8,29 @@ import {
   FixedAddress,
 } from '@/infrastructure/database/csp';
 
-/** IpSpace with AddressBlocks & Subnets */
 export type IpSpaceWithChildren = IpSpace & {
   addressBlocks?: AddressBlockWithChildren[];
   subnets?: SubnetWithChildren[];
+  hasRedundancy?: boolean;
 };
 
-/** AddressBlock with Child-Blocks & Subnets */
 export type AddressBlockWithChildren = AddressBlock & {
   children?: AddressBlockWithChildren[];
   subnets?: SubnetWithChildren[];
+  hasRedundancy?: boolean;
 };
 
-/** Subnet with Ranges AND direct FixedAddresses (without Range) */
 export type SubnetWithChildren = Subnet & {
   ranges?: RangeWithChildren[];
-  fixedAddresses?: FixedAddress[];
+  fixedAddresses?: FixedAddressWithRedundancy[];
+  hasRedundancy?: boolean;
 };
 
-/** Range with FixedAddresses */
 export type RangeWithChildren = Range & {
-  fixedAddresses?: FixedAddress[];
+  fixedAddresses?: FixedAddressWithRedundancy[];
+  hasRedundancy?: boolean;
+};
+
+export type FixedAddressWithRedundancy = FixedAddress & {
+  hasRedundancy?: boolean;
 };

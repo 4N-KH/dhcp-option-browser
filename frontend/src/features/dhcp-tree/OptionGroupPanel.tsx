@@ -9,6 +9,7 @@ interface OptionGroupPanelProps {
   originLevelLabel?: string;
   originLevelId?: number;
   options: OptionGroupInSource["options"];
+  partnerKeys?: Set<string>;
 }
 
 const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
@@ -21,33 +22,60 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
 
+  const groupIsRedundant = options.some((opt) => opt.redundant);
+
+  // Fallback-Logik für Label und ID:
+  const effectiveOriginLevel = group.groupOriginLevel ?? originLevel;
+  const effectiveOriginLevelLabel = group.originLevelLabel ?? originLevelLabel;
+  const effectiveOriginLevelId = group.groupOriginLevelId ?? originLevelId;
+
+  const inheritedBadge = status === "GROUP_INHERITED" ? (
+    <span
+      className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold"
+      title={
+        (effectiveOriginLevelLabel ?? "") +
+        (effectiveOriginLevelId ? " #" + effectiveOriginLevelId : "")
+      }
+    >
+      {getInheritedLabel(
+        effectiveOriginLevel,
+        effectiveOriginLevelLabel,
+        effectiveOriginLevelId
+      )}
+    </span>
+  ) : (
+    <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold">
+      Explicit
+    </span>
+  );
+
   return (
-    <div className="mb-5 border border-blue-900 rounded-2xl bg-blue-950/50 shadow">
+    <div
+      className={[
+        "mb-4 border border-blue-900 rounded-lg bg-blue-950/30",
+        groupIsRedundant
+          ? "border-red-700 shadow-[0_0_0_2px_rgba(220,38,38,0.4)]"
+          : "",
+      ].join(" ")}
+    >
       <div
-        className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-blue-900/30 rounded-t-2xl transition"
+        className="flex items-center justify-between px-4 py-2 cursor-pointer"
         onClick={() => setOpen((o) => !o)}
       >
         <div className="flex items-center gap-3">
-          <span className="font-bold text-blue-200 text-lg">{group.name}</span>
-          {status === "GROUP_INHERITED" ? (
-            <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
-              {getInheritedLabel(
-                originLevel || group.groupOriginLevel,
-                originLevelLabel || group.originLevelLabel,
-                originLevelId || group.groupOriginLevelId
-              )}
-            </span>
-          ) : (
-            <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
-              Explicit
+          <span className="font-bold text-blue-200">{group.name}</span>
+          {groupIsRedundant && (
+            <span className="bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold shadow-sm">
+              Redundant in group
             </span>
           )}
+          {inheritedBadge}
           {group.comment && (
             <span className="text-xs text-gray-400 ml-2">{group.comment}</span>
           )}
         </div>
         <button
-          className="text-xs px-3 py-1 rounded bg-blue-800 text-blue-200 shadow hover:bg-blue-700 transition"
+          className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-200"
           tabIndex={-1}
         >
           {open ? "Hide Options" : "Show Options"}
@@ -55,40 +83,61 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
       </div>
       {open && (
         <div className="pb-2 px-4">
-          <div className="overflow-x-auto rounded-b-2xl bg-blue-950/70">
-            <table className="min-w-[750px] w-full text-sm border-separate border-spacing-0">
-              <thead>
-                <tr className="text-blue-200 uppercase text-xs font-bold border-b border-blue-900">
-                  <th className="py-2 px-3 text-left">Code</th>
-                  <th className="py-2 px-3 text-left">Name</th>
-                  <th className="py-2 px-3 text-left">Value</th>
-                  <th className="py-2 px-3 text-left">Option Space</th>
-                  <th className="py-2 px-3 text-left">Type</th>
-                  <th className="py-2 px-3 text-left">Comment</th>
+          <table className="w-full text-sm mt-1">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Value</th>
+                <th>Type</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {options.length > 0 ? (
+                options.map((opt, idx) => {
+                  const isRedundant = opt.redundant === true;
+                  // isPartner wird ignoriert, Partner-Badge entfernt
+                  return (
+                    <tr
+                      key={`${opt.code}-${opt.value}-${idx}`}
+                      className={[
+                        isRedundant
+                          ? "bg-red-900/80 text-red-200 font-bold animate-pulse"
+                          : "",
+                      ].join(" ")}
+                      title={
+                        isRedundant
+                          ? "Redundant"
+                          : undefined
+                      }
+                    >
+                      <td className="font-mono">{opt.code}</td>
+                      <td>{opt.name ?? "–"}</td>
+                      <td>{opt.value ?? "–"}</td>
+                      <td>{opt.type ?? "–"}</td>
+                      <td>
+                        {isRedundant && (
+                          <span
+                            className="ml-2 bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold"
+                          >
+                            Redundant
+                          </span>
+                        )}
+                        {/* Partner-Badge entfernt */}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-gray-500 py-2 text-center">
+                    No options in this group
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {options.length > 0 ? options.map((opt, i) => (
-                  <tr key={opt.code} className={i % 2 === 0 ? "bg-blue-950/40" : ""}>
-                    <td className="font-mono px-3 py-1">{opt.code}</td>
-                    <td className="px-3 py-1">{opt.name ?? "–"}</td>
-                    <td className="px-3 py-1">{opt.value ?? "–"}</td>
-                    <td className="px-3 py-1">
-                      {opt.optionSpace
-                        ? `${opt.optionSpace.name}${opt.optionSpace.protocol ? " (" + opt.optionSpace.protocol + ")" : ""}`
-                        : "–"}
-                    </td>
-                    <td className="px-3 py-1">{opt.type ?? "–"}</td>
-                    <td className="px-3 py-1">{opt.optionCodeComment ?? "–"}</td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={6} className="text-gray-500 py-2 text-center">No options in this group</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

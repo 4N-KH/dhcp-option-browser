@@ -28,7 +28,7 @@ export class DhcpOptionRawMapper {
         ? {
             id: o.optionCode.optionSpace.id,
             name: o.optionCode.optionSpace.name,
-            protocol: o.optionCode.optionSpace.protocol ?? '', // leere Zeichenkette statt null!
+            protocol: o.optionCode.optionSpace.protocol ?? '',
             comment: o.optionCode.optionSpace.comment ?? null,
             createdAt: o.optionCode.optionSpace.createdAt ?? null,
             updatedAt: o.optionCode.optionSpace.updatedAt ?? null,

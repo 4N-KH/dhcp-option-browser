@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -18,6 +19,7 @@ export class CspOptionSpaceImportService {
     private readonly cspDataClient: CspDataClient,
     @InjectRepository(OptionSpace)
     private readonly optionSpaceRepo: Repository<OptionSpace>,
+    private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
   /**
@@ -57,8 +59,10 @@ export class CspOptionSpaceImportService {
       if (!entity) {
         entity = this.optionSpaceRepo.create({ externalId: dto.id });
       }
-      entity.name = dto.name ?? '';
-      entity.comment = dto.comment ?? null;
+      entity.name = this.encodingSanitizer.sanitize(dto.name ?? '');
+      entity.comment = dto.comment
+        ? this.encodingSanitizer.sanitize(dto.comment)
+        : null;
       entity.protocol = dto.protocol ?? null;
       entity.createdAt = dto.created_at ?? null;
       entity.updatedAt = dto.updated_at ?? null;

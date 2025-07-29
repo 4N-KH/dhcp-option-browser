@@ -16,6 +16,7 @@ import {
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -42,6 +43,7 @@ export class CspRangeImportService {
     private readonly optionGroupRepo: Repository<OptionGroup>,
     @InjectRepository(OptionCodeEntity)
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
+    private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
   /**
@@ -118,10 +120,12 @@ export class CspRangeImportService {
         range = this.rangeRepo.create({ externalId: dto.id });
       }
 
-      range.name = dto.name;
-      range.start = dto.start;
-      range.end = dto.end;
-      range.comment = dto.comment ?? null;
+      range.name = this.encodingSanitizer.sanitize(dto.name ?? '');
+      range.start = this.encodingSanitizer.sanitize(dto.start ?? '');
+      range.end = this.encodingSanitizer.sanitize(dto.end ?? '');
+      range.comment = dto.comment
+        ? this.encodingSanitizer.sanitize(dto.comment)
+        : null;
       range.subnet = parentSubnet;
       range.subnetId = parentSubnet.id;
 
@@ -235,9 +239,11 @@ export class CspRangeImportService {
             const exclusion = this.exclusionRepo.create({
               range,
               rangeId: range.id,
-              start: excl.start,
-              end: excl.end,
-              comment: excl.comment ?? null,
+              start: this.encodingSanitizer.sanitize(excl.start),
+              end: this.encodingSanitizer.sanitize(excl.end),
+              comment: excl.comment
+                ? this.encodingSanitizer.sanitize(excl.comment)
+                : null,
             });
             await this.exclusionRepo.save(exclusion);
           }

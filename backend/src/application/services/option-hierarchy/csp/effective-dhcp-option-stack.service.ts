@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
-import { ContextChainBuilder } from './context-chain.builder';
+import {
+  ContextChainBuilder,
+  filterContextsForAddressBlock,
+} from './context-chain.builder';
 import { ExplicitOptionsLoader } from './types/explicit-options.loader';
 import { OptionGroupsLoader } from './types/option-groups.loader';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
-import { DhcpOptionRaw } from './types/dhcp-option-raw.type';
-import { OptionStackAssembler } from './types/option-stack.assembler';
+import { OptionStackAssemblerService } from './types/option-stack-assembler/option-stack-assembler-orchestrator.service';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 
 import { IpSpace } from '@/infrastructure/database/csp/ip-space.entity';
@@ -16,12 +18,11 @@ import { DhcpGlobalConfig } from '@/infrastructure/database/csp/global-config.en
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-type ContextObj = {
-  level: ObjectType;
-  levelId: number;
-  options: DhcpOptionRaw[];
-  optionGroups: { group: OptionGroup; options: DhcpOptionRaw[] }[];
-};
+import type { ContextObj } from './types/option-stack-assembler/types/context-obj.type';
+
+// Redundanz & Dedupe-Utility:
+import { markRedundancyPerPanelStrict } from '@/shared/utils/mark-redundancy-per-panel.util';
+import { dedupeEffectiveDhcpOptionSlimDtoArray } from '@/shared/utils/dedupe-effective-options.util';
 
 @Injectable()
 export class EffectiveDhcpOptionStackService {
@@ -31,7 +32,7 @@ export class EffectiveDhcpOptionStackService {
     private readonly contextChainBuilder: ContextChainBuilder,
     private readonly explicitOptionsLoader: ExplicitOptionsLoader,
     private readonly optionGroupsLoader: OptionGroupsLoader,
-    private readonly optionStackAssembler: OptionStackAssembler,
+    private readonly optionStackAssembler: OptionStackAssemblerService,
     @InjectRepository(IpSpace)
     private readonly ipSpaceRepo: Repository<IpSpace>,
     @InjectRepository(AddressBlock)
@@ -55,7 +56,7 @@ export class EffectiveDhcpOptionStackService {
       );
     }
 
-    // 1. ContextChain aufbauen
+    // 1. Kontext-Kette aufbauen
     const contextChain = await this.contextChainBuilder.build(
       objectType,
       objectId,
@@ -75,35 +76,7 @@ export class EffectiveDhcpOptionStackService {
       allContexts.push({ ...ctx, options, optionGroups });
     }
 
-    if (enableDebugLogging) {
-      this.logger.warn(
-        '[DEBUG] Dump of allContexts (incl. OptionGroups and Options):\n' +
-          JSON.stringify(
-            allContexts.map((ctx) => ({
-              level: ctx.level,
-              levelId: ctx.levelId,
-              options: ctx.options.map((o) => ({
-                code: o.code,
-                value: o.option_value,
-                name: o.name,
-              })),
-              optionGroups: ctx.optionGroups.map((g) => ({
-                group: g.group?.name ?? g.group?.id,
-                groupId: g.group?.id,
-                options: g.options.map((o) => ({
-                  code: o.code,
-                  value: o.option_value,
-                  name: o.name,
-                })),
-              })),
-            })),
-            null,
-            2,
-          ),
-      );
-    }
-
-    // 3. OptionGroups robust mit Vererbung (explizit, inherited, nie doppelt!)
+    // 3. OptionGroups-Vererbung robust ergänzen (nie doppelt!)
     const allGroups = new Map<
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
@@ -132,15 +105,7 @@ export class EffectiveDhcpOptionStackService {
       }
     }
 
-    if (enableDebugLogging) {
-      allContexts.forEach((ctx, idx) => {
-        this.logger.warn(
-          `[DEBUG] Context [${idx}] Level: ${ctx.level} (ID: ${ctx.levelId}) Options: ${ctx.options.length} OptionGroups: ${ctx.optionGroups.length}`,
-        );
-      });
-    }
-
-    // ---------- Label-Maps für Kontext-Labels (auch für Einzeloptionen) ----------
+    // 4. Label-Maps für Kontext-Labels bauen
     const [ipSpaces, addressBlocks, subnets, ranges, globalConfig] =
       await Promise.all([
         this.ipSpaceRepo.find(),
@@ -168,24 +133,31 @@ export class EffectiveDhcpOptionStackService {
       rangesById: new Map(
         ranges.map((x) => [x.id, { name: x.name, start: x.start, end: x.end }]),
       ),
-      // KEIN fixedAddressesById nötig
     };
 
-    // 4. Stacks bauen (inkl. OptionGroup-Inheritance) UND allGroups weitergeben!
-    const { stacks, allGroups: fullAllGroups } =
-      this.optionStackAssembler.assemble(allContexts);
-
-    if (enableDebugLogging) {
-      this.logger.warn(`[DEBUG] OptionStacks assembled, begin DTO mapping...`);
+    // 5. Kontext ggf. auf AddressBlock filtern
+    let filteredContexts = allContexts;
+    if (objectType === ObjectType.ADDRESSBLOCK) {
+      filteredContexts = filterContextsForAddressBlock(allContexts, objectId);
     }
 
-    // 5. Slim-DTOs für das Frontend (alle Parameter übergeben! => auch für Einzeloptionen Labels!)
-    const slimDtos = this.optionStackAssembler.buildSlimDtoForAll(
+    // 6. Stacks bauen und DTOs mappen
+    const { stacks, allGroups: fullAllGroups } =
+      this.optionStackAssembler.assemble(filteredContexts);
+
+    // 7. Slim-DTOs fürs Frontend (noch ohne Redundanz)
+    let slimDtos = this.optionStackAssembler.buildSlimDtoForAll(
       stacks,
-      allContexts,
+      filteredContexts,
       fullAllGroups,
       contextTreeMaps,
     );
+
+    // 8. Deduplizieren: Keine doppelten Optionen oder Gruppenoptionen pro Panel!
+    slimDtos = dedupeEffectiveDhcpOptionSlimDtoArray(slimDtos);
+
+    // 9. Jetzt Redundanz-Flags panel-weise markieren (NUR Panel-scharf, keine globale Duplikaterkennung!)
+    markRedundancyPerPanelStrict(slimDtos);
 
     if (enableDebugLogging) {
       this.logger.warn(

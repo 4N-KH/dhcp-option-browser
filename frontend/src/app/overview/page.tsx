@@ -8,11 +8,13 @@ import { getDefaultSelection } from "@/features/dhcp-tree/helpers/tree-node-help
 import { TreeSelection } from "@/features/dhcp-tree/types";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 import ImportWithProgress from "@/features/config-import/ImportWithProgress";
+import OptionOverviewTab from "./option-overview-tab"; // <--- NEU! (siehe oben)
 
 export default function OverviewPage() {
   const [tree, setTree] = useState<DhcpLightTreeDto | null>(null);
   const [selected, setSelected] = useState<TreeSelection | null>(null);
   const [showTree, setShowTree] = useState(false);
+  const [tab, setTab] = useState<"tree" | "overview">("tree");
 
   // Fetch existing data immediately after login/reload
   useEffect(() => {
@@ -23,21 +25,52 @@ export default function OverviewPage() {
     });
   }, []);
 
-  // If overview should be shown
   if (showTree && tree) {
     return (
-      <div className="flex h-[80vh] w-full">
-        {/* Sidebar: Tree */}
-        <div className="w-1/3 min-w-[340px] max-w-[480px] border-r border-[var(--border)] bg-[rgba(255,255,255,0.02)] overflow-y-auto">
-          <LightTreeView
-            tree={tree}
-            selected={selected}
-            onSelect={setSelected}
-          />
+      <div className="flex flex-col h-[80vh] w-full">
+        {/* Tabs */}
+        <div className="flex gap-4 mb-4">
+          <button
+            className={`px-6 py-2 rounded-lg font-bold transition ${
+              tab === "tree"
+                ? "bg-[var(--accent)] text-white"
+                : "bg-white/10 text-blue-200"
+            }`}
+            onClick={() => setTab("tree")}
+          >
+            DHCP Tree
+          </button>
+          <button
+            className={`px-6 py-2 rounded-lg font-bold transition ${
+              tab === "overview"
+                ? "bg-[var(--accent)] text-white"
+                : "bg-white/10 text-blue-200"
+            }`}
+            onClick={() => setTab("overview")}
+          >
+            Option Overview
+          </button>
         </div>
-        {/* Main: Properties panel */}
-        <div className="flex-1 p-8 overflow-y-auto">
-          <DhcpPropertiesPanel selected={selected} />
+        {/* Tab Content */}
+        <div className="flex-1 w-full h-full overflow-hidden">
+          {tab === "tree" ? (
+            <div className="flex h-full w-full">
+              {/* Sidebar: Tree */}
+              <div className="w-1/3 min-w-[340px] max-w-[480px] border-r border-[var(--border)] bg-[rgba(255,255,255,0.02)] overflow-y-auto">
+                <LightTreeView
+                  tree={tree}
+                  selected={selected}
+                  onSelect={setSelected}
+                />
+              </div>
+              {/* Main: Properties panel */}
+              <div className="flex-1 p-8 overflow-y-auto">
+                <DhcpPropertiesPanel selected={selected} />
+              </div>
+            </div>
+          ) : (
+            <OptionOverviewTab />
+          )}
         </div>
       </div>
     );

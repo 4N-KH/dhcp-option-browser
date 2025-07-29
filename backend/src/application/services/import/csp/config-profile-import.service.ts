@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspConfigProfileDto } from '@/domain/dto/csp/config-profile.dto';
 import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
+import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -11,16 +12,20 @@ type InterruptibleImportOptions = {
 /**
  * Service for importing configuration profiles from CSP.
  * - Fetches config profiles via CspDataClient
- * - Logs relevant DHCP options per profile
+ * - Normalizes encoding for strings and DHCP options
+ * - Reports progress and supports interrupt
  */
 @Injectable()
 export class CspConfigProfileImportService {
   private readonly logger = new Logger(CspConfigProfileImportService.name);
 
-  constructor(private readonly cspDataClient: CspDataClient) {}
+  constructor(
+    private readonly cspDataClient: CspDataClient,
+    private readonly encodingSanitizer: DefaultEncodingSanitizerService,
+  ) {}
 
   /**
-   * Import all CSP configuration profiles, normalise options, report progress, support interrupt.
+   * Import all CSP configuration profiles, normalise options & encoding, report progress, support interrupt.
    */
   async importConfigProfiles(
     opts?: InterruptibleImportOptions,
@@ -49,7 +54,17 @@ export class CspConfigProfileImportService {
       checkCancel();
       const normalisedProfile: CspConfigProfileDto = {
         ...profile,
-        dhcp_options: normalizeDhcpOptions(profile.dhcp_options),
+        name: this.encodingSanitizer.sanitize(profile.name ?? ''),
+        comment: profile.comment
+          ? this.encodingSanitizer.sanitize(profile.comment)
+          : undefined,
+        dhcp_options: normalizeDhcpOptions(profile.dhcp_options).map((opt) => ({
+          ...opt,
+          option_value:
+            typeof opt.option_value === 'string'
+              ? this.encodingSanitizer.sanitize(opt.option_value)
+              : opt.option_value,
+        })),
       };
       profiles.push(normalisedProfile);
 

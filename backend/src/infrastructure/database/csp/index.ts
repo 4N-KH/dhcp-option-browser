@@ -52,3 +52,4 @@ export * from './address-block-dhcp-option.repository';
 export * from './subnet-dhcp-option.repository';
 export * from './range-dhcp-option.repository';
 export * from './fixed-dhcp-option.repository';
+export * from './all-dhcp-option-assignment.repository';
