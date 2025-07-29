@@ -1,0 +1,46 @@
+version: "3.8"
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: dhcpuser
+      POSTGRES_PASSWORD: dhcppass
+      POSTGRES_DB: dhcpdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/create_views.sql:/docker-entrypoint-initdb.d/create_views.sql
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_USER: dhcpuser
+      DATABASE_PASSWORD: dhcppass
+      DATABASE_NAME: dhcpdb
+      # ggf. weitere .env Variablen!
+    depends_on:
+      - db
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+    command: npm run start:prod
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+    env_file:
+      - ./frontend/.env
+
+volumes:
+  db-data:

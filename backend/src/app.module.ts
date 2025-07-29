@@ -156,7 +156,7 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
         FixedDhcpOption,
         FixedAddressOptionGroup,
       ],
-      synchronize: false,
+      synchronize: true,
     }),
     TypeOrmModule.forFeature([
       CspCredentialEntity,
