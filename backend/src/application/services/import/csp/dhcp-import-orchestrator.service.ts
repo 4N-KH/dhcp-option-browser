@@ -1,4 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 
 import { CspGlobalConfigImportService } from './global-config-import.service';
 import { CspConfigProfileImportService } from './config-profile-import.service';
@@ -12,6 +13,7 @@ import { CspOptionCodeImportService } from './option-code-import.service';
 import { CspOptionSpaceImportService } from './option-space-import.service';
 import { CspOptionGroupDhcpOptionImportService } from './option-group-dhcp-option-import.service';
 import { EncodingSanitizer } from '@/application/services/import/transformers/encoding-sanitizer.interface';
+import { createAllDhcpOptionAssignmentsView } from '@/shared/utils/create-views.util';
 
 const IMPORT_PHASES = [
   'optionSpaces',
@@ -55,6 +57,7 @@ export class DhcpCspImportOrchestratorService {
     private readonly fixedAddressImport: CspFixedAddressImportService,
     @Inject(EncodingSanitizer)
     private readonly encodingSanitizer: EncodingSanitizer,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -98,7 +101,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer // Wenn Service angepasst wurde
       });
       updatePhaseProgress(++currentPhase, 'optionSpaces');
 
@@ -111,7 +113,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'optionCodes');
 
@@ -124,7 +125,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'optionGroups');
 
@@ -137,7 +137,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'optionGroupDhcpOptions');
 
@@ -150,7 +149,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'globalConfig');
 
@@ -163,7 +161,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'configProfiles');
 
@@ -176,7 +173,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'ipSpaces');
 
@@ -189,7 +185,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'addressBlocks');
 
@@ -202,7 +197,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'subnets');
 
@@ -215,7 +209,6 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'ranges');
 
@@ -228,9 +221,12 @@ export class DhcpCspImportOrchestratorService {
             current: cur,
             total: tot,
           }),
-        // encodingSanitizer: this.encodingSanitizer
       });
       updatePhaseProgress(++currentPhase, 'fixedAddresses');
+
+      // ---> View nach vollständigem Import erzeugen/aktualisieren <---
+      await createAllDhcpOptionAssignmentsView(this.dataSource);
+      this.logger.log('all_dhcp_option_assignments-View (re-)created.');
 
       this.logger.log('--- CSP DHCP full import completed successfully ---');
       if (opts?.onProgress) opts.onProgress(100, 'fixedAddresses');
