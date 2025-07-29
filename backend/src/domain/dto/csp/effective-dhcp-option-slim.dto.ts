@@ -26,7 +26,7 @@ export class EffectiveDhcpOptionSlimDto {
       name: string;
       comment?: string | null;
       options: {
-        level: import('c:/implementation/dhcp-option-browser_2025-06-09_22-43/dhcp-option-browser/backend/src/domain/enums/csp/object-type.enum').ObjectType;
+        level: import('../../enums/csp/object-type.enum').ObjectType;
         levelId: number;
         code: string;
         name?: string;
