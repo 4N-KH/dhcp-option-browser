@@ -5,5 +5,8 @@
     "dist",
     "test",
     "**/*.spec.ts"
-  ]
+  ],
+  "compilerOptions": {
+    "outDir": "./dist"
+  }
 }
