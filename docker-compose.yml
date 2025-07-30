@@ -11,7 +11,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dhcpuser"]
+      test: ["CMD-SHELL", "pg_isready -U dhcpuser -d dhcpdb"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -20,7 +20,7 @@ services:
     build: ./backend
     container_name: dhcp-backend
     environment:
-      DB_HOST: db                # exakt wie in .env
+      DB_HOST: db
       DB_PORT: 5432
       DB_USERNAME: dhcpuser
       DB_PASSWORD: dhcppass

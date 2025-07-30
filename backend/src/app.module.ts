@@ -255,7 +255,6 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     OptionValueEffectivenessService,
     OptionValueExplicitService,
 
-    // ✨ String Sanitizer als Interface-Provider & als direkter Service ✨
     DefaultEncodingSanitizerService,
     {
       provide: EncodingSanitizer,
