@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:15
@@ -22,7 +20,7 @@ services:
     build: ./backend
     container_name: dhcp-backend
     environment:
-      DB_HOST: db                # Gleiche Namen wie in .env
+      DB_HOST: db                # exakt wie in .env
       DB_PORT: 5432
       DB_USERNAME: dhcpuser
       DB_PASSWORD: dhcppass
