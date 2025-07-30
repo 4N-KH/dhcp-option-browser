@@ -6,14 +6,14 @@ import {
   LightRangeDto,
   LightFixedAddressDto,
 } from "@/types/dto/dhcp-light-tree.dto";
-import { TreeSelection } from "../types";
+import { TreeSelection } from "../../../types/types";
 
-// Initial selection for root node
+// Default selection: root node (global config)
 export function getDefaultSelection(tree: DhcpLightTreeDto): TreeSelection {
   return { type: "global", object: tree };
 }
 
-// Returns all children as TreeSelection[] for the given object (recursively)
+// Recursively collects children of a node
 export function getChildren(selection: TreeSelection): TreeSelection[] {
   const { type, object } = selection;
   switch (type) {
@@ -26,6 +26,7 @@ export function getChildren(selection: TreeSelection): TreeSelection[] {
     }
     case "ipSpace": {
       const ipSpace = object as LightIpSpaceDto;
+      // Return both address blocks and direct subnets
       return [
         ...ipSpace.addressBlocks.map((block) => ({
           type: "addressBlock" as const,
@@ -39,6 +40,7 @@ export function getChildren(selection: TreeSelection): TreeSelection[] {
     }
     case "addressBlock": {
       const block = object as LightAddressBlockDto;
+      // Return nested blocks and subnets
       return [
         ...block.children.map((child) => ({
           type: "addressBlock" as const,
@@ -52,8 +54,8 @@ export function getChildren(selection: TreeSelection): TreeSelection[] {
     }
     case "subnet": {
       const subnet = object as LightSubnetDto;
-      // Support both ranges and (optional) direct fixed addresses
       const children: TreeSelection[] = [];
+      // Include ranges if present
       if (subnet.ranges) {
         children.push(
           ...subnet.ranges.map((range) => ({
@@ -62,6 +64,7 @@ export function getChildren(selection: TreeSelection): TreeSelection[] {
           }))
         );
       }
+      // Include fixed addresses if explicitly listed
       if (Array.isArray(subnet.fixedAddresses) && subnet.fixedAddresses.length > 0) {
         children.push(
           ...subnet.fixedAddresses.map((fa) => ({
@@ -74,18 +77,19 @@ export function getChildren(selection: TreeSelection): TreeSelection[] {
     }
     case "range": {
       const range = object as LightRangeDto;
+      // Ranges only contain fixed addresses
       return range.fixedAddresses.map((fa) => ({
         type: "fixedAddress" as const,
         object: fa,
       }));
     }
-    // fixedAddress: leaf node, no children
+    // fixedAddress is a leaf node
     default:
       return [];
   }
 }
 
-// Liefert den sichtbaren Label-Text für jeden Tree-Knoten (UX only)
+// Returns display label for each node (used in UI)
 export function getNodeLabel(selection: TreeSelection): string {
   const { type, object } = selection;
 

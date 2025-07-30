@@ -1,5 +1,3 @@
-// src/types/dto/effective-dhcp-option-slim.dto.ts
-
 export interface RedundantWithInfo {
   code: string;
   level: string;
@@ -15,7 +13,6 @@ export interface OptionInGroupDto {
   value: string | null;
   type?: string | null;
   array?: boolean | null;
-  // === Redundanz-Felder für Optionen innerhalb Gruppen ===
   redundant?: boolean;
   redundantWith?: RedundantWithInfo;
 }
@@ -80,7 +77,6 @@ export interface EffectiveDhcpOptionSlimDto {
     optionGroupId?: number;
     optionGroupName?: string;
   }[];
-  // === Redundanz-Felder für Einzeloptionen ===
   redundant?: boolean;
   redundantWith?: RedundantWithInfo;
 }

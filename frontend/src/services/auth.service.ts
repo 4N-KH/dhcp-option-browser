@@ -21,7 +21,6 @@ function getApiBaseUrl(): string {
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Reads token from localStorage (or other secure store)
 function getToken(): string | null {
   return typeof window !== "undefined"
     ? localStorage.getItem("jwtToken")

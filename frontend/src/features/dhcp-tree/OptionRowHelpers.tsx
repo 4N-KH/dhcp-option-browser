@@ -2,19 +2,17 @@ import React from "react";
 import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
 import { getInheritedLabel } from "./helpers/labels";
 
-// Robust: Origin-Label-Ermittlung für Einzeloptionen
+// Determine origin label for a single option with fallback logic
 function getOriginLevelLabel(option: EffectiveDhcpOptionSlimDto): string | undefined {
-  // 1. Primär: originLevelLabel direkt
   if (option.source.originLevelLabel) return option.source.originLevelLabel;
-  // 2. Falls OptionGroup: originLevelLabel aus Group
   if (option.source.optionGroup?.originLevelLabel)
     return option.source.optionGroup.originLevelLabel;
-  // 3. Fallback: Group-OriginLevel (z.B. "ipSpace KH")
   if (option.source.optionGroup?.groupOriginLevel)
     return option.source.optionGroup.groupOriginLevel;
   return undefined;
 }
 
+// Determine origin level ID with fallback
 function getOriginLevelId(option: EffectiveDhcpOptionSlimDto): number | undefined {
   if (option.source.originLevelId) return option.source.originLevelId;
   if (option.source.optionGroup?.groupOriginLevelId)
@@ -22,6 +20,7 @@ function getOriginLevelId(option: EffectiveDhcpOptionSlimDto): number | undefine
   return undefined;
 }
 
+// Determine origin level type with fallback
 function getOriginLevel(option: EffectiveDhcpOptionSlimDto): string | undefined {
   if (option.source.originLevel) return option.source.originLevel;
   if (option.source.optionGroup?.groupOriginLevel)
@@ -29,7 +28,7 @@ function getOriginLevel(option: EffectiveDhcpOptionSlimDto): string | undefined 
   return undefined;
 }
 
-// Badge-Status für explizit/vererbt/overridden
+// Badge component indicating status: Explicit, Inherited, or Overridden
 export function StatusBadge({
   status,
   overridden,
@@ -64,7 +63,7 @@ export function StatusBadge({
   );
 }
 
-// Einzelne Optionszeile für Options-Tabelle
+// Table row for displaying a single DHCP option
 export function DhcpOptionRow({
   option,
   rowIndex,
@@ -72,13 +71,13 @@ export function DhcpOptionRow({
   option: EffectiveDhcpOptionSlimDto;
   rowIndex: number;
 }) {
-  // Einheitliche Klartext-Logik für Level-Label
-  const originLevelLabel = getOriginLevelLabel(option);
+  const originLevelLabel = getOriginLevelLabel(option); // Human-readable origin label
   const originLevelId = getOriginLevelId(option);
   const originLevel = getOriginLevel(option);
 
   const isRedundant = option.redundant === true;
 
+  // Apply alternating row background and redundancy highlighting
   const trClass = [
     rowIndex % 2 === 0 ? "bg-blue-950/40" : "",
     "hover:bg-blue-900/40 transition",
@@ -105,9 +104,7 @@ export function DhcpOptionRow({
           originLevelLabel={originLevelLabel}
         />
         {isRedundant && (
-          <span
-            className="ml-2 bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold"
-          >
+          <span className="ml-2 bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold">
             Redundant
           </span>
         )}

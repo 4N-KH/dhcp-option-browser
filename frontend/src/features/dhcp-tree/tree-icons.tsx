@@ -6,7 +6,7 @@ import {
   Server,     // Range
   Computer,   // Fixed Address
 } from "lucide-react";
-import { DhcpObjectType } from "./types";
+import { DhcpObjectType } from "../../types/types";
 
 export function getIcon(type: DhcpObjectType) {
   switch (type) {

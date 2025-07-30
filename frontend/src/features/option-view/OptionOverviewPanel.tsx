@@ -4,7 +4,7 @@ import { OptionValueOverviewDto } from "@/types/dto/option-value-overview.dto";
 import { OptionOccurrenceDto } from "@/types/dto/option-occurrence.dto";
 import { AnimatePresence, motion } from "framer-motion";
 
-// THEME
+// Theme configuration for styling
 const THEME = {
   borderRadius: {
     panel: "2.5rem",
@@ -31,7 +31,7 @@ const THEME = {
 
 const t = (s: string) => s;
 
-// SHIMMER
+// Loading shimmer placeholder
 const Shimmer: React.FC<{ count?: number }> = ({ count = 6 }) => (
   <div aria-busy="true" aria-live="polite" className="space-y-3 p-10 flex flex-col h-[340px] justify-center">
     {Array.from({ length: count }).map((_, i) => (
@@ -44,7 +44,7 @@ const Shimmer: React.FC<{ count?: number }> = ({ count = 6 }) => (
   </div>
 );
 
-// STATE/REDUCER
+// State and reducer for managing selected option and value
 type State = {
   openOption: string | null;
   selectedValue: string | null;
@@ -67,19 +67,16 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-// --- MAIN PANEL --- //
+// Props for the main panel
 type Props = {
   options: OptionCodeOverviewDto[] | null;
   loading?: boolean;
   error?: string | null;
   fetchValues: (option: OptionCodeOverviewDto) => Promise<OptionValueOverviewDto[]>;
-  fetchOccurrences: (
-    option: OptionCodeOverviewDto,
-    value: string
-  ) => Promise<OptionOccurrenceDto[]>;
+  fetchOccurrences: (option: OptionCodeOverviewDto, value: string) => Promise<OptionOccurrenceDto[]>;
 };
 
-// Nur noch code + name im Key!
+// Unique key for an option (code + name)
 const getOptionKey = (opt: OptionCodeOverviewDto) => `${opt.code}:${opt.name}`;
 
 const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchValues, fetchOccurrences }) => {
@@ -89,7 +86,7 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
   const [loadingValues, setLoadingValues] = React.useState(false);
   const [loadingOccurrences, setLoadingOccurrences] = React.useState(false);
 
-  // Load values when option opened
+  // Load values when an option is expanded
   React.useEffect(() => {
     if (state.openOption) {
       setLoadingValues(true);
@@ -109,13 +106,13 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
     }
   }, [state.openOption, fetchValues, options]);
 
-  // Load occurrences when value selected
+  // Load occurrences when a value is selected
   React.useEffect(() => {
     if (state.openOption && state.selectedValue) {
       setLoadingOccurrences(true);
       setOccurrences(null);
       const opt = options?.find((o) => getOptionKey(o) === state.openOption);
-      if (opt && state.selectedValue !== null) {
+      if (opt) {
         fetchOccurrences(opt, state.selectedValue)
           .then(setOccurrences)
           .catch(() => setOccurrences([]))
@@ -127,7 +124,7 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
     }
   }, [state.openOption, state.selectedValue, fetchOccurrences, options]);
 
-  // Empty/Loading/Error State
+  // Empty/Loading/Error handling
   if (loading) return <Shimmer count={6} />;
   if (error)
     return (
@@ -142,7 +139,7 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
       </div>
     );
 
-  // Layout
+  // Main layout
   return (
     <div
       className={`flex ${THEME.color.bgPanel} ${THEME.color.borderPanel} rounded-[${THEME.borderRadius.panel}] shadow-2xl overflow-hidden focus:outline-none`}
@@ -167,10 +164,8 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
             return (
               <li key={optionKey}>
                 <div
-                  className={`
-                    flex items-center justify-between cursor-pointer px-3 py-3 rounded-lg transition font-medium
-                    ${state.openOption === optionKey ? "bg-blue-900/60 text-white" : "hover:bg-blue-900/30 text-blue-100"}
-                  `}
+                  className={`flex items-center justify-between cursor-pointer px-3 py-3 rounded-lg transition font-medium
+                    ${state.openOption === optionKey ? "bg-blue-900/60 text-white" : "hover:bg-blue-900/30 text-blue-100"}`}
                   onClick={() => dispatch({ type: "TOGGLE_OPEN", optionCode: optionKey })}
                   tabIndex={0}
                   onKeyDown={(e) => {
@@ -179,7 +174,6 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
                 >
                   <span className="font-mono text-base">{opt.code}</span>
                   <span className="ml-3">{opt.name}</span>
-                  {/* Keine type/source mehr */}
                   <span className="ml-auto flex items-center">
                     <motion.svg
                       className="w-4 h-4 ml-2"
@@ -208,17 +202,14 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
                       {!loadingValues &&
                         values &&
                         values.map((val) => {
-                          // Value-Key eindeutig: optionKey + value
                           const valueKey = `${optionKey}:${val.value ?? "null"}`;
                           return (
                             <li
                               key={valueKey}
-                              className={`
-                                px-4 py-3 rounded-lg cursor-pointer font-mono transition
+                              className={`px-4 py-3 rounded-lg cursor-pointer font-mono transition
                                 ${state.selectedValue === val.value
                                   ? "bg-blue-800/90 text-white"
-                                  : "hover:bg-blue-800/40 text-blue-200"}
-                              `}
+                                  : "hover:bg-blue-800/40 text-blue-200"}`}
                               onClick={() => dispatch({ type: "SELECT_VALUE", value: val.value ?? "" })}
                               tabIndex={0}
                               onKeyDown={(e) => {
@@ -238,6 +229,7 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
           })}
         </ul>
       </section>
+
       {/* Right: Objects Table */}
       <section className={`flex-1 min-w-[300px] p-5 h-full flex flex-col ${THEME.color.sectionRight}`}>
         <h2 className="font-semibold text-blue-50 mb-4 text-xl tracking-wide select-none" tabIndex={0}>
@@ -251,7 +243,7 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
   );
 };
 
-// --- OBJECTS TABLE --- //
+// Table of objects where selected option/value occurs
 const ObjectsTable: React.FC<{ loading: boolean; occurrences: OptionOccurrenceDto[] }> = ({ loading, occurrences }) => (
   <div className="overflow-auto h-full custom-scrollbar" tabIndex={0} aria-label={t("Objects Table")}>
     {loading ? (
@@ -278,7 +270,10 @@ const ObjectsTable: React.FC<{ loading: boolean; occurrences: OptionOccurrenceDt
             </tr>
           )}
           {occurrences.map((occ, idx) => (
-            <tr key={occ.objectId ? `${occ.objectType}:${occ.objectId}` : `${occ.objectType}:${idx}`} className={idx % 2 === 0 ? "bg-blue-950/30" : ""}>
+            <tr
+              key={occ.objectId ? `${occ.objectType}:${occ.objectId}` : `${occ.objectType}:${idx}`}
+              className={idx % 2 === 0 ? "bg-blue-950/30" : ""}
+            >
               <td className="p-3 font-mono">{occ.objectType}</td>
               <td className="p-3">{occ.objectLabel}</td>
               <td className="p-3 font-mono">{occ.address ?? <span className="text-blue-300">–</span>}</td>
@@ -293,8 +288,5 @@ const ObjectsTable: React.FC<{ loading: boolean; occurrences: OptionOccurrenceDt
     )}
   </div>
 );
-
-
-
 
 export default OptionOverviewPanel;

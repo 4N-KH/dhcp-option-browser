@@ -20,15 +20,16 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
   originLevelId,
   options,
 }) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // Controls expand/collapse state
 
-  const groupIsRedundant = options.some((opt) => opt.redundant);
+  const groupIsRedundant = options.some((opt) => opt.redundant); // Group flagged if any option is redundant
 
-  // Fallback-Logik für Label und ID:
+  // Resolve origin info with fallback (from props if not present in group)
   const effectiveOriginLevel = group.groupOriginLevel ?? originLevel;
   const effectiveOriginLevelLabel = group.originLevelLabel ?? originLevelLabel;
   const effectiveOriginLevelId = group.groupOriginLevelId ?? originLevelId;
 
+  // Badge indicating inheritance or explicit status
   const inheritedBadge = status === "GROUP_INHERITED" ? (
     <span
       className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold"
@@ -58,6 +59,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
           : "",
       ].join(" ")}
     >
+      {/* Header row with group name, badges, and toggle */}
       <div
         className="flex items-center justify-between px-4 py-2 cursor-pointer"
         onClick={() => setOpen((o) => !o)}
@@ -81,6 +83,8 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
           {open ? "Hide Options" : "Show Options"}
         </button>
       </div>
+
+      {/* Expandable section showing options table */}
       {open && (
         <div className="pb-2 px-4">
           <table className="w-full text-sm mt-1">
@@ -97,7 +101,6 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
               {options.length > 0 ? (
                 options.map((opt, idx) => {
                   const isRedundant = opt.redundant === true;
-                  // isPartner wird ignoriert, Partner-Badge entfernt
                   return (
                     <tr
                       key={`${opt.code}-${opt.value}-${idx}`}
@@ -106,11 +109,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
                           ? "bg-red-900/80 text-red-200 font-bold animate-pulse"
                           : "",
                       ].join(" ")}
-                      title={
-                        isRedundant
-                          ? "Redundant"
-                          : undefined
-                      }
+                      title={isRedundant ? "Redundant" : undefined}
                     >
                       <td className="font-mono">{opt.code}</td>
                       <td>{opt.name ?? "–"}</td>
@@ -118,13 +117,11 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
                       <td>{opt.type ?? "–"}</td>
                       <td>
                         {isRedundant && (
-                          <span
-                            className="ml-2 bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold"
-                          >
+                          <span className="ml-2 bg-red-800 text-red-100 px-2 py-0.5 rounded text-xs font-semibold">
                             Redundant
                           </span>
                         )}
-                        {/* Partner-Badge entfernt */}
+                        {/* Partner badge intentionally omitted */}
                       </td>
                     </tr>
                   );

@@ -8,9 +8,8 @@ import {
 } from "@/services/option-overview.service";
 import { OptionCodeOverviewDto } from "@/types/dto/option-code-overview.dto";
 
-// Wrapper-Funktionen, damit die Signaturen passen:
+// Simple wrappers for matching signatures
 function fetchValues(option: OptionCodeOverviewDto) {
-  // Du kannst hier noch Typen explizit angeben, wenn du willst.
   return fetchOptionValues(option.code, option.name);
 }
 function fetchOccurrences(option: OptionCodeOverviewDto, value: string) {

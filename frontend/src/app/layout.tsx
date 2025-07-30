@@ -12,7 +12,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="de" className={geist.className}>
+    <html lang="en" className={geist.className}>
       <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <QueryProvider>
           {children}

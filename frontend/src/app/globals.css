@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Theme variables */
 :root {
   --background: radial-gradient(circle at top center, rgba(59,130,246,0.25) 0%, rgba(15,23,42,0.7) 70%),
                 linear-gradient(135deg, #1c355e 0%, #2b60c5 50%, #5faaff 100%);
@@ -14,6 +15,7 @@
   --font-mono: var(--font-geist-mono), monospace;
 }
 
+/* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: radial-gradient(circle at top center, rgba(59,130,246,0.25) 0%, rgba(15,23,42,0.7) 70%),
@@ -28,6 +30,7 @@
   }
 }
 
+/* Base styles */
 body {
   background: var(--background);
   color: var(--foreground);
@@ -36,14 +39,15 @@ body {
   z-index: 0;
 }
 
+/* Subtle overlays */
 body::before {
   content: "";
   background: 
-    radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 55%), /* added this for subtle logo contrast boost */
+    radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 55%),
     radial-gradient(circle at 30% 30%, rgba(255,255,255,0.07) 0%, transparent 60%), 
     radial-gradient(circle at 70% 70%, rgba(255,255,255,0.04) 0%, transparent 60%);
   background-size: cover;
-  opacity: 0.05; /* slightly increased */
+  opacity: 0.05;
   position: fixed;
   inset: 0;
   z-index: 0;

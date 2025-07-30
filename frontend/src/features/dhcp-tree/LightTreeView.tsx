@@ -1,7 +1,7 @@
 // src/features/dhcp-browser/LightTreeView.tsx
 import React, { useState } from "react";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
-import { TreeSelection, DhcpObjectType } from "./types";
+import { TreeSelection, DhcpObjectType } from "../../types/types";
 import { getChildren, getNodeLabel } from "./helpers/tree-node-helpers";
 import { getIcon } from "./tree-icons";
 
@@ -11,21 +11,22 @@ interface LightTreeViewProps {
   onSelect: (sel: TreeSelection) => void;
 }
 
+// Builds a unique key for each node based on type and ID
 function getNodeKey(sel: TreeSelection): string {
   return `${sel.type}-${(sel.object as { id: string | number }).id}`;
 }
 
-// Recursively renders each node in the tree
+// Recursive component for rendering each tree node
 const TreeNodeView: React.FC<{
   selection: TreeSelection;
   selected: TreeSelection | null;
   onSelect: (sel: TreeSelection) => void;
   level?: number;
 }> = ({ selection, selected, onSelect, level = 0 }) => {
-  const children = getChildren(selection);
-  const [open, setOpen] = useState(level < 1);
+  const children = getChildren(selection); // Retrieve node's children
+  const [open, setOpen] = useState(level < 1); // Root level nodes are expanded by default
 
-  // Checks if the current node is selected
+  // Determine if the current node is selected
   const isSelected =
     !!selected &&
     selection.type === selected.type &&
@@ -40,26 +41,32 @@ const TreeNodeView: React.FC<{
         `}
         onClick={() => onSelect(selection)}
       >
-        {/* Expand/Collapse toggle */}
+        {/* Expand/Collapse toggle for nodes with children */}
         {children.length > 0 && (
           <button
             onClick={e => {
-              e.stopPropagation();
+              e.stopPropagation(); // Prevent node click event
               setOpen(!open);
             }}
             className="w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--accent-light)] focus:outline-none transition"
             aria-label={open ? "Collapse" : "Expand"}
             tabIndex={-1}
           >
-            <span className="block transition-transform"
-              style={{ transform: `rotate(${open ? 90 : 0}deg)` }}>
+            <span
+              className="block transition-transform"
+              style={{ transform: `rotate(${open ? 90 : 0}deg)` }}
+            >
               ▶
             </span>
           </button>
         )}
+        {/* Node icon */}
         <span>{getIcon(selection.type as DhcpObjectType)}</span>
+        {/* Node label */}
         <span className="truncate font-medium">{getNodeLabel(selection)}</span>
       </div>
+
+      {/* Recursively render children when expanded */}
       {open && children.length > 0 && (
         <div className="ml-2 border-l border-[var(--border)] pl-2">
           {children.map(child => (
@@ -82,7 +89,7 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
   selected,
   onSelect,
 }) => {
-  const root: TreeSelection = { type: "global", object: tree };
+  const root: TreeSelection = { type: "global", object: tree }; // Root node represents global DHCP config
 
   return (
     <div className="p-4">

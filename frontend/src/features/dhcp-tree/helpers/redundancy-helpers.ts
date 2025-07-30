@@ -1,6 +1,4 @@
 import { EffectiveDhcpOptionSlimDto, OptionGroupInSource, OptionInGroupDto } from "@/types/dto/effective-dhcp-option-slim.dto";
-
-// groupId IMMER dabei, auch ""/undefined
 export function getOptionKey(
   code: string,
   value: string | null,
