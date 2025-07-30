@@ -1,15 +1,15 @@
-# Frontend Dockerfile (React)
 FROM node:20
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --only=production
 
-COPY . .
+COPY . . 
 
 RUN npm run build
 
-RUN npm install -g serve
+ENV NODE_ENV=production
+EXPOSE 3000
 
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["npm", "run", "start"]
