@@ -23,7 +23,6 @@ import { ApiConfigService } from './shared/config/api-config.service';
 
 // --- Import/Export Controller ---
 import { ImportController } from './controller/import.controller';
-import { ImportRawDataController } from './controller/csp-import.controller';
 import { CredentialsCspController } from './controller/auth/csp/credentials-csp.controller';
 import { AuthController } from './controller/auth/auth.controller';
 import { CspFullImportController } from './controller/csp-full-import.controller';
@@ -190,7 +189,6 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
   controllers: [
     AppController,
     ImportController,
-    ImportRawDataController,
     CredentialsCspController,
     AuthController,
     CspFullImportController,

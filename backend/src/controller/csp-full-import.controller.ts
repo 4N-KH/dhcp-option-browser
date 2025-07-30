@@ -5,6 +5,7 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { DhcpCspImportOrchestratorService } from '@/application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspGlobalConfigImportService } from '@/application/services/import/csp/global-config-import.service';
@@ -58,6 +59,8 @@ function markCancelled(id: string): void {
 
 @Controller('api/csp/import')
 export class CspFullImportController {
+  private readonly logger = new Logger(CspFullImportController.name);
+
   constructor(
     private readonly orchestrator: DhcpCspImportOrchestratorService,
     private readonly globalConfigImport: CspGlobalConfigImportService,
@@ -65,22 +68,16 @@ export class CspFullImportController {
     private readonly globalConfigRepo: Repository<DhcpGlobalConfig>,
   ) {}
 
-  /**
-   * POST /api/csp/import/all
-   * Triggers the full import as an asynchronous job. Returns jobId immediately.
-   */
   @Post('all')
   @HttpCode(HttpStatus.ACCEPTED)
   startFullImport(): { jobId: string } {
     const job = createJob();
 
-    // Start import process in background (ESLint-compliant, non-blocking)
     setImmediate(() => {
       void (async () => {
         try {
           updateJob(job.id, { status: ImportJobStatus.RUNNING, progress: 1 });
 
-          // Run full import with progress callback and cancellation check
           await this.orchestrator.runFullImport({
             onProgress: (percent: number) => {
               const current = getJob(job.id);
@@ -96,23 +93,21 @@ export class CspFullImportController {
             isCancelled: () => !!getJob(job.id)?.cancelled,
           });
 
-          // Double-check cancellation before marking success
           if (getJob(job.id)?.cancelled) {
             updateJob(job.id, {
               status: ImportJobStatus.CANCELLED,
               progress: 100,
             });
           } else {
-            // Optional: Load final import result or confirmation if needed
-            // const result = await this.globalConfigRepo.findOne({ ... });
-
             updateJob(job.id, {
               status: ImportJobStatus.SUCCESS,
               progress: 100,
-              // result, // optionally store result data here
             });
           }
-        } catch (e) {
+        } catch (err: unknown) {
+          const error = err as Error;
+          this.logger.error('Full import failed', error.stack || String(err));
+
           if (getJob(job.id)?.cancelled) {
             updateJob(job.id, {
               status: ImportJobStatus.CANCELLED,
@@ -122,7 +117,7 @@ export class CspFullImportController {
             updateJob(job.id, {
               status: ImportJobStatus.ERROR,
               progress: 100,
-              error: (e as Error)?.message || 'Unknown error',
+              error: error.message || 'Unknown error',
             });
           }
         }
@@ -132,10 +127,6 @@ export class CspFullImportController {
     return { jobId: job.id };
   }
 
-  /**
-   * POST /api/csp/import/cancel/:jobId
-   * Cancels an active import job.
-   */
   @Post('cancel/:jobId')
   @HttpCode(HttpStatus.OK)
   cancelImport(@Param('jobId') jobId: string): { status: string } {
@@ -151,10 +142,6 @@ export class CspFullImportController {
     return { status: 'cancelled' };
   }
 
-  /**
-   * GET /api/csp/import/status/:jobId
-   * Returns current job status, progress and error if any.
-   */
   @Get('status/:jobId')
   @HttpCode(HttpStatus.OK)
   getImportStatus(
@@ -165,21 +152,22 @@ export class CspFullImportController {
     return job;
   }
 
-  /**
-   * POST /api/csp/import/global-config
-   * Executes import of the central DHCP configuration only.
-   */
   @Post('global-config')
   @HttpCode(HttpStatus.ACCEPTED)
   async importGlobalConfig(): Promise<{ message: string }> {
-    await this.globalConfigImport.importGlobalDhcpConfig();
-    return { message: 'Central DHCP configuration import completed.' };
+    try {
+      await this.globalConfigImport.importGlobalDhcpConfig();
+      return { message: 'Central DHCP configuration import completed.' };
+    } catch (err: unknown) {
+      const error = err as Error;
+      this.logger.error(
+        'Global config import failed',
+        error.stack || String(err),
+      );
+      throw err;
+    }
   }
 
-  /**
-   * GET /api/csp/import/global-config
-   * Retrieves the current central configuration from the database.
-   */
   @Get('global-config')
   @HttpCode(HttpStatus.OK)
   async getGlobalConfig(): Promise<DhcpGlobalConfig | null> {
