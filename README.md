@@ -46,13 +46,6 @@ Open your browser to access the application
 Frontend  
 [http://localhost:3000](http://localhost:3000)
 
-Backend  
-[http://localhost:3001](http://localhost:3001)
-
-Optional  
-pgAdmin  
-[http://localhost:8080](http://localhost:8080)
-
 ## Stopping the Application
 
 To stop all services, use
