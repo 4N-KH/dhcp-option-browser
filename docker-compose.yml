@@ -22,11 +22,11 @@ services:
     build: ./backend
     container_name: dhcp-backend
     environment:
-      DATABASE_HOST: db
-      DATABASE_PORT: 5432
-      DATABASE_USER: dhcpuser
-      DATABASE_PASSWORD: dhcppass
-      DATABASE_NAME: dhcpdb
+      DB_HOST: db                # Gleiche Namen wie in .env
+      DB_PORT: 5432
+      DB_USERNAME: dhcpuser
+      DB_PASSWORD: dhcppass
+      DB_NAME: dhcpdb
     depends_on:
       db:
         condition: service_healthy
