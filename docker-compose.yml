@@ -29,7 +29,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "3001:5000" # extern 3001 erreichbar
+      - "3001:3001"
     command: npm run start:prod
     env_file:
       - ./backend/.env
