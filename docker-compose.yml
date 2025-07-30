@@ -1,6 +1,9 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:15
+    container_name: dhcp-db
     environment:
       POSTGRES_USER: dhcpuser
       POSTGRES_PASSWORD: dhcppass
@@ -9,9 +12,15 @@ services:
       - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dhcpuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./backend
+    container_name: dhcp-backend
     environment:
       DATABASE_HOST: db
       DATABASE_PORT: 5432
@@ -19,21 +28,25 @@ services:
       DATABASE_PASSWORD: dhcppass
       DATABASE_NAME: dhcpdb
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "5000:5000"
     command: npm run start:prod
     env_file:
       - ./backend/.env
+    restart: always
 
   frontend:
     build: ./frontend
+    container_name: dhcp-frontend
     ports:
       - "3000:3000"
     depends_on:
       - backend
     env_file:
       - ./frontend/.env
+    restart: always
 
 volumes:
   db-data:

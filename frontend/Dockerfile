@@ -7,10 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY next.config.js ./
-COPY postcss.config.js ./
-COPY tailwind.config.js ./
+COPY postcss.config.mjs ./
 
-# Dev-Dependencies installieren (Tailwind/PostCSS wird benötigt für Build)
+# Dev-Dependencies installieren
 RUN npm install
 
 # Projektdateien kopieren
