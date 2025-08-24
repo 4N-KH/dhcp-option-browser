@@ -17,6 +17,7 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+import type { CspRangeDto } from '@/domain/dto/csp/range.dto';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -46,10 +47,7 @@ export class CspRangeImportService {
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
-  /**
-   * Imports all Ranges from CSP, including OptionGroups, DHCP options and exclusions, and stores them in the database.
-   * Interrupt- und Progress-fähig!
-   */
+  // Imports all ranges including OptionGroups, DHCP options and exclusions
   async importRanges(opts?: InterruptibleImportOptions): Promise<Range[]> {
     this.logger.log('Importing Ranges from CSP...');
     const checkCancel = () => {
@@ -59,9 +57,8 @@ export class CspRangeImportService {
       }
     };
 
-    // 1. Ranges laden
     checkCancel();
-    const dtos = await this.cspDataClient.fetchRanges();
+    const dtos: CspRangeDto[] = await this.cspDataClient.fetchRanges();
 
     if (!dtos?.length) {
       this.logger.warn('No Ranges found in CSP.');
@@ -72,7 +69,7 @@ export class CspRangeImportService {
     let progress = 0;
     const report = () => opts?.onProgress?.(progress, total);
 
-    // 2. Hilfstabellen aufbauen (Subnets, OptionGroups, OptionCodes)
+    // Load lookups
     checkCancel();
     const [subnets, allOptionGroups, optionCodes] = await Promise.all([
       this.subnetRepo.find(),
@@ -97,11 +94,9 @@ export class CspRangeImportService {
 
     const importedRanges: Range[] = [];
 
-    // 3. Ranges iterieren und anlegen/updaten
     for (const dto of dtos) {
       checkCancel();
 
-      // Parent assignment (subnetId)
       const parentSubnet = dto.parent ? subnetMap.get(dto.parent) : undefined;
       if (!parentSubnet) {
         this.logger.warn(
@@ -116,9 +111,7 @@ export class CspRangeImportService {
         where: { externalId: dto.id },
         relations: ['dhcpOptions', 'exclusionRanges', 'optionGroups'],
       });
-      if (!range) {
-        range = this.rangeRepo.create({ externalId: dto.id });
-      }
+      if (!range) range = this.rangeRepo.create({ externalId: dto.id });
 
       range.name = this.encodingSanitizer.sanitize(dto.name ?? '');
       range.start = this.encodingSanitizer.sanitize(dto.start ?? '');
@@ -131,9 +124,8 @@ export class CspRangeImportService {
 
       await this.rangeRepo.save(range);
 
-      // --- DHCP options (nur echte Optionen, keine Gruppen) ---
+      // DHCP options
       await this.dhcpOptionRepo.delete({ rangeId: range.id });
-
       if (Array.isArray(dto.dhcp_options) && dto.dhcp_options.length > 0) {
         const validOptions = dto.dhcp_options.filter(
           (
@@ -157,15 +149,12 @@ export class CspRangeImportService {
             rangeId: range.id,
           }),
         );
-        if (dhcpOptionEntities.length > 0) {
+        if (dhcpOptionEntities.length > 0)
           await this.dhcpOptionRepo.save(dhcpOptionEntities);
-        }
       }
 
-      // --- OptionGroups assignment via Utility ---
+      // OptionGroups
       await this.rangeOptionGroupRepo.delete({ rangeId: range.id });
-
-      // Map groupKeys for logging
       let groupKeys = Array.isArray(dto.dhcp_options)
         ? dto.dhcp_options
             .map((opt) =>
@@ -182,36 +171,6 @@ export class CspRangeImportService {
         optionGroupMap,
         null,
       );
-
-      // (Optional) Logging: show first 3 resolutions
-      let resolveLog = '';
-      let logCount = 0;
-      for (const groupKey of groupKeys) {
-        const og =
-          optionGroupMap.get(groupKey) ||
-          optionGroupMap.get(groupKey.replace(/^dhcp\/option_group\//, '')) ||
-          Array.from(optionGroupMap.values()).find(
-            (g) =>
-              g.externalId?.trim().toLowerCase() === groupKey ||
-              g.name?.trim().toLowerCase() === groupKey,
-          );
-        if (logCount < 3) {
-          if (og) {
-            resolveLog += `  ✔ [${range.start} - ${range.end}] groupKey='${groupKey}' -> OptionGroup='${og.name}' (id=${og.id})\n`;
-          } else {
-            resolveLog += `  ✘ [${range.start} - ${range.end}] groupKey='${groupKey}' -> NOT FOUND\n`;
-          }
-        }
-        logCount++;
-      }
-      if (resolveLog) {
-        this.logger.log(
-          `[OptionGroup-Resolve] Range: ${range.start} - ${range.end} (id=${range.id})\n${resolveLog}${
-            logCount > 3 ? '  ...' : ''
-          }`,
-        );
-      }
-
       for (const optionGroup of foundGroups) {
         await this.rangeOptionGroupRepo.save(
           this.rangeOptionGroupRepo.create({
@@ -228,7 +187,7 @@ export class CspRangeImportService {
         );
       }
 
-      // --- Exclusion ranges ---
+      // Exclusion ranges
       await this.exclusionRepo.delete({ rangeId: range.id });
       if (
         Array.isArray(dto.exclusion_ranges) &&

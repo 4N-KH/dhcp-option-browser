@@ -1,5 +1,3 @@
-// src/domain/dto/csp/effective-dhcp-option-slim.dto.ts
-
 export class EffectiveDhcpOptionSlimDto {
   code: string;
   name?: string;

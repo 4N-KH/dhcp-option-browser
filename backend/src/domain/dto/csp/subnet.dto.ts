@@ -1,15 +1,7 @@
-export interface CspSubnetDto {
-  id: string;
-  name: string;
-  address: string;
-  cidr: number;
-  parent?: string | null;
-  space?: string | null;
-  comment?: string | null;
-  dhcp_options?: {
-    group?: string | null;
-    option_code: string;
-    option_value: string;
-    type: string;
-  }[];
-}
+import type { z } from 'zod';
+import { CspSubnetSchema } from './zod/subnet.zod';
+
+export type CspSubnetDto = z.infer<typeof CspSubnetSchema>;
+export { CspSubnetSchema };
+export const parseCspSubnet = (data: unknown): CspSubnetDto =>
+  CspSubnetSchema.parse(data);

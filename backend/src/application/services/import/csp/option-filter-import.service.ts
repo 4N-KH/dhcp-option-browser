@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionFilter } from '@/infrastructure/database/csp/option-filter.entity';
 import { CspOptionFilterDto } from '@/domain/dto/csp/option-filter.dto';
-
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
@@ -21,14 +20,13 @@ export class CspOptionFilterImportService {
     private readonly cspDataClient: CspDataClient,
     @InjectRepository(OptionFilter)
     private readonly optionFilterRepo: Repository<OptionFilter>,
-    // EncodingSanitizer wird injiziert
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
   async importOptionFilters(
     opts?: InterruptibleImportOptions,
   ): Promise<OptionFilter[]> {
-    this.logger.log('Starte Import der Option Filter von CSP...');
+    this.logger.log('Starting import of Option Filters from CSP...');
 
     const checkCancel = () => {
       if (opts?.isCancelled?.()) {
@@ -37,54 +35,48 @@ export class CspOptionFilterImportService {
       }
     };
 
-    // Schritt 1: Rohdaten abrufen
     checkCancel();
-    const rawFilters = await this.cspDataClient.fetchOptionFilters();
+    const rawFilters: CspOptionFilterDto[] =
+      await this.cspDataClient.fetchOptionFilters();
 
     if (!rawFilters?.length) {
-      this.logger.warn('Keine Option Filter von der CSP-API erhalten.');
+      this.logger.warn('No Option Filters received from CSP API.');
       return [];
     }
 
     this.logger.log(
-      `[Import] CSP-API lieferte ${rawFilters.length} Option Filter.`,
+      `[Import] CSP API returned ${rawFilters.length} Option Filters.`,
     );
 
     const imported: OptionFilter[] = [];
     const skipped: { id: string; name: string; reason: string }[] = [];
-    const allReceivedIds: string[] = (rawFilters as CspOptionFilterDto[]).map(
-      (f) => f.id,
-    );
+    const allReceivedIds: string[] = rawFilters.map((f) => f.id);
     const persistedIds: string[] = [];
     const total = rawFilters.length;
     let progress = 0;
     const report = () => opts?.onProgress?.(progress, total);
 
-    for (const dto of rawFilters as CspOptionFilterDto[]) {
+    for (const dto of rawFilters) {
       checkCancel();
 
-      // Grundvalidierung
       if (!dto.id || !dto.name) {
         skipped.push({
           id: dto.id || 'UNDEFINED',
           name: dto.name || '',
-          reason: 'Fehlende ID oder Name',
+          reason: 'Missing ID or Name',
         });
         progress++;
         report();
         continue;
       }
 
-      // Mapping zu Entity
       let entity = await this.optionFilterRepo.findOne({
         where: { externalId: dto.id },
       });
-
       if (!entity) {
         entity = this.optionFilterRepo.create({ externalId: dto.id });
       }
 
-      // EncodingSanitizer anwenden auf string-Felder:
       entity.name = this.encodingSanitizer.sanitize(dto.name);
       entity.protocol = dto.protocol ?? undefined;
       entity.role = dto.role ?? undefined;
@@ -95,7 +87,6 @@ export class CspOptionFilterImportService {
       entity.createdAt = dto.created_at ?? undefined;
       entity.updatedAt = dto.updated_at ?? undefined;
 
-      // dhcp_options (korrektes Mapping/Validierung)
       if (Array.isArray(dto.dhcp_options)) {
         entity.dhcpOptions = dto.dhcp_options.filter(
           (opt) =>
@@ -108,7 +99,6 @@ export class CspOptionFilterImportService {
         entity.dhcpOptions = undefined;
       }
 
-      // rules (optional, garantiert string für match)
       if (dto.rules && typeof dto.rules === 'object') {
         entity.rules = {
           match:
@@ -128,26 +118,24 @@ export class CspOptionFilterImportService {
         entity.rules = undefined;
       }
 
-      // Persistieren
       await this.optionFilterRepo.save(entity);
       imported.push(entity);
       persistedIds.push(dto.id);
 
       this.logger.debug(
-        `[${dto.id}] Persistiert: name="${entity.name}", dhcpOptions: ${JSON.stringify(entity.dhcpOptions)}`,
+        `[${dto.id}] Saved: name="${entity.name}", dhcpOptions: ${JSON.stringify(entity.dhcpOptions)}`,
       );
 
       progress++;
       report();
     }
 
-    // Logging: Skipped und fehlende IDs
     if (skipped.length) {
-      this.logger.warn(
-        `[Import] ${skipped.length} Filter wurden übersprungen:`,
-      );
+      this.logger.warn(`[Import] ${skipped.length} filters were skipped:`);
       skipped.forEach((f) =>
-        this.logger.warn(`Skipped: "${f.name}" (${f.id}) - Grund: ${f.reason}`),
+        this.logger.warn(
+          `Skipped: "${f.name}" (${f.id}) - Reason: ${f.reason}`,
+        ),
       );
     }
 
@@ -156,12 +144,12 @@ export class CspOptionFilterImportService {
     );
     if (missingIds.length > 0) {
       this.logger.warn(
-        `[Import] ${missingIds.length} empfangene Option Filter NICHT persistiert! Fehlende IDs: ${JSON.stringify(missingIds)}`,
+        `[Import] ${missingIds.length} received Option Filters were NOT persisted. Missing IDs: ${JSON.stringify(missingIds)}`,
       );
     }
 
     this.logger.log(
-      `Import abgeschlossen: ${imported.length} Option Filter gespeichert.`,
+      `Import complete: ${imported.length} Option Filters saved.`,
     );
     return imported;
   }

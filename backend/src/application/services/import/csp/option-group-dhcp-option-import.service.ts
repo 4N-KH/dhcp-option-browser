@@ -30,18 +30,15 @@ export class CspOptionGroupDhcpOptionImportService {
     private readonly ogdoRepo: Repository<OptionGroupDhcpOption>,
     @InjectRepository(OptionSpace)
     private readonly optionSpaceRepo: Repository<OptionSpace>,
-    // EncodingSanitizer injizieren
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
-  /**
-   * Imports all OptionGroupDhcpOption assignments from CSP,
-   * links codes and spaces, avoids duplicates, and is interrupt/progress capable.
-   */
   async importOptionGroupDhcpOptions(
     opts?: InterruptibleImportOptions,
   ): Promise<void> {
-    this.logger.log('Importiere OptionGroupDhcpOption-Zuordnungen aus CSP...');
+    this.logger.log(
+      'Starting import of OptionGroupDhcpOption mappings from CSP...',
+    );
 
     const checkCancel = () => {
       if (opts?.isCancelled?.()) {
@@ -55,11 +52,11 @@ export class CspOptionGroupDhcpOptionImportService {
     const allCodes = await this.optionCodeRepo.find({
       relations: ['optionSpace'],
     });
+
     const codeMap = new Map<string, OptionCodeEntity>(
       allCodes.map((code) => [code.externalId, code]),
     );
 
-    // Gesamtprogress = Summe aller group.dhcp_options-Elemente
     const total = groups.reduce(
       (acc, group) => acc + (group.dhcp_options?.length || 0),
       0,
@@ -67,8 +64,8 @@ export class CspOptionGroupDhcpOptionImportService {
     let progress = 0;
     const report = () => opts?.onProgress?.(progress, total);
 
-    let created = 0,
-      skipped = 0;
+    let created = 0;
+    let skipped = 0;
 
     for (const group of groups) {
       checkCancel();
@@ -80,7 +77,7 @@ export class CspOptionGroupDhcpOptionImportService {
       });
       if (!groupEntity) {
         this.logger.warn(
-          `OptionGroup mit externalId=${group.id} nicht in DB gefunden – überspringe.`,
+          `OptionGroup with externalId=${group.id} not found in DB – skipping.`,
         );
         progress += group.dhcp_options.length;
         report();
@@ -96,7 +93,7 @@ export class CspOptionGroupDhcpOptionImportService {
 
         if (!codeEntity) {
           this.logger.warn(
-            `OptionCode mit externalId=${opt.option_code} nicht gefunden – überspringe.`,
+            `OptionCode with externalId=${opt.option_code} not found – skipping.`,
           );
           skipped++;
           progress++;
@@ -104,12 +101,10 @@ export class CspOptionGroupDhcpOptionImportService {
           continue;
         }
 
-        // Sanitize Option Value!
         const sanitizedValue = this.encodingSanitizer.sanitize(
           opt.option_value,
         );
 
-        // Eindeutig prüfen NUR über optionGroupId, optionCodeId und option_value
         const exists = await this.ogdoRepo.findOne({
           where: {
             optionGroupId: groupEntity.id,
@@ -126,18 +121,19 @@ export class CspOptionGroupDhcpOptionImportService {
             optionCodeId: codeEntity.id,
             option_value: sanitizedValue,
             optionSpace: optionSpaceRef,
-            optionSpaceId: optionSpaceId,
+            optionSpaceId,
           });
           await this.ogdoRepo.save(entity);
           created++;
         }
+
         progress++;
         report();
       }
     }
 
     this.logger.log(
-      `Fertig: ${created} neue OptionGroupDhcpOption-Zuordnungen angelegt, ${skipped} übersprungen.`,
+      `Import complete: ${created} new OptionGroupDhcpOption mappings created, ${skipped} skipped.`,
     );
   }
 }

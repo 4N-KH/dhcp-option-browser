@@ -11,3 +11,4 @@ export const CspOptionSpaceSchema = z.object({
 });
 
 export type CspOptionSpace = z.infer<typeof CspOptionSpaceSchema>;
+export type CspOptionSpaceDto = CspOptionSpace;

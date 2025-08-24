@@ -8,21 +8,6 @@ import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
-/**
- * Baut eine Map aller OptionCodes, schlüsselt nach externalId und code (beides String).
- */
-export function buildOptionCodeMap(
-  optionCodes: OptionCodeEntity[],
-): Map<string, OptionCodeEntity> {
-  const map = new Map<string, OptionCodeEntity>();
-  for (const code of optionCodes) {
-    if (code.externalId) map.set(code.externalId, code);
-    if (code.code !== undefined && code.code !== null)
-      map.set(String(code.code), code);
-  }
-  return map;
-}
-
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
   onProgress?: (current: number, total: number) => void;
@@ -42,15 +27,16 @@ export class CspOptionCodeImportService {
     private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
-  /**
-   * Importiert alle OptionCodes inkl. OptionSpace-Mapping (über externalId UND name!).
-   * Interrupt- und progress-fähig.
+  /*
+  Imports all OptionCodes and links them to OptionSpaces (by externalId or name).
+  Supports cancellation and progress tracking.
    */
   async importOptionCodes(
     opts?: InterruptibleImportOptions,
   ): Promise<OptionCodeEntity[]> {
     this.logger.log('Commencing import of DHCP Option Codes from CSP...');
 
+    // Abort if cancelled mid-process
     const checkCancel = () => {
       if (opts?.isCancelled?.()) {
         this.logger.warn('OptionCode import interrupted by user.');
@@ -66,7 +52,7 @@ export class CspOptionCodeImportService {
       return [];
     }
 
-    // OptionSpaces laden und Map bauen (nach externalId UND name, unique!)
+    // Preload OptionSpaces and build a lookup by both externalId and name
     const optionSpaces = await this.optionSpaceRepo.find();
     const optionSpaceMap = new Map<string, OptionSpace>();
     for (const os of optionSpaces) {
@@ -82,13 +68,13 @@ export class CspOptionCodeImportService {
     for (const dto of codes) {
       checkCancel();
 
-      // Versuche zuerst nach externalId, dann nach Name
+      // Resolve OptionSpace by externalId or name
       let optionSpace: OptionSpace | undefined = undefined;
       if (dto.option_space && optionSpaceMap.has(dto.option_space)) {
         optionSpace = optionSpaceMap.get(dto.option_space);
       }
 
-      // Upsert nach externalId
+      // Upsert OptionCode by externalId
       let entity = await this.optionCodeRepo.findOne({
         where: { externalId: dto.id },
       });
@@ -96,7 +82,8 @@ export class CspOptionCodeImportService {
         entity = this.optionCodeRepo.create({ externalId: dto.id });
       }
 
-      entity.code = String(dto.code); // Immer string, egal was geliefert wird!
+      // Normalize and sanitize all fields
+      entity.code = String(dto.code); // Always stored as string
       entity.name = this.encodingSanitizer.sanitize(
         typeof dto.name === 'string' ? dto.name : '',
       );
@@ -127,6 +114,7 @@ export class CspOptionCodeImportService {
       progress++;
       report();
     }
+
     this.logger.log(
       `Import complete: ${importedEntities.length} Option Codes have been saved.`,
     );

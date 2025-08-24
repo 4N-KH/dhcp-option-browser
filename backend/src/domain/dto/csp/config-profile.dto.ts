@@ -1,12 +1,7 @@
-export interface CspConfigProfileDto {
-  id: string;
-  name: string;
-  comment?: string | null;
-  dhcp_options?: {
-    group?: string | null;
-    option_code: string;
-    option_value: string;
-    type: string;
-  }[];
-  inheritance_sources?: Record<string, any>;
-}
+import type { z } from 'zod';
+import { CspConfigProfileSchema } from './zod/config-profile.zod';
+
+export type CspConfigProfileDto = z.infer<typeof CspConfigProfileSchema>;
+export { CspConfigProfileSchema };
+export const parseCspConfigProfile = (data: unknown): CspConfigProfileDto =>
+  CspConfigProfileSchema.parse(data);

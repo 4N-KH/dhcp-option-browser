@@ -18,6 +18,7 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+import type { CspSubnetDto } from '@/domain/dto/csp/subnet.dto';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -49,10 +50,7 @@ export class CspSubnetImportService {
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
-  /**
-   * Imports all Subnets including DHCP options, OptionGroups and correct parent assignment (CSP-conform).
-   * Interrupt- und Progress-fähig!
-   */
+  // Imports subnets including DHCP options, OptionGroups and parent assignment
   async importSubnets(opts?: InterruptibleImportOptions): Promise<Subnet[]> {
     this.logger.log('Importing Subnets from CSP...');
     const checkCancel = () => {
@@ -62,9 +60,9 @@ export class CspSubnetImportService {
       }
     };
 
-    // 1. Subnet DTOs laden
+    // Load Subnet DTOs
     checkCancel();
-    const dtos = await this.cspDataClient.fetchSubnets();
+    const dtos: CspSubnetDto[] = await this.cspDataClient.fetchSubnets();
     if (!dtos?.length) {
       this.logger.warn('No Subnets found in CSP.');
       return [];
@@ -73,7 +71,7 @@ export class CspSubnetImportService {
     let progress = 0;
     const report = () => opts?.onProgress?.(progress, total);
 
-    // 2. Hilfstabellen aufbauen (Parents, Optionen, Gruppen)
+    // Load lookup tables for parents, options and groups
     checkCancel();
     const [spaces, addressBlocks, optionCodes, allOptionGroups] =
       await Promise.all([
@@ -101,7 +99,7 @@ export class CspSubnetImportService {
       if (og.id) optionGroupMap.set(String(og.id), og);
     }
 
-    // 3. Subnets speichern/anlegen
+    // Save and create subnets
     const subnetMap = new Map<string, Subnet>();
     for (const dto of dtos) {
       checkCancel();
@@ -119,7 +117,7 @@ export class CspSubnetImportService {
         ? this.encodingSanitizer.sanitize(dto.comment)
         : null;
 
-      // Parent-Assignment
+      // Parent assignment (AddressBlock or IpSpace)
       if (dto.parent?.startsWith('ipam/address_block/')) {
         const addressBlock = addressBlockMap.get(dto.parent);
         subnet.addressBlock = addressBlock;
@@ -157,7 +155,7 @@ export class CspSubnetImportService {
       report();
     }
 
-    // 4. DHCP Options importieren
+    // Import DHCP options
     progress = 0;
     for (const dto of dtos) {
       checkCancel();
@@ -190,16 +188,14 @@ export class CspSubnetImportService {
             subnetId: subnet.id,
           }),
         );
-        if (entities.length > 0) {
-          await this.subnetDhcpOptionRepo.save(entities);
-        }
+        if (entities.length > 0) await this.subnetDhcpOptionRepo.save(entities);
       }
 
       progress++;
       report();
     }
 
-    // 5. OptionGroups zuweisen
+    // Assign OptionGroups
     progress = 0;
     for (const dto of dtos) {
       checkCancel();
@@ -242,7 +238,7 @@ export class CspSubnetImportService {
     }
 
     this.logger.log(
-      `Import complete: ${subnetMap.size} Subnets including DHCP options and OptionGroups, fully interrupt- and progress-capable.`,
+      `Import complete: ${subnetMap.size} Subnets including DHCP options and OptionGroups imported.`,
     );
     return Array.from(subnetMap.values());
   }

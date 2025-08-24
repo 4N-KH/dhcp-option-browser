@@ -23,9 +23,8 @@ export class CspAuthLoginService {
     private readonly userRepo: Repository<UserEntity>,
   ) {}
 
-  /**
-   * Authenticates a CSP API key and issues a JWT upon success.
-   * Token lifetime is determined by the "remember" flag.
+  /* Authenticates a CSP API key and issues a JWT upon success.
+  Token lifetime is determined by the "remember" flag.
    */
   async login(
     apiKey: string,

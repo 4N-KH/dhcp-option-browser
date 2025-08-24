@@ -9,3 +9,4 @@ export const CspIpSpaceSchema = z.object({
 });
 
 export type CspIpSpace = z.infer<typeof CspIpSpaceSchema>;
+export type CspIpSpaceDto = CspIpSpace;

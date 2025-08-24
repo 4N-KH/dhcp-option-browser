@@ -60,9 +60,6 @@ export class DhcpCspImportOrchestratorService {
     private readonly dataSource: DataSource,
   ) {}
 
-  /**
-   * Runs a full import in correct order, including fine-grained error handling, progress and cancellation support.
-   */
   async runFullImport(opts?: OrchestratorOptions): Promise<void> {
     this.logger.log('--- Starting full CSP DHCP import sequence ---');
     const totalPhases = IMPORT_PHASES.length;
@@ -224,7 +221,7 @@ export class DhcpCspImportOrchestratorService {
       });
       updatePhaseProgress(++currentPhase, 'fixedAddresses');
 
-      // ---> View nach vollständigem Import erzeugen/aktualisieren <---
+      // View nach vollständigem Import erzeugen/aktualisieren
       await createAllDhcpOptionAssignmentsView(this.dataSource);
       this.logger.log('all_dhcp_option_assignments-View (re-)created.');
 

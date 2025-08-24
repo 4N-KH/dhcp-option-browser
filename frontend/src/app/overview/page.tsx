@@ -8,28 +8,61 @@ import { getDefaultSelection } from "@/features/dhcp-tree/helpers/tree-node-help
 import { TreeSelection } from "@/types/types";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 import ImportWithProgress from "@/features/config-import/ImportWithProgress";
-import OptionOverviewTab from "./option-overview-tab"; // <--- NEU! (siehe oben)
+import OptionOverviewTab from "./option-overview-tab";
 
 export default function OverviewPage() {
   const [tree, setTree] = useState<DhcpLightTreeDto | null>(null);
   const [selected, setSelected] = useState<TreeSelection | null>(null);
-  const [showTree, setShowTree] = useState(false);
   const [tab, setTab] = useState<"tree" | "overview">("tree");
+  const [loading, setLoading] = useState(true);
 
-  // Fetch existing data immediately after login/reload
+  // load DHCP tree once
   useEffect(() => {
-    fetchDhcpLightTree().then((data: DhcpLightTreeDto) => {
-      if (data && data.ipSpaces?.length) {
-        setTree(data);
-      }
-    });
+    fetchDhcpLightTree()
+      .then((data: DhcpLightTreeDto) => {
+        if (data && data.ipSpaces) {
+          setTree(data);
+          if (data.ipSpaces.length > 0) {
+            setSelected(getDefaultSelection(data));
+          }
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  if (showTree && tree) {
+  // loading indicator
+  if (loading) {
     return (
-      <div className="flex flex-col h-[80vh] w-full">
-        {/* Tabs */}
-        <div className="flex gap-4 mb-4">
+      <div className="flex items-center justify-center h-[70vh] text-xl text-blue-300">
+        Loading data...
+      </div>
+    );
+  }
+
+  // no data present
+  if (!tree || !tree.ipSpaces || tree.ipSpaces.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <p className="text-gray-400 text-xl mb-6">No data available</p>
+        {/* sync button */}
+        <ImportWithProgress
+          onComplete={async () => {
+            const newTree = await fetchDhcpLightTree();
+            setTree(newTree);
+            if (newTree && newTree.ipSpaces?.length) {
+              setSelected(getDefaultSelection(newTree));
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-[80vh] w-full">
+      {/* header with tabs and sync */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex gap-4">
           <button
             className={`px-6 py-2 rounded-lg font-bold transition ${
               tab === "tree"
@@ -51,70 +84,33 @@ export default function OverviewPage() {
             Option Overview
           </button>
         </div>
-        {/* Tab Content */}
-        <div className="flex-1 w-full h-full overflow-hidden">
-          {tab === "tree" ? (
-            <div className="flex h-full w-full">
-              {/* Sidebar: Tree */}
-              <div className="w-1/3 min-w-[340px] max-w-[480px] border-r border-[var(--border)] bg-[rgba(255,255,255,0.02)] overflow-y-auto">
-                <LightTreeView
-                  tree={tree}
-                  selected={selected}
-                  onSelect={setSelected}
-                />
-              </div>
-              {/* Main: Properties panel */}
-              <div className="flex-1 p-8 overflow-y-auto">
-                <DhcpPropertiesPanel selected={selected} />
-              </div>
-            </div>
-          ) : (
-            <OptionOverviewTab />
-          )}
-        </div>
+        {/* manual synchronize only */}
+        <ImportWithProgress
+          onComplete={async () => {
+            const updatedTree = await fetchDhcpLightTree();
+            setTree(updatedTree);
+            if (updatedTree && updatedTree.ipSpaces?.length) {
+              setSelected(getDefaultSelection(updatedTree));
+            }
+          }}
+        />
       </div>
-    );
-  }
 
-  // Default: Import/overview choice UI
-  return (
-    <div className="flex flex-col items-center justify-center h-[70vh]">
-      <h2 className="text-2xl font-bold mb-6">DHCP Data Import</h2>
-      <div className="flex gap-8 items-center w-full max-w-2xl mb-2">
-        {/* Import-Button in Wrapper */}
-        <div className="flex-1 flex justify-center">
-          <div className="w-full max-w-[320px]">
-            <ImportWithProgress
-              onComplete={async () => {
-                const newTree = await fetchDhcpLightTree();
-                setTree(newTree);
-                setSelected(newTree ? getDefaultSelection(newTree) : null);
-                setShowTree(true);
-              }}
-            />
+      {/* main view */}
+      <div className="flex-1 w-full h-full overflow-hidden">
+        {tab === "tree" ? (
+          <div className="flex h-full w-full">
+            <div className="w-1/3 min-w-[340px] max-w-[480px] border-r border-[var(--border)] bg-[rgba(255,255,255,0.02)] overflow-y-auto">
+              <LightTreeView tree={tree} selected={selected} onSelect={setSelected} />
+            </div>
+            <div className="flex-1 p-8 overflow-y-auto">
+              <DhcpPropertiesPanel selected={selected} />
+            </div>
           </div>
-        </div>
-        {/* Overview-Button in Wrapper */}
-        <div className="flex-1 flex justify-center">
-          <button
-            onClick={() => {
-              setShowTree(true);
-              if (tree) setSelected(getDefaultSelection(tree));
-            }}
-            className="w-full max-w-[320px] min-h-[60px] bg-slate-700 hover:bg-slate-800 text-white px-8 py-4 rounded-xl font-semibold shadow text-lg transition"
-            disabled={!tree}
-          >
-            Go to Overview
-          </button>
-        </div>
+        ) : (
+          <OptionOverviewTab />
+        )}
       </div>
-      <p className="text-gray-400 mt-4 max-w-xl text-center">
-        Import new DHCP data or proceed to the overview to see the currently stored configuration.
-        <br />
-        <span className="text-sm opacity-70">
-          After reloading the page, you do <b>not</b> need to re-import!
-        </span>
-      </p>
     </div>
   );
 }

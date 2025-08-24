@@ -13,3 +13,4 @@ export const CspAddressBlockSchema = z.object({
 });
 
 export type CspAddressBlock = z.infer<typeof CspAddressBlockSchema>;
+export type CspAddressBlockDto = CspAddressBlock;

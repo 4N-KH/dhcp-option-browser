@@ -1,5 +1,3 @@
-// src/domain/dto/csp/option-group-meta.dto.ts
-
 export interface OptionInGroupDto {
   code: string;
   name?: string;

@@ -22,10 +22,7 @@ export class CspOptionGroupImportService {
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
-  /**
-   * Imports all Option Groups from CSP and persists/updates them in the database.
-   * Interrupt- und progress-fähig!
-   */
+  // Imports all Option Groups from CSP and persists/updates them in the database
   async importOptionGroups(
     opts?: InterruptibleImportOptions,
   ): Promise<OptionGroup[]> {
@@ -64,8 +61,6 @@ export class CspOptionGroupImportService {
         ? this.encodingSanitizer.sanitize(dto.comment)
         : undefined;
       entity.protocol = dto.protocol ?? undefined;
-      // entity.createdAt = dto.created_at ?? undefined;
-      // entity.updatedAt = dto.updated_at ?? undefined;
 
       await this.optionGroupRepo.save(entity);
       importedEntities.push(entity);

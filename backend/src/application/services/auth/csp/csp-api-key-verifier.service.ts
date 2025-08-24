@@ -5,10 +5,8 @@ import axios from 'axios';
 export class CspApiKeyVerifierService {
   private readonly logger = new Logger(CspApiKeyVerifierService.name);
 
-  /**
-   * Verifies a CSP API key by performing a lightweight GET against Infoblox CSP.
-   * Throws UnauthorizedException for invalid or unreachable keys.
-   */
+  /* verifies a CSP API key by performing a lightweight GET against Infoblox CSP.
+   Throws UnauthorizedException for invalid or unreachable keys */
   async verify(apiKey: string): Promise<void> {
     const baseUrl =
       process.env.CSP_BASE_URL ?? 'https://csp.infoblox.com/api/ddi/v1';

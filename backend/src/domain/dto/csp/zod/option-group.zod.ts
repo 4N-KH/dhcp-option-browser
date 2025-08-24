@@ -18,3 +18,4 @@ export const CspOptionGroupSchema = z.object({
 });
 
 export type CspOptionGroup = z.infer<typeof CspOptionGroupSchema>;
+export type CspOptionGroupDto = CspOptionGroup;

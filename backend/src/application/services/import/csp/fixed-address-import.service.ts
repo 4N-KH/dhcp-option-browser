@@ -18,6 +18,7 @@ import {
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+import type { CspFixedAddressDto } from '@/domain/dto/csp/fixed-address.dto';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -62,7 +63,8 @@ export class CspFixedAddressImportService {
     };
 
     checkCancel();
-    const dtos = await this.cspDataClient.fetchFixedAddresses();
+    const dtos: CspFixedAddressDto[] =
+      await this.cspDataClient.fetchFixedAddresses();
 
     if (!dtos?.length) {
       this.logger.warn('No Fixed Addresses found in CSP.');

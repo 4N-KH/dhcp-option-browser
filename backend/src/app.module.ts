@@ -38,6 +38,10 @@ import { OptionValuesService } from './application/services/option-hierarchy/csp
 import { OptionValueEffectivenessService } from './application/services/option-hierarchy/csp/option-value-effectiveness.service';
 import { OptionValueExplicitService } from './application/services/option-hierarchy/csp/option-value-explicit.service';
 
+// --- Redundancy Report ---
+import { RedundancyReportController } from './controller/redundancy-report.controller';
+import { RedundancyReportService } from './application/services/option-hierarchy/csp/redundancy-report.service';
+
 // --- Import Services ---
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspSubnetImportService } from './application/services/import/csp/subnet-import.service';
@@ -98,12 +102,11 @@ import {
 
 import { AllDhcpOptionAssignmentRepository } from './infrastructure/database/csp/all-dhcp-option-assignment.repository';
 
-// --- EFFECTIVE STACK SERVICES (Neue Architektur) ---
+// --- EFFECTIVE STACK SERVICES ---
 import { EffectiveDhcpOptionStackService } from './application/services/option-hierarchy/csp/effective-dhcp-option-stack.service';
 import { ContextChainBuilder } from './application/services/option-hierarchy/csp/context-chain.builder';
 import { ExplicitOptionsLoader } from './application/services/option-hierarchy/csp/types/explicit-options.loader';
 import { OptionGroupsLoader } from './application/services/option-hierarchy/csp/types/option-groups.loader';
-// Refaktoriert:
 import { OptionStackAssemblerService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/option-stack-assembler-orchestrator.service';
 import { StackBuilderService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/stack-builder.service';
 import { SlimDtoFactoryService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/slim-dto-factory.service';
@@ -112,7 +115,7 @@ import { OptionInheritanceStackEntryFactory } from './application/services/optio
 import { OptionGroupMetaFactory } from './application/services/option-hierarchy/csp/option-group-meta.factory';
 import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp/dhcp-option-raw.mapper';
 
-// --- String Sanitizer (neu) ---
+// --- String Sanitizer ---
 import { EncodingSanitizer } from './application/services/import/transformers/encoding-sanitizer.interface';
 import { DefaultEncodingSanitizerService } from './application/services/import/transformers/default-encoding-sanitizer.service';
 
@@ -195,9 +198,9 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     CspLightTreeController,
     EffectiveDhcpOptionStackController,
     OptionOverviewController,
+    RedundancyReportController, // ✅ Neu registriert!
   ],
   providers: [
-    // Auth + Clients
     CredentialCspService,
     GridAuthProvider,
     CspAuthProvider,
@@ -208,7 +211,6 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     CspDataClient,
     ApiConfigService,
 
-    // Import
     DhcpCspImportOrchestratorService,
     CspSubnetImportService,
     CspOptionGroupImportService,
@@ -223,10 +225,8 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     CspOptionSpaceImportService,
     CspOptionFilterImportService,
 
-    // Tree Loader
     GlobalLightTreeLoaderService,
 
-    // Repositories
     GlobalConfigOptionRepository,
     IpSpaceDhcpOptionRepository,
     AddressBlockDhcpOptionRepository,
@@ -235,7 +235,6 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     FixedDhcpOptionRepository,
     AllDhcpOptionAssignmentRepository,
 
-    // Stack Services (neue Architektur)
     EffectiveDhcpOptionStackService,
     ContextChainBuilder,
     ExplicitOptionsLoader,
@@ -247,11 +246,12 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     OptionGroupMetaFactory,
     DhcpOptionRawMapper,
 
-    // Option Overview & Explorer
     OptionOverviewService,
     OptionValuesService,
     OptionValueEffectivenessService,
     OptionValueExplicitService,
+
+    RedundancyReportService, // ✅ Neu registriert!
 
     DefaultEncodingSanitizerService,
     {

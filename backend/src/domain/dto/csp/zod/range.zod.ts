@@ -26,3 +26,4 @@ export const CspRangeSchema = z.object({
 });
 
 export type CspRange = z.infer<typeof CspRangeSchema>;
+export type CspRangeDto = CspRange;

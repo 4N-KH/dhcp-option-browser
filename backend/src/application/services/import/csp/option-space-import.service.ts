@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+import type { CspOptionSpaceDto } from '@/domain/dto/csp/option-space.dto';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -22,11 +23,7 @@ export class CspOptionSpaceImportService {
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
-  /**
-   * Imports all Option Spaces from CSP and persists them in the database.
-   * Updates existing records where applicable.
-   * Interrupt- und progress-fähig!
-   */
+  // Imports all Option Spaces from CSP and persists them in the database
   async importOptionSpaces(
     opts?: InterruptibleImportOptions,
   ): Promise<OptionSpace[]> {
@@ -39,7 +36,8 @@ export class CspOptionSpaceImportService {
     };
 
     checkCancel();
-    const spaces = await this.cspDataClient.fetchOptionSpaces();
+    const spaces: CspOptionSpaceDto[] =
+      await this.cspDataClient.fetchOptionSpaces();
 
     if (!spaces?.length) {
       this.logger.warn('No Option Spaces were received from CSP.');

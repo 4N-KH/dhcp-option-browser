@@ -1,15 +1,7 @@
-export interface CspOptionGroupDto {
-  id: string;
-  name: string;
-  comment?: string | null;
-  protocol?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+import type { z } from 'zod';
+import { CspOptionGroupSchema } from './zod/option-group.zod';
 
-  dhcp_options?: {
-    group?: string | null;
-    option_code: string;
-    option_value: string;
-    type: string;
-  }[];
-}
+export type CspOptionGroupDto = z.infer<typeof CspOptionGroupSchema>;
+export { CspOptionGroupSchema };
+export const parseCspOptionGroup = (data: unknown): CspOptionGroupDto =>
+  CspOptionGroupSchema.parse(data);

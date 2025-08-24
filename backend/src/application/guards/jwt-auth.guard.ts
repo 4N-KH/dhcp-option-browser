@@ -7,10 +7,8 @@ import {
   verifyJwtStrict,
 } from '@/shared/utils/jwt.util';
 
-/**
- * Guard to protect routes with strict JWT authentication.
- * Uses centralised JWT utilities for type safety and testability.
- */
+/*Guard to protect routes with strict JWT authentication.
+ Uses centralised JWT utilities for type safety and testability.*/
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly secret: string;
@@ -43,7 +41,7 @@ export class JwtAuthGuard implements CanActivate {
       throwUnauthorized('Invalid or expired token');
     }
 
-    // Payload is now strictly typed and safe
+    // Payload strictly typed and safe
     req.user = {
       id: payload.id,
       region: payload.region,

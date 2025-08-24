@@ -8,17 +8,22 @@ import { DhcpGlobalConfigOption } from '@/infrastructure/database/csp/global-con
 import { DhcpGlobalConfigOptionGroup } from '@/infrastructure/database/csp/global-config-option-group.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
-import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
-import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 
+import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import {
   buildOptionCodeMap,
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
-
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+
 import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+
+// Zod-Validierung & -Narrowing: stellt sicher, dass dhcp_options immer ein Array ist
+import {
+  CspGlobalDhcpConfigSchema,
+  CspGlobalDhcpConfig,
+} from '@/domain/dto/csp/zod/global-dhcp-config.zod';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -26,7 +31,6 @@ type InterruptibleImportOptions = {
 };
 
 @Injectable()
-// Service for importing global DHCPv4 configuration from CSP
 export class CspGlobalConfigImportService {
   private readonly logger = new Logger(CspGlobalConfigImportService.name);
 
@@ -42,49 +46,32 @@ export class CspGlobalConfigImportService {
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
     @InjectRepository(OptionGroup)
     private readonly optionGroupRepo: Repository<OptionGroup>,
-    @InjectRepository(OptionSpace)
-    private readonly optionSpaceRepo: Repository<OptionSpace>,
     @Inject(DefaultEncodingSanitizerService)
     private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
 
-  // Imports the global DHCPv4 configuration, supporting progress and cancellation
   async importGlobalDhcpConfig(
     opts?: InterruptibleImportOptions,
   ): Promise<DhcpGlobalConfig | null> {
-    this.logger.log('Importing global DHCPv4 configuration from CSP...');
-
-    // Cancellation check
     const checkCancel = () => {
-      if (opts?.isCancelled?.()) {
-        this.logger.warn('GlobalConfig import interrupted by user.');
-        throw new Error('Import cancelled by user');
-      }
+      if (opts?.isCancelled?.()) throw new Error('Import cancelled by user');
     };
 
     checkCancel();
-    // Fetch global config from CSP
-    const rawGlobalConfig = await this.cspDataClient.fetchGlobalDhcpConfig();
 
-    this.logger.verbose(
-      `Received from CSP: ${JSON.stringify(rawGlobalConfig, null, 2)}`,
-    );
+    // Rohdaten holen und via Zod zu einem sicheren Typ verengen
+    const raw = await this.cspDataClient.fetchGlobalDhcpConfig();
+    const globalCfg: CspGlobalDhcpConfig | null = raw
+      ? CspGlobalDhcpConfigSchema.parse(raw)
+      : null;
 
-    // Check for empty configuration
+    // leer? -> alle evtl. vorhandenen GlobalConfigs entfernen und null zurückgeben
     const isEmpty =
-      !rawGlobalConfig ||
-      typeof rawGlobalConfig !== 'object' ||
-      ((!Array.isArray(rawGlobalConfig.dhcp_options) ||
-        rawGlobalConfig.dhcp_options.length === 0) &&
-        (!rawGlobalConfig.comment ||
-          rawGlobalConfig.comment === null ||
-          rawGlobalConfig.comment === ''));
+      !globalCfg ||
+      (globalCfg.dhcp_options.length === 0 &&
+        (!globalCfg.comment || globalCfg.comment === ''));
 
     if (isEmpty) {
-      this.logger.log(
-        'No global options and no comment – nothing to store as central configuration.',
-      );
-      // Remove all previous global config and related data
       const configs = await this.globalConfigRepo.find();
       for (const config of configs) {
         await this.globalConfigOptionRepo.delete({ globalConfigId: config.id });
@@ -96,7 +83,7 @@ export class CspGlobalConfigImportService {
       return null;
     }
 
-    // Remove old config and relations
+    // vorhandene GlobalConfig (falls eine) weg, damit idempotent
     const existing = await this.globalConfigRepo.findOne({
       relations: ['dhcpOptions', 'optionGroups'],
       where: {},
@@ -109,43 +96,35 @@ export class CspGlobalConfigImportService {
       await this.globalConfigRepo.delete(existing.id);
     }
 
-    // Normalise all DHCP options
-    const normalisedDhcpOptions = normalizeDhcpOptions(
-      Array.isArray(rawGlobalConfig.dhcp_options)
-        ? rawGlobalConfig.dhcp_options
-        : [],
-    );
-
-    // Select only real (non-group) options
+    // Normalisieren (filtert Gruppen etc.)
+    const normalisedDhcpOptions = normalizeDhcpOptions(globalCfg.dhcp_options);
     const realOptions = normalisedDhcpOptions.filter(
       (opt) => opt.type !== 'group',
     );
 
-    // Progress reporting setup
     const total =
       realOptions.length +
       (Array.isArray(normalisedDhcpOptions) ? normalisedDhcpOptions.length : 0);
     let progress = 0;
     const report = () => opts?.onProgress?.(progress, total);
 
-    // Sanitize config comment
     const sanitizedComment = this.encodingSanitizer.sanitize(
-      rawGlobalConfig?.comment ?? '',
+      globalCfg.comment ?? '',
     );
 
+    // GlobalConfig anlegen
     checkCancel();
-    // Create and store new config entity
     const globalConfig = this.globalConfigRepo.create({
       comment: sanitizedComment,
     });
     await this.globalConfigRepo.save(globalConfig);
 
-    // Prepare map for option code resolution
+    // OptionCode-Lookup
     const optionCodeMap = buildOptionCodeMap(
       await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
     );
 
-    // Save all real DHCP options
+    // Reale Optionen speichern
     if (realOptions.length > 0) {
       for (const opt of realOptions) {
         checkCancel();
@@ -167,7 +146,7 @@ export class CspGlobalConfigImportService {
       }
     }
 
-    // Build OptionGroup map for group assignment
+    // OptionGroups aus allen (inkl. group-Einträgen) ableiten
     const optionGroupMap = new Map<string, OptionGroup>();
     for (const og of await this.optionGroupRepo.find()) {
       if (!og) continue;
@@ -177,7 +156,6 @@ export class CspGlobalConfigImportService {
       if (og.id) optionGroupMap.set(String(og.id), og);
     }
 
-    // Assign option groups (from all options)
     const foundGroups = resolveOptionGroupsFromOptions(
       normalisedDhcpOptions,
       optionGroupMap,
@@ -198,16 +176,9 @@ export class CspGlobalConfigImportService {
       }
     }
 
-    // Load and return result with relations
-    const result = await this.globalConfigRepo.findOneOrFail({
+    return this.globalConfigRepo.findOneOrFail({
       where: { id: globalConfig.id },
       relations: ['dhcpOptions', 'optionGroups', 'optionGroups.optionGroup'],
     });
-
-    this.logger.log(
-      `Imported global DHCP config with ${result.dhcpOptions?.length ?? 0} options and ${result.optionGroups?.length ?? 0} option groups.`,
-    );
-
-    return result;
   }
 }

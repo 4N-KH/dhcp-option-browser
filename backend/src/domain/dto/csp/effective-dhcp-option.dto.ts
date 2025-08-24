@@ -1,13 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { OptionSpaceMetaDto } from './option-space-meta.dto';
 
-export class OptionSpaceMetaDto {
-  @ApiProperty() id: number;
-  @ApiProperty() name: string;
-  @ApiProperty() protocol: string;
-  @ApiPropertyOptional() comment?: string;
-  @ApiPropertyOptional() createdAt?: string;
-  @ApiPropertyOptional() updatedAt?: string;
-}
+// Re-export für bestehende Imports aus anderen Dateien
+export { OptionSpaceMetaDto } from './option-space-meta.dto';
 
 export class EffectiveDhcpOptionDto {
   @ApiProperty() code: string;

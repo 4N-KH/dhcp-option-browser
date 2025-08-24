@@ -1,15 +1,7 @@
-export interface CspOptionCodeDto {
-  id: string;
-  code: number;
-  name: string;
-  type: string;
+import type { z } from 'zod';
+import { CspOptionCodeSchema } from './zod/option-code.zod';
 
-  option_space?: string | null;
-  comment?: string | null;
-
-  source?: string | null;
-  array?: boolean | null;
-
-  created_at?: string | null;
-  updated_at?: string | null;
-}
+export type CspOptionCodeDto = z.infer<typeof CspOptionCodeSchema>;
+export { CspOptionCodeSchema };
+export const parseCspOptionCode = (data: unknown): CspOptionCodeDto =>
+  CspOptionCodeSchema.parse(data);

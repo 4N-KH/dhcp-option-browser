@@ -15,3 +15,4 @@ export const CspFixedAddressSchema = z.object({
 });
 
 export type CspFixedAddress = z.infer<typeof CspFixedAddressSchema>;
+export type CspFixedAddressDto = CspFixedAddress;

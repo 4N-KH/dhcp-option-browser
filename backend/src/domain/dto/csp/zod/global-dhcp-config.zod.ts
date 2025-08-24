@@ -11,3 +11,4 @@ export const CspGlobalDhcpConfigSchema = z.object({
 });
 
 export type CspGlobalDhcpConfig = z.infer<typeof CspGlobalDhcpConfigSchema>;
+export type CspGlobalDhcpConfigDto = CspGlobalDhcpConfig;

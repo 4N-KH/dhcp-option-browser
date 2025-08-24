@@ -8,17 +8,15 @@ import { IpSpaceDhcpOption } from '@/infrastructure/database/csp/ip-space-dhcp-o
 import { IpSpaceOptionGroup } from '@/infrastructure/database/csp/ip-space-option-group.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
-import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
 import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
-
 import {
   buildOptionCodeMap,
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
-
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+import type { CspIpSpaceDto } from '@/domain/dto/csp/ip-space.dto';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -41,8 +39,6 @@ export class CspIpSpaceImportService {
     private readonly optionGroupRepo: Repository<OptionGroup>,
     @InjectRepository(OptionCodeEntity)
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
-    @InjectRepository(OptionSpace)
-    private readonly optionSpaceRepo: Repository<OptionSpace>,
     @Inject(DefaultEncodingSanitizerService)
     private readonly encodingSanitizer: EncodingSanitizer,
   ) {}
@@ -60,19 +56,18 @@ export class CspIpSpaceImportService {
     };
 
     checkCancel();
-    const rawIpSpaces = await this.cspDataClient.fetchIpSpaces();
+    const rawIpSpaces: CspIpSpaceDto[] =
+      await this.cspDataClient.fetchIpSpaces();
 
     if (!Array.isArray(rawIpSpaces) || rawIpSpaces.length === 0) {
       this.logger.warn('No IP Spaces found.');
       return [];
     }
 
-    // Prepare lookup maps
     const optionCodeMap = buildOptionCodeMap(
       await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
     );
 
-    // Prepare OptionGroup map (by externalId, name, id)
     const optionGroupMap = new Map<string, OptionGroup>();
     for (const og of await this.optionGroupRepo.find()) {
       if (!og) continue;
@@ -90,7 +85,7 @@ export class CspIpSpaceImportService {
     for (const dto of rawIpSpaces) {
       checkCancel();
 
-      // Upsert IpSpace by externalId
+      // Upsert IpSpace based on externalId
       let entity = await this.ipSpaceRepo.findOne({
         where: { externalId: dto.id },
         relations: ['dhcpOptions', 'optionGroups'],
@@ -101,7 +96,7 @@ export class CspIpSpaceImportService {
       entity.name = this.encodingSanitizer.sanitize(dto.name ?? '');
       entity.comment = this.encodingSanitizer.sanitize(dto.comment ?? '');
 
-      // Save to ensure .id is set
+      // Ensure entity is saved before relations
       entity = await this.ipSpaceRepo.save(entity);
       if (!entity.id) {
         this.logger.error(
@@ -112,13 +107,13 @@ export class CspIpSpaceImportService {
         continue;
       }
 
-      // Delete old DHCP options (idempotent)
+      // Clear old DHCP options for idempotency
       await this.ipSpaceDhcpOptionRepo.delete({ ipSpaceId: entity.id });
 
-      // Nur echte Optionen importieren (type !== 'group')
       const normalizedOptions = normalizeDhcpOptions(
         dto.dhcp_options ?? [],
       ).filter((opt) => opt.type !== 'group');
+
       if (normalizedOptions.length > 0) {
         const dhcpOptionEntities = normalizedOptions.map((opt) =>
           this.ipSpaceDhcpOptionRepo.create({
@@ -137,10 +132,10 @@ export class CspIpSpaceImportService {
         await this.ipSpaceDhcpOptionRepo.save(dhcpOptionEntities);
       }
 
-      // Delete old OptionGroup relations
+      // Clear old OptionGroup relations
       await this.ipSpaceOptionGroupRepo.delete({ ipSpaceId: entity.id });
 
-      // OptionGroups aus ALLEN dhcp_options extrahieren
+      // Resolve OptionGroups and create joins
       const foundGroups = resolveOptionGroupsFromOptions(
         dto.dhcp_options ?? [],
         optionGroupMap,

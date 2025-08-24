@@ -1,9 +1,8 @@
-export interface CspGlobalDhcpConfigDto {
-  comment?: string | null;
-  dhcp_options: {
-    group?: string | null;
-    option_code: string;
-    option_value: string;
-    type: string;
-  }[];
-}
+import type { z } from 'zod';
+import { CspGlobalDhcpConfigSchema } from './zod/global-dhcp-config.zod';
+
+export type CspGlobalDhcpConfigDto = z.infer<typeof CspGlobalDhcpConfigSchema>;
+export { CspGlobalDhcpConfigSchema };
+export const parseCspGlobalDhcpConfig = (
+  data: unknown,
+): CspGlobalDhcpConfigDto => CspGlobalDhcpConfigSchema.parse(data);

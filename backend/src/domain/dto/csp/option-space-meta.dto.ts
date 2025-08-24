@@ -8,7 +8,7 @@ export class OptionSpaceMetaDto {
   name: string;
 
   @ApiProperty()
-  protocol: string; // Niemals | null!
+  protocol: string;
 
   @ApiPropertyOptional()
   comment?: string | null;

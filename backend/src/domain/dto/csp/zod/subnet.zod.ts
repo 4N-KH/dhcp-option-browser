@@ -13,3 +13,4 @@ export const CspSubnetSchema = z.object({
 });
 
 export type CspSubnet = z.infer<typeof CspSubnetSchema>;
+export type CspSubnetDto = CspSubnet;

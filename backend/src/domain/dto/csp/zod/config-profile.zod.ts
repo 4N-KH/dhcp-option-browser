@@ -10,3 +10,4 @@ export const CspConfigProfileSchema = z.object({
 });
 
 export type CspConfigProfile = z.infer<typeof CspConfigProfileSchema>;
+export type CspConfigProfileDto = CspConfigProfile;

@@ -1,5 +1,3 @@
-// src/domain/dto/csp/effective-dhcp-option-stack.dto.ts
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 import { OptionGroupMetaDto } from './option-group-meta.dto';

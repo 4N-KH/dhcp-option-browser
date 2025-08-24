@@ -16,3 +16,4 @@ export const CspOptionCodeSchema = z.object({
 });
 
 export type CspOptionCode = z.infer<typeof CspOptionCodeSchema>;
+export type CspOptionCodeDto = CspOptionCode;

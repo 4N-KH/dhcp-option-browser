@@ -9,8 +9,6 @@ import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.enti
 import { AddressBlockOptionGroup } from '@/infrastructure/database/csp/address-block-option-group.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { IpSpace } from '@/infrastructure/database/csp/ip-space.entity';
-import { OptionSpace } from '@/infrastructure/database/csp/option-space.entity';
-import { normalizeAddressBlockDtos } from '@/shared/parser/normalize-address-block-dtos';
 
 import {
   mapDhcpOptionToEntity,
@@ -19,6 +17,7 @@ import {
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
 import { EncodingSanitizer } from '@/application/services/import/transformers/encoding-sanitizer.interface';
+import type { CspAddressBlockDto } from '@/domain/dto/csp/address-block.dto';
 
 type InterruptibleImportOptions = {
   isCancelled?: () => boolean;
@@ -37,8 +36,6 @@ export class CspAddressBlockImportService {
     private readonly abDhcpOptionRepo: Repository<AddressBlockDhcpOption>,
     @InjectRepository(OptionCodeEntity)
     private readonly optionCodeRepo: Repository<OptionCodeEntity>,
-    @InjectRepository(OptionSpace)
-    private readonly optionSpaceRepo: Repository<OptionSpace>,
     @InjectRepository(AddressBlockOptionGroup)
     private readonly abOptionGroupRepo: Repository<AddressBlockOptionGroup>,
     @InjectRepository(OptionGroup)
@@ -75,10 +72,10 @@ export class CspAddressBlockImportService {
         'TRUNCATE TABLE "address_block_option_group", "address_block_dhcp_option", "address_block" CASCADE;',
       );
 
-      // 1. Fetch and normalise data
+      // 1. Fetch data (bereits normalisiert & zod-validiert im DataClient)
       checkCancel();
-      const rawDtos = await this.cspDataClient.fetchAddressBlocks();
-      const dtos = normalizeAddressBlockDtos(rawDtos);
+      const dtos: CspAddressBlockDto[] =
+        await this.cspDataClient.fetchAddressBlocks();
 
       if (!dtos?.length) {
         this.logger.warn('No Address Blocks found in CSP.');
@@ -120,7 +117,7 @@ export class CspAddressBlockImportService {
       let progress = 0;
       const report = () => opts?.onProgress?.(progress, total);
 
-      // 3. Create AddressBlocks (without parent linkage yet, for IDs to be set)
+      // 3. Create AddressBlocks (IDs erzeugen, Elternbezug später)
       const blockMap = new Map<string, AddressBlock>();
       for (const dto of dtos) {
         checkCancel();
@@ -156,7 +153,7 @@ export class CspAddressBlockImportService {
         report();
       }
 
-      // 4. Establish parent-child relations now that all blocks have IDs
+      // 4. Parent/Child-Beziehungen
       for (const dto of dtos) {
         checkCancel();
         if (dto.parent) {
@@ -174,7 +171,7 @@ export class CspAddressBlockImportService {
         }
       }
 
-      // 5. Save DHCP options per block
+      // 5. DHCP-Optionen je Block
       for (const dto of dtos) {
         checkCancel();
         const block = blockMap.get(dto.id);
@@ -233,13 +230,13 @@ export class CspAddressBlockImportService {
         }
       }
 
-      // 6. Assign option groups to each block
+      // 6. OptionGroups je Block
       for (const dto of dtos) {
         checkCancel();
         const block = blockMap.get(dto.id);
         if (!block || !block.id) continue;
 
-        // Extract group keys from options
+        // Keys aus Options extrahieren (nur Logging)
         let groupKeys = Array.isArray(dto.dhcp_options)
           ? dto.dhcp_options
               .map((opt) =>

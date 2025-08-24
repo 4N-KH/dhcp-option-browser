@@ -9,11 +9,8 @@ type InterruptibleImportOptions = {
   onProgress?: (current: number, total: number) => void;
 };
 
-/**
- * Service for importing configuration profiles from CSP.
- * - Fetches config profiles via CspDataClient
- * - Normalizes encoding for strings and DHCP options
- * - Reports progress and supports interrupt
+/*
+ Service for importing configuration profiles from CSP.
  */
 @Injectable()
 export class CspConfigProfileImportService {
@@ -24,9 +21,6 @@ export class CspConfigProfileImportService {
     private readonly encodingSanitizer: DefaultEncodingSanitizerService,
   ) {}
 
-  /**
-   * Import all CSP configuration profiles, normalise options & encoding, report progress, support interrupt.
-   */
   async importConfigProfiles(
     opts?: InterruptibleImportOptions,
   ): Promise<CspConfigProfileDto[]> {
@@ -39,7 +33,9 @@ export class CspConfigProfileImportService {
 
     this.logger.log('Starting import of CSP configuration profiles...');
     checkCancel();
-    const rawProfiles = await this.cspDataClient.fetchConfigProfiles();
+
+    const rawProfiles: CspConfigProfileDto[] =
+      await this.cspDataClient.fetchConfigProfiles();
 
     if (!rawProfiles || rawProfiles.length === 0) {
       this.logger.warn('No CSP configuration profiles found.');
@@ -80,7 +76,6 @@ export class CspConfigProfileImportService {
     this.logger.log(
       `Fetched ${profiles.length} config profiles from CSP (${totalOptions} DHCP options in total).`,
     );
-    // Optional: this.logger.debug(JSON.stringify(profiles.slice(0, 2), null, 2));
 
     return profiles;
   }
