@@ -15,14 +15,17 @@ export class RedundancyOverviewService {
   ) {}
 
   /**
-   * Redundant = identical (option_code, option_value) on the same object
-   * from ≥ 2 distinct sources.
+   * Panel-strikte Redundanz:
+   * Ein OptionsCODE erscheint auf demselben Objekt aus ≥ 2 unterschiedlichen Quellen,
+   * unabhängig davon, ob die Werte identisch oder unterschiedlich sind.
+   * - Bei gemischten Werten wird der Wert als "<multiple>" ausgegeben.
+   * - "setIn" enthält je Quelle den Vererbungsstatus (explicit|inherited).
    */
   async getRedundancyOverview(): Promise<RedundancyOverviewItemDto[]> {
-    const rows = await this.allAssignmentsRepo.findRedundancyOverviewFromBase();
+    const rows =
+      await this.allAssignmentsRepo.findRedundancyOverviewPanelStrictFromBase();
 
     const out: RedundancyOverviewItemDto[] = rows.map((r) => {
-      // de-duplicate exact source entries
       const seen = new Set<string>();
       const setIn: SourceJson[] = [];
       for (const s of r.sources ?? []) {
@@ -35,7 +38,7 @@ export class RedundancyOverviewService {
 
       return {
         level: r.object_type as RedundancyOverviewItemDto['level'],
-        objectId: r.object_id, // used by frontend to jump to tree
+        objectId: r.object_id,
         name: r.object_label ?? null,
         address: r.address ?? null,
         redundantOption: {
@@ -48,14 +51,13 @@ export class RedundancyOverviewService {
       };
     });
 
-    // stable UI order
     out.sort((a, b) =>
       `${a.level}|${a.name ?? ''}|${a.address ?? ''}|${a.redundantOption.code}`.localeCompare(
         `${b.level}|${b.name ?? ''}|${b.address ?? ''}|${b.redundantOption.code}`,
       ),
     );
 
-    this.logger.log(`Redundancy overview built with ${out.length} entries.`);
+    this.logger.log(`Panel-strict redundancy overview: ${out.length} entries.`);
     return out;
   }
 }

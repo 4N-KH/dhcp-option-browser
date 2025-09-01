@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { fetchDhcpLightTree } from "@/services/dhcp-hierarchy.service";
-import LightTreeView from "@/features/dhcp-tree/LightTreeView";
+import LightTreeView, { type NodeKey as TreeNodeKey } from "@/features/dhcp-tree/LightTreeView";
 import DhcpPropertiesPanel from "@/features/dhcp-tree/DhcpPropertiesPanel";
 import { getDefaultSelection } from "@/features/dhcp-tree/helpers/tree-node-helpers";
 import { TreeSelection } from "@/types/types";
@@ -20,116 +20,200 @@ import RedundancyOverviewPanel from "@/features/redundancy/RedundancyOverviewPan
 import OptionGroupOverviewPanel from "@/features/option-view/OptionGroupOverviewPanel";
 import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 
-// Safe access for optional fixed addresses on address blocks
+/* ---------------- safe helpers for optional arrays ---------------- */
+
+function arr<T>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
+}
+function getAddressBlocks(ip: LightIpSpaceDto): LightAddressBlockDto[] {
+  return arr<LightAddressBlockDto>((ip as unknown as { addressBlocks?: unknown }).addressBlocks);
+}
+function getSubnets(ab: LightAddressBlockDto): LightSubnetDto[] {
+  return arr<LightSubnetDto>((ab as unknown as { subnets?: unknown }).subnets);
+}
+function getRanges(sn: LightSubnetDto): LightRangeDto[] {
+  return arr<LightRangeDto>((sn as unknown as { ranges?: unknown }).ranges);
+}
+function getFixedUnderIpSpace(ip: LightIpSpaceDto): LightFixedAddressDto[] {
+  return arr<LightFixedAddressDto>((ip as unknown as { fixedAddresses?: unknown }).fixedAddresses);
+}
 function getFixedUnderAddressBlock(ab: LightAddressBlockDto): LightFixedAddressDto[] {
-  const possible = (ab as unknown as { fixedAddresses?: unknown }).fixedAddresses;
-  return Array.isArray(possible) ? (possible as LightFixedAddressDto[]) : [];
+  return arr<LightFixedAddressDto>((ab as unknown as { fixedAddresses?: unknown }).fixedAddresses);
+}
+function getFixedUnderSubnet(sn: LightSubnetDto): LightFixedAddressDto[] {
+  return arr<LightFixedAddressDto>((sn as unknown as { fixedAddresses?: unknown }).fixedAddresses);
+}
+function getFixedUnderRange(rg: LightRangeDto): LightFixedAddressDto[] {
+  return arr<LightFixedAddressDto>((rg as unknown as { fixedAddresses?: unknown }).fixedAddresses);
 }
 
-// Build ancestor path from root to target node
-type NodeKey = { type: "ipSpace" | "addressBlock" | "subnet" | "range" | "fixedAddress"; id: number };
+/* ---------------- key helpers (MUST MATCH LightTreeView) ---------------- */
 
-function buildPath(
-  tree: DhcpLightTreeDto,
-  level: Exclude<RedundancyLevel, "global">,
-  id: number
-): NodeKey[] {
-  const path: NodeKey[] = [];
+type NT = Exclude<RedundancyLevel, "global">; // navigable node types
+type KeyStr = string;
 
-  for (const ip of (tree.ipSpaces ?? []) as LightIpSpaceDto[]) {
-    const pushIp = () => path.push({ type: "ipSpace", id: ip.id });
-    if (level === "ipSpace" && ip.id === id) {
-      pushIp();
-      return path;
-    }
-
-    for (const ab of (ip.addressBlocks ?? []) as LightAddressBlockDto[]) {
-      const pushAb = () => {
-        pushIp();
-        path.push({ type: "addressBlock", id: ab.id });
-      };
-      if (level === "addressBlock" && ab.id === id) {
-        pushAb();
-        return path;
-      }
-
-      for (const sn of (ab.subnets ?? []) as LightSubnetDto[]) {
-        const pushSn = () => {
-          pushAb();
-          path.push({ type: "subnet", id: sn.id });
-        };
-        if (level === "subnet" && sn.id === id) {
-          pushSn();
-          return path;
-        }
-
-        for (const rg of (sn.ranges ?? []) as LightRangeDto[]) {
-          if (level === "range" && rg.id === id) {
-            pushSn();
-            path.push({ type: "range", id: rg.id });
-            return path;
-          }
-        }
-
-        for (const fa of (sn.fixedAddresses ?? []) as LightFixedAddressDto[]) {
-          if (level === "fixedAddress" && fa.id === id) {
-            pushSn();
-            path.push({ type: "fixedAddress", id: fa.id });
-            return path;
-          }
-        }
-      }
-
-      for (const fa of getFixedUnderAddressBlock(ab)) {
-        if (level === "fixedAddress" && fa.id === id) {
-          pushAb();
-          path.push({ type: "fixedAddress", id: fa.id });
-          return path;
-        }
-      }
-    }
-  }
-
-  return path;
+function isObj(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
 }
-
-// Find the concrete object for selection
-function findSelection(
-  tree: DhcpLightTreeDto,
-  level: Exclude<RedundancyLevel, "global">,
-  id: number
-): TreeSelection | null {
-  for (const ip of (tree.ipSpaces ?? []) as LightIpSpaceDto[]) {
-    if (level === "ipSpace" && ip.id === id) return { type: "ipSpace", object: ip };
-
-    for (const ab of (ip.addressBlocks ?? []) as LightAddressBlockDto[]) {
-      if (level === "addressBlock" && ab.id === id) return { type: "addressBlock", object: ab };
-
-      for (const sn of (ab.subnets ?? []) as LightSubnetDto[]) {
-        if (level === "subnet" && sn.id === id) return { type: "subnet", object: sn };
-
-        for (const rg of (sn.ranges ?? []) as LightRangeDto[]) {
-          if (level === "range" && rg.id === id) return { type: "range", object: rg };
-        }
-        for (const fa of (sn.fixedAddresses ?? []) as LightFixedAddressDto[]) {
-          if (level === "fixedAddress" && fa.id === id) return { type: "fixedAddress", object: fa };
-        }
-      }
-
-      for (const fa of getFixedUnderAddressBlock(ab)) {
-        if (level === "fixedAddress" && fa.id === id) return { type: "fixedAddress", object: fa };
-      }
-    }
-  }
+function rd(o: unknown, k: string): unknown {
+  return isObj(o) ? o[k] : undefined;
+}
+function s(v: unknown): string | null {
+  if (typeof v === "string" && v) return v;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
   return null;
 }
+
+/** Build the SAME stable key id as LightTreeView.stableIdFor */
+function stableIdForSelection(sel: TreeSelection): string {
+  const t = sel.type as TreeNodeKey["type"];
+  const o = sel.object as unknown;
+
+  const rawId = s(rd(o, "id"));
+  if (rawId) return rawId;
+
+  switch (t) {
+    case "ipSpace":
+      return s(rd(o, "name")) ?? "ipSpace:unknown";
+    case "addressBlock":
+      return s(rd(o, "address")) ?? s(rd(o, "name")) ?? "addressBlock:unknown";
+    case "subnet":
+      return s(rd(o, "address")) ?? "subnet:unknown";
+    case "range": {
+      const sid = s(rd(o, "subnetId")) ?? s(rd(rd(o, "subnet"), "id")) ?? "?:";
+      const start = s(rd(o, "start")) ?? s(rd(o, "from")) ?? "start?";
+      const end = s(rd(o, "end")) ?? s(rd(o, "to")) ?? "end?";
+      return `${sid}:${start}-${end}`;
+    }
+    case "fixedAddress": {
+      const sid =
+        s(rd(o, "subnetId")) ??
+        s(rd(rd(o, "subnet"), "id")) ??
+        s(rd(rd(o, "range"), "subnetId")) ??
+        "?:";
+      const addr = s(rd(o, "address")) ?? s(rd(o, "name")) ?? "addr?";
+      return `${sid}:${addr}`;
+    }
+    case "global":
+    default:
+      return "root";
+  }
+}
+const keyStrOfSelection = (sel: TreeSelection): KeyStr =>
+  `${sel.type}:${stableIdForSelection(sel)}`;
+
+/* ---------------- index builder: parent map + id lookup ---------------- */
+
+function buildIndex(tree: DhcpLightTreeDto) {
+  const parent = new Map<KeyStr, KeyStr | null>();
+  const nodeByKey = new Map<KeyStr, TreeSelection>();
+  const idToKey = new Map<KeyStr, KeyStr>();
+
+  const rootKey: KeyStr = "global:root";
+  parent.set(rootKey, null);
+
+  const indexSel = (sel: TreeSelection, parentKey: KeyStr) => {
+    const key = keyStrOfSelection(sel);
+    if (!parent.has(key)) parent.set(key, parentKey);
+    nodeByKey.set(key, sel);
+
+    const idVal = rd(sel.object as unknown, "id");
+    if (typeof idVal === "number" || typeof idVal === "string") {
+      idToKey.set(`${sel.type}:${String(idVal)}`, key);
+    }
+  };
+
+  for (const ip of (tree.ipSpaces ?? []) as LightIpSpaceDto[]) {
+    const ipSel: TreeSelection = { type: "ipSpace", object: ip };
+    indexSel(ipSel, rootKey);
+
+    // optional fixed under ipSpace
+    for (const fa of getFixedUnderIpSpace(ip)) {
+      indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(ipSel));
+    }
+
+    // address blocks
+    for (const ab of getAddressBlocks(ip)) {
+      const abSel: TreeSelection = { type: "addressBlock", object: ab };
+      indexSel(abSel, keyStrOfSelection(ipSel));
+
+      // fixed under addressBlock
+      for (const fa of getFixedUnderAddressBlock(ab)) {
+        indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(abSel));
+      }
+
+      // subnets
+      for (const sn of getSubnets(ab)) {
+        const snSel: TreeSelection = { type: "subnet", object: sn };
+        indexSel(snSel, keyStrOfSelection(abSel));
+
+        // ranges
+        for (const rg of getRanges(sn)) {
+          const rgSel: TreeSelection = { type: "range", object: rg };
+          indexSel(rgSel, keyStrOfSelection(snSel));
+
+          // fixed under range
+          for (const fa of getFixedUnderRange(rg)) {
+            indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(rgSel));
+          }
+        }
+
+        // fixed under subnet
+        for (const fa of getFixedUnderSubnet(sn)) {
+          indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(snSel));
+        }
+      }
+    }
+  }
+
+  return { parent, nodeByKey, idToKey, rootKey };
+}
+
+/* ---------------- path & selection using index (stable keys) ---------------- */
+
+function pathFromIndex(
+  parent: Map<KeyStr, KeyStr | null>,
+  idToKey: Map<KeyStr, KeyStr>,
+  type: NT,
+  id: number
+): TreeNodeKey[] {
+  const keyStart = idToKey.get(`${type}:${String(id)}`);
+  if (!keyStart) return [];
+
+  const rev: TreeNodeKey[] = [];
+  let cur: KeyStr | null | undefined = keyStart;
+  let guard = 0;
+
+  while (cur && guard++ < 4000) {
+    const [t, ...rest] = cur.split(":");
+    const restJoined = rest.join(":"); // supports composite stable ids with colons
+    if (t !== "global") {
+      rev.push({ type: t as TreeNodeKey["type"], id: restJoined });
+    }
+    cur = parent.get(cur) ?? null;
+  }
+
+  return rev.reverse();
+}
+
+function selectionFromIndex(
+  nodeByKey: Map<KeyStr, TreeSelection>,
+  idToKey: Map<KeyStr, KeyStr>,
+  type: NT,
+  id: number
+): TreeSelection | null {
+  const key = idToKey.get(`${type}:${String(id)}`);
+  return key ? nodeByKey.get(key) ?? null : null;
+}
+
+/* ---------------- component ---------------- */
 
 export default function OverviewPage() {
   const [tree, setTree] = useState<DhcpLightTreeDto | null>(null);
   const [selected, setSelected] = useState<TreeSelection | null>(null);
   const [tab, setTab] = useState<"tree" | "overview" | "groups" | "redundancies">("tree");
   const [loading, setLoading] = useState(true);
-  const [autoExpandPath, setAutoExpandPath] = useState<NodeKey[] | null>(null);
+  const [autoExpandPath, setAutoExpandPath] = useState<TreeNodeKey[] | null>(null);
 
   useEffect(() => {
     fetchDhcpLightTree()
@@ -145,12 +229,21 @@ export default function OverviewPage() {
   const handleJumpToTree = (level: RedundancyLevel, objectId: number) => {
     setTab("tree");
     if (!tree) return;
-    if (level !== "global") {
-      const sel = findSelection(tree, level, objectId);
-      const path = buildPath(tree, level, objectId);
-      if (sel) setSelected(sel);
-      if (path.length) setAutoExpandPath(path);
+
+    if (level === "global") {
+      setSelected({ type: "global", object: tree });
+      setAutoExpandPath(null);
+      return;
     }
+
+    // Build index once per jump – ensures exact mapping for ALL object IDs.
+    const { parent, nodeByKey, idToKey } = buildIndex(tree);
+
+    const sel = selectionFromIndex(nodeByKey, idToKey, level as NT, objectId);
+    const path = pathFromIndex(parent, idToKey, level as NT, objectId);
+
+    if (sel) setSelected(sel);
+    if (path.length) setAutoExpandPath(path);
   };
 
   const onImportComplete = async () => {

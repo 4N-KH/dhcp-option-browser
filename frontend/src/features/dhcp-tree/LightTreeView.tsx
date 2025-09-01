@@ -1,85 +1,120 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 import { TreeSelection, DhcpObjectType } from "@/types/types";
 import { getChildren, getNodeLabel } from "./helpers/tree-node-helpers";
 import { getIcon } from "./tree-icons";
 
-type NodeType = "global" | "ipSpace" | "addressBlock" | "subnet" | "range" | "fixedAddress";
-type NodeKey = { type: NodeType; id: number | string };
+/** Node types used in the tree */
+export type NodeType = "global" | "ipSpace" | "addressBlock" | "subnet" | "range" | "fixedAddress";
+/** Stable path key */
+export type NodeKey = { type: NodeType; id: string };
 
 interface LightTreeViewProps {
   tree: DhcpLightTreeDto;
   selected: TreeSelection | null;
   onSelect: (sel: TreeSelection) => void;
+  /** Optional expand path (root→leaf); last entry is the visual target */
   autoExpandPath?: NodeKey[] | null;
+  /** Called after path has been applied once */
   onAutoExpandConsumed?: () => void;
 }
 
-/** Guard für Objekte mit { id } */
-function hasId(val: unknown): val is { id: number | string } {
-  return (
-    typeof val === "object" &&
-    val !== null &&
-    "id" in (val as Record<string, unknown>) &&
-    (typeof (val as { id: unknown }).id === "number" ||
-      typeof (val as { id: unknown }).id === "string")
-  );
+/* ---------------- helpers: robust, type-aware keys (no any) ---------------- */
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
 }
 
-/** Key-Helpers */
+function read(obj: unknown, key: string): unknown {
+  return isObject(obj) ? obj[key] : undefined;
+}
+
+function toStr(v: unknown): string | null {
+  if (typeof v === "string" && v.length > 0) return v;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return null;
+}
+
+/** Build a stable id for any selection; prefers numeric/string id. */
+function stableIdFor(sel: TreeSelection): string {
+  const t = sel.type as NodeType;
+  const o = sel.object as unknown;
+
+  const rawId = toStr(read(o, "id"));
+  if (rawId) return rawId;
+
+  switch (t) {
+    case "ipSpace":
+      return toStr(read(o, "name")) ?? "ipSpace:unknown";
+    case "addressBlock":
+      return toStr(read(o, "address")) ?? toStr(read(o, "name")) ?? "addressBlock:unknown";
+    case "subnet":
+      return toStr(read(o, "address")) ?? "subnet:unknown";
+    case "range": {
+      const sid = toStr(read(o, "subnetId")) ?? toStr(read(read(o, "subnet"), "id")) ?? "?:";
+      const start = toStr(read(o, "start")) ?? toStr(read(o, "from")) ?? "start?";
+      const end = toStr(read(o, "end")) ?? toStr(read(o, "to")) ?? "end?";
+      return `${sid}:${start}-${end}`;
+    }
+    case "fixedAddress": {
+      const sid =
+        toStr(read(o, "subnetId")) ??
+        toStr(read(read(o, "subnet"), "id")) ??
+        toStr(read(read(o, "range"), "subnetId")) ??
+        "?:";
+      const addr = toStr(read(o, "address")) ?? toStr(read(o, "name")) ?? "addr?";
+      return `${sid}:${addr}`;
+    }
+    case "global":
+    default:
+      return "root";
+  }
+}
+
+function selectionToNodeKey(sel: TreeSelection): NodeKey {
+  return { type: sel.type as NodeType, id: stableIdFor(sel) };
+}
+
 function nodeKeyToString(k: NodeKey): string {
   return `${k.type}:${k.id}`;
 }
-function getSelectionId(sel: TreeSelection): number | string {
-  const objUnknown = sel.object as unknown;
-  if (hasId(objUnknown)) return objUnknown.id;
-  return "root";
-}
-function selectionToNodeKey(sel: TreeSelection): NodeKey {
-  return { type: sel.type as NodeType, id: getSelectionId(sel) };
-}
-function isSameSelection(a: TreeSelection | null, b: TreeSelection | null): boolean {
+
+function sameSelection(a: TreeSelection | null, b: TreeSelection | null): boolean {
   if (!a || !b) return false;
   if (a.type !== b.type) return false;
-  return getSelectionId(a) === getSelectionId(b);
+  return stableIdFor(a) === stableIdFor(b);
 }
 
-/** Fester SVG-Chevron (verhindert Glyph-Jitter) */
+/* ---------------- ui bits ---------------- */
+
 const Chevron: React.FC<{ open: boolean }> = ({ open }) => (
-  <svg
-    aria-hidden
-    viewBox="0 0 20 20"
-    className="w-4 h-4 will-change-transform"
-    style={{ transform: `rotate(${open ? 90 : 0}deg)` }}
-  >
+  <svg aria-hidden viewBox="0 0 20 20" className="w-4 h-4" style={{ transform: `rotate(${open ? 90 : 0}deg)` }}>
     <path d="M7 5l6 5-6 5" fill="currentColor" />
   </svg>
 );
 
-/* ----------------------------- Tree Node ----------------------------- */
-
-const TreeNodeView: React.FC<{
+const Row: React.FC<{
   selection: TreeSelection;
   selected: TreeSelection | null;
   onSelect: (sel: TreeSelection) => void;
-  level?: number;
   isOpen: boolean;
   onToggle: (key: NodeKey) => void;
   isExpandedKey: (key: NodeKey) => boolean;
-}> = ({ selection, selected, onSelect, level = 0, isOpen, onToggle, isExpandedKey }) => {
+  level: number;
+}> = ({ selection, selected, onSelect, isOpen, onToggle, isExpandedKey, level }) => {
   const children = useMemo(() => getChildren(selection), [selection]);
   const key = selectionToNodeKey(selection);
-  const currentSelected = isSameSelection(selection, selected);
+  const keyStr = nodeKeyToString(key);
+  const isSelected = sameSelection(selection, selected);
 
   return (
     <div style={{ paddingLeft: level * 14 }} className="group">
       <div
-        className={`tree-row flex items-center gap-2 py-1 px-2 rounded-lg cursor-pointer select-none transition
-          ${currentSelected ? "bg-[var(--accent)] text-white shadow" : "hover:bg-[var(--accent-light)]/70"}
-        `}
+        id={`tree-node-${keyStr}`}
+        className="tree-row flex items-center gap-2 py-1 px-2 rounded-lg cursor-pointer transition"
+        data-tree-key={keyStr}
         onClick={() => onSelect(selection)}
       >
-        {/* Spalte 1: Toggle (fix 20px) */}
         <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
           {children.length > 0 ? (
             <button
@@ -94,38 +129,36 @@ const TreeNodeView: React.FC<{
               <Chevron open={isOpen} />
             </button>
           ) : (
-            // Platzhalter hält die Spalte stabil
             <span className="inline-block w-5 h-5" />
           )}
         </div>
 
-        {/* Spalte 2: Icon (fix 20px) */}
         <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
           <span className="inline-block">{getIcon(selection.type as DhcpObjectType)}</span>
         </div>
 
-        {/* Spalte 3: Label (nimmt Restbreite) */}
-        <div className="min-w-0 flex-1">
-          <span className="block truncate font-medium leading-5">{getNodeLabel(selection)}</span>
+        <div className={`min-w-0 flex-1 ${isSelected ? "font-semibold" : ""}`}>
+          <span className={`block truncate leading-5 ${isSelected ? "text-[var(--accent)]" : ""}`}>
+            {getNodeLabel(selection)}
+          </span>
         </div>
       </div>
 
-      {/* Children */}
       {isOpen && children.length > 0 && (
         <div className="ml-2 border-l border-[var(--border)] pl-2">
           {children.map((child) => {
             const childKey = selectionToNodeKey(child);
             const childOpen = isExpandedKey(childKey);
             return (
-              <TreeNodeView
+              <Row
                 key={nodeKeyToString(childKey)}
                 selection={child}
                 selected={selected}
                 onSelect={onSelect}
-                level={level + 1}
                 isOpen={childOpen}
                 onToggle={onToggle}
                 isExpandedKey={isExpandedKey}
+                level={level + 1}
               />
             );
           })}
@@ -135,7 +168,7 @@ const TreeNodeView: React.FC<{
   );
 };
 
-/* ----------------------------- Root View ----------------------------- */
+/* ---------------- main ---------------- */
 
 const LightTreeView: React.FC<LightTreeViewProps> = ({
   tree,
@@ -145,34 +178,23 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
   onAutoExpandConsumed,
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const parentOfRef = useRef<Map<string, string | null>>(new Map()); // childKeyStr -> parentKeyStr|null
+  const pendingKeyRef = useRef<string | null>(null); // target to scroll after path expand
 
-  const root: TreeSelection = { type: "global", object: tree };
-  const rootKeyStr = nodeKeyToString({ type: "global", id: "root" });
+  // root selection/key
+  const rootSelection: TreeSelection = useMemo(
+    () => ({ type: "global" as DhcpObjectType, object: tree }),
+    [tree],
+  );
+  const rootKey: NodeKey = { type: "global", id: "root" };
+  const rootKeyStr = nodeKeyToString(rootKey);
 
-  // Root immer offen
-  useEffect(() => {
-    setExpanded((prev) => {
-      if (prev.has(rootKeyStr)) return prev;
-      const next = new Set(prev);
-      next.add(rootKeyStr);
-      return next;
-    });
-  }, [rootKeyStr]);
+  const isExpandedKey = useCallback(
+    (k: NodeKey) => expanded.has(nodeKeyToString(k)),
+    [expanded],
+  );
 
-  // Auto-Expand-Pfad anwenden
-  useEffect(() => {
-    if (!autoExpandPath || autoExpandPath.length === 0) return;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      for (const k of autoExpandPath) next.add(nodeKeyToString(k));
-      return next;
-    });
-    onAutoExpandConsumed?.();
-  }, [autoExpandPath, onAutoExpandConsumed]);
-
-  const isExpandedKey = (k: NodeKey) => expanded.has(nodeKeyToString(k));
-
-  const toggle = (k: NodeKey) => {
+  const toggle = useCallback((k: NodeKey) => {
     const key = nodeKeyToString(k);
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -180,20 +202,154 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
       else next.add(key);
       return next;
     });
+  }, []);
+
+  // build parent map; keep root open
+  useEffect(() => {
+    const parentOf = new Map<string, string | null>();
+    const walk = (sel: TreeSelection, parentKeyStr: string | null) => {
+      const keyStr = nodeKeyToString(selectionToNodeKey(sel));
+      if (!parentOf.has(keyStr)) parentOf.set(keyStr, parentKeyStr);
+      const children = getChildren(sel);
+      for (const c of children) walk(c, keyStr);
+    };
+    walk(rootSelection, null);
+    parentOfRef.current = parentOf;
+
+    setExpanded((prev) => {
+      if (prev.has(rootKeyStr)) return prev;
+      const next = new Set(prev);
+      next.add(rootKeyStr);
+      return next;
+    });
+  }, [rootSelection, rootKeyStr]);
+
+  // helper: expand ancestor chain for a key string
+  const expandAncestors = useCallback((targetKeyStr: string) => {
+    const parentOf = parentOfRef.current;
+    if (!parentOf.size) return;
+
+    const path: string[] = [];
+    let cur: string | null | undefined = targetKeyStr;
+    let guard = 0;
+    while (cur && guard++ < 1000) {
+      path.push(cur);
+      cur = parentOf.get(cur) ?? null;
+    }
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const k of path) next.add(k);
+      next.add(rootKeyStr);
+      return next;
+    });
+  }, [rootKeyStr]);
+
+  // DOM query that works regardless of container
+  const findRowEl = useCallback((targetKeyStr: string): HTMLElement | null => {
+    const q1 = document.querySelector<HTMLElement>(`.tree-row[data-tree-key="${targetKeyStr}"]`);
+    if (q1) return q1;
+    const q2 = document.getElementById(`tree-node-${targetKeyStr}`);
+    return q2 as HTMLElement | null;
+  }, []);
+
+  const flash = (el: HTMLElement) => {
+    el.classList.add("ring-2", "ring-[var(--accent)]");
+    setTimeout(() => el.classList.remove("ring-2", "ring-[var(--accent)]"), 650);
   };
 
-  const rootOpen = isExpandedKey({ type: "global", id: "root" });
+  const scrollToKey = useCallback((targetKeyStr: string) => {
+    let done = false;
+
+    const tryScroll = () => {
+      if (done) return true;
+      const el = findRowEl(targetKeyStr);
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        try {
+          el.focus({ preventScroll: true });
+        } catch {
+          /* ignore */
+        }
+        flash(el);
+        done = true;
+        return true;
+      }
+      return false;
+    };
+
+    if (tryScroll()) return;
+
+    const obs = new MutationObserver(() => {
+      tryScroll();
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+
+    const raf1 = requestAnimationFrame(() => tryScroll());
+    const raf2 = requestAnimationFrame(() => tryScroll());
+    const timeout = setTimeout(() => {
+      obs.disconnect();
+    }, 3000);
+
+    const cleanup = () => {
+      obs.disconnect();
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(timeout);
+    };
+
+    // Ensure cleanup after success
+    const watcher = new MutationObserver(() => {
+      if (tryScroll()) cleanup();
+    });
+    watcher.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => watcher.disconnect(), 3200);
+  }, [findRowEl]);
+
+  // Selected → expand + scroll
+  useEffect(() => {
+    if (!selected) return;
+    const targetKeyStr = nodeKeyToString(selectionToNodeKey(selected));
+    expandAncestors(targetKeyStr);
+    // wait a tick for expansion to render, then scroll
+    requestAnimationFrame(() => scrollToKey(targetKeyStr));
+  }, [selected, expandAncestors, scrollToKey, expanded.size]);
+
+  // autoExpandPath → expand + scroll to leaf (even wenn selected noch nicht gesetzt)
+  useEffect(() => {
+    if (!autoExpandPath || autoExpandPath.length === 0) return;
+    const leaf = autoExpandPath[autoExpandPath.length - 1];
+    const leafKeyStr = nodeKeyToString(leaf);
+    pendingKeyRef.current = leafKeyStr;
+
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const k of autoExpandPath) next.add(nodeKeyToString(k));
+      next.add(rootKeyStr);
+      return next;
+    });
+
+    // after paint, scroll to the leaf
+    requestAnimationFrame(() => {
+      if (pendingKeyRef.current) {
+        scrollToKey(pendingKeyRef.current);
+        pendingKeyRef.current = null;
+      }
+      onAutoExpandConsumed?.();
+    });
+  }, [autoExpandPath, onAutoExpandConsumed, rootKeyStr, scrollToKey]);
+
+  const rootOpen = isExpandedKey(rootKey);
 
   return (
     <div className="p-4 tree-container">
-      <TreeNodeView
-        selection={root}
+      <Row
+        selection={rootSelection}
         selected={selected}
         onSelect={onSelect}
-        level={0}
         isOpen={rootOpen}
         onToggle={toggle}
         isExpandedKey={isExpandedKey}
+        level={0}
       />
     </div>
   );
