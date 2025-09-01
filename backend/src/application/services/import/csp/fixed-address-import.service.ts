@@ -18,6 +18,7 @@ import {
   mapDhcpOptionToEntity,
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import type { CspFixedAddressDto } from '@/domain/dto/csp/fixed-address.dto';
 
 type InterruptibleImportOptions = {
@@ -148,23 +149,12 @@ export class CspFixedAddressImportService {
 
       // --- DHCP options ---
       await this.dhcpOptionRepo.delete({ fixedAddressId: fixed.id });
-      if (Array.isArray(dto.dhcp_options) && dto.dhcp_options.length > 0) {
-        const validOptions = dto.dhcp_options.filter(
-          (
-            opt,
-          ): opt is {
-            group?: string | null;
-            option_code: string;
-            option_value: string;
-            type: string;
-          } =>
-            !!opt &&
-            typeof opt.option_code === 'string' &&
-            typeof opt.option_value === 'string' &&
-            typeof opt.type === 'string' &&
-            opt.type !== 'group',
-        );
-        const dhcpOptionEntities = validOptions.map((opt) =>
+      {
+        const normalized = normalizeAndDedupeDhcpOptions(
+          dto.dhcp_options ?? [],
+        ).filter((o) => o.type !== 'group');
+
+        const dhcpOptionEntities = normalized.map((opt) =>
           this.dhcpOptionRepo.create({
             ...mapDhcpOptionToEntity<FixedDhcpOption>(
               {
@@ -192,56 +182,19 @@ export class CspFixedAddressImportService {
         fixedAddressId: fixed.id,
       });
 
-      let groupKeys = Array.isArray(dto.dhcp_options)
-        ? dto.dhcp_options
-            .map((opt) =>
-              typeof opt.group === 'string'
-                ? this.encodingSanitizer.sanitize(
-                    opt.group.trim().toLowerCase(),
-                  )
-                : null,
-            )
-            .filter((g): g is string => !!g)
-        : [];
-      groupKeys = Array.from(new Set(groupKeys));
-
       const foundGroups = resolveOptionGroupsFromOptions(
-        dto.dhcp_options?.map((opt) => ({
-          ...opt,
-          group:
-            typeof opt.group === 'string'
-              ? this.encodingSanitizer.sanitize(opt.group)
-              : opt.group,
-        })),
+        normalizeAndDedupeDhcpOptions(
+          (dto.dhcp_options ?? []).map((opt) => ({
+            ...opt,
+            group:
+              typeof opt.group === 'string'
+                ? this.encodingSanitizer.sanitize(opt.group)
+                : opt.group,
+          })),
+        ),
         optionGroupMap,
         null,
       );
-
-      let resolveLog = '';
-      let logCount = 0;
-      for (const groupKey of groupKeys) {
-        const og =
-          optionGroupMap.get(groupKey) ||
-          optionGroupMap.get(groupKey.replace(/^dhcp\/option_group\//, '')) ||
-          Array.from(optionGroupMap.values()).find(
-            (g) =>
-              g.externalId?.trim().toLowerCase() === groupKey ||
-              g.name?.trim().toLowerCase() === groupKey,
-          );
-        if (logCount < 3) {
-          if (og) {
-            resolveLog += `  ✔ [${fixed.address}] groupKey='${groupKey}' -> OptionGroup='${og.name}' (id=${og.id})\n`;
-          } else {
-            resolveLog += `  ✘ [${fixed.address}] groupKey='${groupKey}' -> NOT FOUND\n`;
-          }
-        }
-        logCount++;
-      }
-      if (resolveLog) {
-        this.logger.log(
-          `[OptionGroup-Resolve] FixedAddress: ${fixed.address} (id=${fixed.id})\n${resolveLog}${logCount > 3 ? '  ...' : ''}`,
-        );
-      }
 
       for (const optionGroup of foundGroups) {
         await this.fixedAddressOptionGroupRepo.save(
@@ -251,11 +204,6 @@ export class CspFixedAddressImportService {
             optionGroup,
             optionGroupId: optionGroup.id,
           }),
-        );
-      }
-      if (foundGroups.length === 0 && groupKeys.length > 0) {
-        this.logger.warn(
-          `[NO_MATCH] FixedAddress '${fixed.address}' (ID=${fixed.id}) - no OptionGroups found for: ${groupKeys.join(', ')}`,
         );
       }
 

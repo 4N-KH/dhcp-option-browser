@@ -1,6 +1,6 @@
 import axios from "axios";
 import { AuthCredentialDto } from "../types/dto/auth-credential.dto";
-import { Region } from "../types/enum/region.enum";
+// import { Region } from "../types/enum/region.enum"; // REGION: vorläufig deaktiviert
 
 // Login/credentials API response shape
 export interface AuthResponse {
@@ -79,13 +79,14 @@ export const login = async (
 
 // ---- Save CSP credentials (API key) for current user ----
 export const saveCspCredential = async (
-  apiKey: string,
-  region: Region
+  apiKey: string
+  // , region: Region // REGION: vorläufig deaktiviert
 ): Promise<AuthResponse> => {
   try {
     const response = await axios.post<AuthResponse>(
       `${API_BASE_URL}/credentials/csp`,
-      { apiKey, region },
+      // { apiKey, region }, // REGION: vorläufig deaktiviert
+      { apiKey },
       withAuthHeaders()
     );
     return response.data;
@@ -103,14 +104,15 @@ export const saveCspCredential = async (
   }
 };
 
-// ---- Get CSP credentials for autofill (for a specific region) ----
+// ---- Get CSP credentials for autofill (regionlos) ----
 export const getCspCredential = async (
-  region: Region
+  // region: Region // REGION: vorläufig deaktiviert
 ): Promise<{ apiKey?: string; success: boolean; message?: string }> => {
   try {
     const response = await axios.get<{ apiKey: string }>(
       `${API_BASE_URL}/credentials/csp`,
-      { params: { region }, ...withAuthHeaders() }
+      // { params: { region }, ...withAuthHeaders() } // REGION: vorläufig deaktiviert
+      { ...withAuthHeaders() }
     );
     return { apiKey: response.data.apiKey, success: true };
   } catch (error: unknown) {
@@ -127,14 +129,15 @@ export const getCspCredential = async (
   }
 };
 
-// ---- (Optional) Delete CSP credentials for user+region ----
+// ---- (Optional) Delete CSP credentials (regionlos) ----
 export const deleteCspCredential = async (
-  region: Region
+  // region: Region // REGION: vorläufig deaktiviert
 ): Promise<AuthResponse> => {
   try {
     const response = await axios.delete<AuthResponse>(
       `${API_BASE_URL}/credentials/csp`,
-      { params: { region }, ...withAuthHeaders() }
+      // { params: { region }, ...withAuthHeaders() } // REGION: vorläufig deaktiviert
+      { ...withAuthHeaders() }
     );
     return response.data;
   } catch (error: unknown) {

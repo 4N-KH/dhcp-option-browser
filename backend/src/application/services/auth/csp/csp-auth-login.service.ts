@@ -16,6 +16,7 @@ export interface LoginResult {
 @Injectable()
 export class CspAuthLoginService {
   private readonly logger = new Logger(CspAuthLoginService.name);
+  private readonly defaultRegion = 'EU'; // REGION: temporary default
 
   constructor(
     private readonly verifier: CspApiKeyVerifierService,
@@ -24,25 +25,21 @@ export class CspAuthLoginService {
   ) {}
 
   /* Authenticates a CSP API key and issues a JWT upon success.
-  Token lifetime is determined by the "remember" flag.
-   */
+     Token lifetime is determined by the "remember" flag.
+  */
   async login(
     apiKey: string,
-    region: string,
+    // region: string, // REGION: temporarily disabled (using defaultRegion)
     remember: boolean = false,
   ): Promise<LoginResult> {
-    if (
-      typeof apiKey !== 'string' ||
-      !apiKey ||
-      typeof region !== 'string' ||
-      !region
-    ) {
+    if (typeof apiKey !== 'string' || !apiKey) {
       this.logger.warn('Missing or invalid credentials in login attempt');
       throw new UnauthorizedException('Missing credentials');
     }
 
     await this.validateApiKey(apiKey);
 
+    const region = this.defaultRegion; // REGION: fixed
     const user = await this.getOrCreateUser(apiKey, region);
 
     const expiresIn = remember ? '7d' : '1h';
@@ -52,7 +49,9 @@ export class CspAuthLoginService {
       throw new Error('Missing JWT_SECRET');
     }
 
-    const token = signJwtStrict({ id: user.id, region }, secret, { expiresIn });
+    const token = signJwtStrict({ id: user.id /* , region */ }, secret, {
+      expiresIn,
+    }); // REGION disabled in payload
 
     this.logger.log(
       `Issued JWT for CSP user id=${user.id} (region=${region}, remember=${remember}, expiresIn=${expiresIn})`,
@@ -95,7 +94,7 @@ export class CspAuthLoginService {
   private makeLoginHash(region: string, apiKey: string): string {
     return crypto
       .createHash('sha256')
-      .update(region + ':' + apiKey)
+      .update(`${region}::${apiKey}`)
       .digest('hex');
   }
 }

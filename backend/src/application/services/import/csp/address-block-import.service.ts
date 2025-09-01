@@ -16,6 +16,7 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import { EncodingSanitizer } from '@/application/services/import/transformers/encoding-sanitizer.interface';
 import type { CspAddressBlockDto } from '@/domain/dto/csp/address-block.dto';
 
@@ -182,51 +183,37 @@ export class CspAddressBlockImportService {
           continue;
         }
 
-        if (Array.isArray(dto.dhcp_options)) {
-          const validOptions = dto.dhcp_options.filter(
-            (
-              opt,
-            ): opt is {
-              option_code: string;
-              option_value: string;
-              type: string;
-            } =>
-              !!opt &&
-              typeof opt.option_code === 'string' &&
-              typeof opt.option_value === 'string' &&
-              typeof opt.type === 'string' &&
-              opt.type !== 'group',
-          );
-          for (const opt of validOptions) {
-            checkCancel();
-            if (!block.id) {
-              this.logger.error(
-                `[FATAL] Block entity for option_code=${opt.option_code} on dto.id=${dto.id} is missing id. Skipping.`,
-              );
-              continue;
-            }
-            const abOpt = manager.create(AddressBlockDhcpOption, {
-              ...mapDhcpOptionToEntity<AddressBlockDhcpOption>(
-                {
-                  ...opt,
-                  option_code: this.encodingSanitizer.sanitize(opt.option_code),
-                  option_value: this.encodingSanitizer.sanitize(
-                    opt.option_value,
-                  ),
-                },
-                optionCodeMap,
-              ),
-              addressBlock: block,
-              addressBlockId: block.id,
-            });
-            if (!abOpt.addressBlockId) {
-              this.logger.error(
-                `[FATAL] Created AddressBlockDhcpOption without addressBlockId (option_code=${opt.option_code}, dto.id=${dto.id}). Skipping.`,
-              );
-              continue;
-            }
-            await manager.save(abOpt);
+        const normalized = normalizeAndDedupeDhcpOptions(
+          dto.dhcp_options ?? [],
+        ).filter((o) => o.type !== 'group');
+
+        for (const opt of normalized) {
+          checkCancel();
+          if (!block.id) {
+            this.logger.error(
+              `[FATAL] Block entity for option_code=${opt.option_code} on dto.id=${dto.id} is missing id. Skipping.`,
+            );
+            continue;
           }
+          const abOpt = manager.create(AddressBlockDhcpOption, {
+            ...mapDhcpOptionToEntity<AddressBlockDhcpOption>(
+              {
+                ...opt,
+                option_code: this.encodingSanitizer.sanitize(opt.option_code),
+                option_value: this.encodingSanitizer.sanitize(opt.option_value),
+              },
+              optionCodeMap,
+            ),
+            addressBlock: block,
+            addressBlockId: block.id,
+          });
+          if (!abOpt.addressBlockId) {
+            this.logger.error(
+              `[FATAL] Created AddressBlockDhcpOption without addressBlockId (option_code=${opt.option_code}, dto.id=${dto.id}). Skipping.`,
+            );
+            continue;
+          }
+          await manager.save(abOpt);
         }
       }
 
@@ -236,22 +223,8 @@ export class CspAddressBlockImportService {
         const block = blockMap.get(dto.id);
         if (!block || !block.id) continue;
 
-        // Keys aus Options extrahieren (nur Logging)
-        let groupKeys = Array.isArray(dto.dhcp_options)
-          ? dto.dhcp_options
-              .map((opt) =>
-                typeof opt.group === 'string'
-                  ? this.encodingSanitizer.sanitize(
-                      opt.group.trim().toLowerCase(),
-                    )
-                  : null,
-              )
-              .filter((g): g is string => !!g)
-          : [];
-        groupKeys = Array.from(new Set(groupKeys));
-
         const foundGroups = resolveOptionGroupsFromOptions(
-          dto.dhcp_options,
+          normalizeAndDedupeDhcpOptions(dto.dhcp_options ?? []),
           optionGroupMap,
           null,
         );

@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { Module, Logger } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 
@@ -38,11 +38,16 @@ import { OptionValuesService } from './application/services/option-hierarchy/csp
 import { OptionValueEffectivenessService } from './application/services/option-hierarchy/csp/option-value-effectiveness.service';
 import { OptionValueExplicitService } from './application/services/option-hierarchy/csp/option-value-explicit.service';
 
-// --- Redundancy Report ---
-import { RedundancyReportController } from './controller/redundancy-report.controller';
-import { RedundancyReportService } from './application/services/option-hierarchy/csp/redundancy-report.service';
+// --- Redundancy Overview ---
+import { RedundancyOverviewController } from './controller/redundancy-overview.controller';
+import { RedundancyOverviewService } from './application/services/option-hierarchy/csp/redundancy-overview.service';
 
-// --- Import Services ---
+// --- Option Group Overview ---
+import { OptionGroupOverviewController } from './controller/option-group-overview.controller';
+import { OptionGroupOverviewService } from './application/services/option-hierarchy/csp/option-group-overview.service';
+import { OptionGroupOverviewRepository } from './infrastructure/database/csp/option-group-overview.repository';
+
+// --- Import Services & Orchestrator ---
 import { DhcpCspImportOrchestratorService } from './application/services/import/csp/dhcp-import-orchestrator.service';
 import { CspSubnetImportService } from './application/services/import/csp/subnet-import.service';
 import { CspOptionGroupImportService } from './application/services/import/csp/option-group-import.service';
@@ -99,7 +104,6 @@ import {
   RangeDhcpOptionRepository,
   FixedDhcpOptionRepository,
 } from './infrastructure/database/csp';
-
 import { AllDhcpOptionAssignmentRepository } from './infrastructure/database/csp/all-dhcp-option-assignment.repository';
 
 // --- EFFECTIVE STACK SERVICES ---
@@ -110,7 +114,6 @@ import { OptionGroupsLoader } from './application/services/option-hierarchy/csp/
 import { OptionStackAssemblerService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/option-stack-assembler-orchestrator.service';
 import { StackBuilderService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/stack-builder.service';
 import { SlimDtoFactoryService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/slim-dto-factory.service';
-
 import { OptionInheritanceStackEntryFactory } from './application/services/option-hierarchy/csp/option-stack-entry.factory';
 import { OptionGroupMetaFactory } from './application/services/option-hierarchy/csp/option-group-meta.factory';
 import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp/dhcp-option-raw.mapper';
@@ -119,46 +122,78 @@ import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp
 import { EncodingSanitizer } from './application/services/import/transformers/encoding-sanitizer.interface';
 import { DefaultEncodingSanitizerService } from './application/services/import/transformers/default-encoding-sanitizer.service';
 
+// --- NEW: Use-Case & Repository-Port/Adapter ---
+import { StartFullImportUseCase } from './application/use-cases/start-full-import.usecase';
+import { InMemoryImportJobRepositoryAdapter } from './infrastructure/repositories/inmemory-import-job.repository.adapter';
+
+// --- NEW: Tokens & Config for orchestrated steps ---
+import {
+  IMPORT_CONFIG,
+  IMPORT_STEPS,
+} from './application/services/import/tokens';
+import { DefaultImportConfig } from './infrastructure/config/default-import.config';
+
+// --- Types for step wiring ---
+import { ImportStepPort } from './domain/ports/import-step.port';
+
+// --- NEW: Performance Indexes Service ---
+import { CreatePerformanceIndexesService } from './application/services/maintenance/create-performance-indexes.service';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     HttpModule,
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: +(process.env.DB_PORT || 5432),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      entities: [
-        CspCredentialEntity,
-        UserEntity,
-        AddressBlock,
-        AddressBlockDhcpOption,
-        AddressBlockOptionGroup,
-        Subnet,
-        SubnetDhcpOption,
-        SubnetOptionGroup,
-        Range,
-        RangeDhcpOption,
-        RangeExclusion,
-        RangeOptionGroup,
-        OptionGroup,
-        OptionGroupDhcpOption,
-        OptionCodeEntity,
-        OptionSpace,
-        OptionFilter,
-        IpSpace,
-        IpSpaceDhcpOption,
-        IpSpaceOptionGroup,
-        DhcpGlobalConfig,
-        DhcpGlobalConfigOption,
-        DhcpGlobalConfigOptionGroup,
-        FixedAddress,
-        FixedDhcpOption,
-        FixedAddressOptionGroup,
-      ],
-      synchronize: true,
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const logger = new Logger('TypeORM');
+        const host = config.get<string>('DB_HOST');
+        const port = Number(config.get('DB_PORT') || 5432);
+        const username = config.get<string>('DB_USERNAME');
+        const database = config.get<string>('DB_NAME');
+        const password = String(config.get('DB_PASSWORD') ?? '');
+        logger.log(
+          `Initialising TypeORM (host=${host}, port=${port}, db=${database}, user=${username}, password=[hidden])`,
+        );
+
+        return {
+          type: 'postgres',
+          host,
+          port,
+          username,
+          password,
+          database,
+          entities: [
+            CspCredentialEntity,
+            UserEntity,
+            AddressBlock,
+            AddressBlockDhcpOption,
+            AddressBlockOptionGroup,
+            Subnet,
+            SubnetDhcpOption,
+            SubnetOptionGroup,
+            Range,
+            RangeDhcpOption,
+            RangeExclusion,
+            RangeOptionGroup,
+            OptionGroup,
+            OptionGroupDhcpOption,
+            OptionCodeEntity,
+            OptionSpace,
+            OptionFilter,
+            IpSpace,
+            IpSpaceDhcpOption,
+            IpSpaceOptionGroup,
+            DhcpGlobalConfig,
+            DhcpGlobalConfigOption,
+            DhcpGlobalConfigOptionGroup,
+            FixedAddress,
+            FixedDhcpOption,
+            FixedAddressOptionGroup,
+          ],
+          synchronize: true,
+        };
+      },
     }),
     TypeOrmModule.forFeature([
       CspCredentialEntity,
@@ -198,9 +233,11 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     CspLightTreeController,
     EffectiveDhcpOptionStackController,
     OptionOverviewController,
-    RedundancyReportController, // ✅ Neu registriert!
+    RedundancyOverviewController,
+    OptionGroupOverviewController,
   ],
   providers: [
+    // Auth / API / Shared
     CredentialCspService,
     GridAuthProvider,
     CspAuthProvider,
@@ -211,6 +248,7 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     CspDataClient,
     ApiConfigService,
 
+    // Import Services
     DhcpCspImportOrchestratorService,
     CspSubnetImportService,
     CspOptionGroupImportService,
@@ -225,8 +263,8 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     CspOptionSpaceImportService,
     CspOptionFilterImportService,
 
+    // Hierarchy / Repositories
     GlobalLightTreeLoaderService,
-
     GlobalConfigOptionRepository,
     IpSpaceDhcpOptionRepository,
     AddressBlockDhcpOptionRepository,
@@ -235,6 +273,7 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     FixedDhcpOptionRepository,
     AllDhcpOptionAssignmentRepository,
 
+    // Effective Stack
     EffectiveDhcpOptionStackService,
     ContextChainBuilder,
     ExplicitOptionsLoader,
@@ -246,18 +285,98 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
     OptionGroupMetaFactory,
     DhcpOptionRawMapper,
 
+    // Option / Redundancy Overview
     OptionOverviewService,
     OptionValuesService,
     OptionValueEffectivenessService,
     OptionValueExplicitService,
+    RedundancyOverviewService,
+    OptionGroupOverviewService,
+    OptionGroupOverviewRepository,
 
-    RedundancyReportService, // ✅ Neu registriert!
-
-    DefaultEncodingSanitizerService,
+    // Use-Case & Repo Binding
+    StartFullImportUseCase,
+    InMemoryImportJobRepositoryAdapter,
     {
-      provide: EncodingSanitizer,
-      useClass: DefaultEncodingSanitizerService,
+      provide: 'ImportJobRepositoryPort',
+      useClass: InMemoryImportJobRepositoryAdapter,
     },
+
+    // Import Config & Steps
+    { provide: IMPORT_CONFIG, useClass: DefaultImportConfig },
+    {
+      provide: IMPORT_STEPS,
+      useFactory: (
+        optionSpace: CspOptionSpaceImportService,
+        optionCode: CspOptionCodeImportService,
+        optionGroup: CspOptionGroupImportService,
+        optionGroupDhcp: CspOptionGroupDhcpOptionImportService,
+        globalConfig: CspGlobalConfigImportService,
+        configProfiles: CspConfigProfileImportService,
+        ipSpaces: CspIpSpaceImportService,
+        addressBlocks: CspAddressBlockImportService,
+        subnets: CspSubnetImportService,
+        ranges: CspRangeImportService,
+        fixedAddresses: CspFixedAddressImportService,
+      ): ReadonlyArray<ImportStepPort> => {
+        const step = (
+          name: string,
+          fn: (args: {
+            onProgress?: (current: number, total: number) => void;
+            isCancelled?: () => boolean;
+          }) => Promise<unknown>,
+        ): ImportStepPort => ({
+          name,
+          run: async (args) => {
+            await fn(args);
+          },
+        });
+
+        return [
+          step('optionSpaces', (args) => optionSpace.importOptionSpaces(args)),
+          step('optionCodes', (args) => optionCode.importOptionCodes(args)),
+          step('optionGroups', (args) => optionGroup.importOptionGroups(args)),
+          step('optionGroupDhcpOptions', (args) =>
+            optionGroupDhcp.importOptionGroupDhcpOptions(args),
+          ),
+          step('globalConfig', (args) =>
+            globalConfig.importGlobalDhcpConfig(args),
+          ),
+          step('configProfiles', (args) =>
+            configProfiles.importConfigProfiles(args),
+          ),
+          step('ipSpaces', (args) => ipSpaces.importIpSpaces(args)),
+          step('addressBlocks', (args) =>
+            addressBlocks.importAddressBlocks(args),
+          ),
+          step('subnets', (args) => subnets.importSubnets(args)),
+          step('ranges', (args) => ranges.importRanges(args)),
+          step('fixedAddresses', (args) =>
+            fixedAddresses.importFixedAddresses(args),
+          ),
+        ];
+      },
+      inject: [
+        CspOptionSpaceImportService,
+        CspOptionCodeImportService,
+        CspOptionGroupImportService,
+        CspOptionGroupDhcpOptionImportService,
+        CspGlobalConfigImportService,
+        CspConfigProfileImportService,
+        CspIpSpaceImportService,
+        CspAddressBlockImportService,
+        CspSubnetImportService,
+        CspRangeImportService,
+        CspFixedAddressImportService,
+      ],
+    },
+
+    // Sanitizer
+    DefaultEncodingSanitizerService,
+    { provide: EncodingSanitizer, useClass: DefaultEncodingSanitizerService },
+
+    // NEW: Performance Indexes at startup
+    CreatePerformanceIndexesService,
   ],
 })
 export class AppModule {}

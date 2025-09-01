@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { loginSchema } from "../logic/login.schema";
 import { AuthMode } from "@/types/enum/auth-mode.enum";
-import { Region } from "@/types/enum/region.enum";
+// import { Region } from "@/types/enum/region.enum";
 import AuthModeTabs from "../components/AuthModeTabs";
 import GridLoginFields from "../components/GridLoginFields";
 import CspLoginFields from "../components/CspLoginFields";
@@ -29,7 +29,6 @@ interface LoginFormProps {
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
-  // Initialise form with react-hook-form and Zod schema validation
   const {
     register,
     handleSubmit,
@@ -45,13 +44,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
       username: "",
       password: "",
       apiKey: "",
-      region: Region.EU,
+      // region: Region.EU,
       remember: false,
       ...initialValues, // Autofill if provided
     },
   });
 
-  // Ensure autofill applies if initialValues change
   useEffect(() => {
     if (initialValues) {
       reset({
@@ -59,7 +57,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
         username: initialValues.username ?? "",
         password: initialValues.password ?? "",
         apiKey: initialValues.apiKey ?? "",
-        region: initialValues.region ?? Region.EU,
+        // region: initialValues.region ?? Region.EU,
         remember: initialValues.remember ?? false,
       });
     }
@@ -69,19 +67,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
   const formUtils: FormUtils = { watch, setValue };
 
   const mode = watch("mode");
-  const region = watch("region") ?? Region.EU;
+  // const region = watch("region") ?? Region.EU;
   const remember = watch("remember");
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Set focus to the first field when mode changes
   useEffect(() => {
     firstInputRef.current?.focus();
   }, [mode]);
 
-  // Handles form submission, including secure credential storage for CSP
   const onSubmit = async (data: LoginFormData) => {
+    // CSP: optionales Speichern — ohne Region
     if (mode === AuthMode.CSP && remember && data.apiKey) {
-      const saveResult = await saveCspCredential(data.apiKey, region);
+      const saveResult = await saveCspCredential(data.apiKey /* , region */);
       if (!saveResult.success) {
         alert(saveResult.message || "Could not save CSP credentials.");
         return;
@@ -96,14 +93,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-8 font-sans transition-all duration-300"
-    >
-      {/* Authentication mode selection */}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <AuthModeTabs selectedMode={mode} onSelect={(m) => setValue("mode", m)} />
 
-      {/* Render input fields based on mode */}
       {mode === AuthMode.GRID && (
         <GridLoginFields
           register={register}
@@ -117,19 +109,17 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
         <CspLoginFields
           register={register}
           errors={errors}
-          region={region}
+          // region={region} // REGION: vorläufig deaktiviert
           inputRef={firstInputRef}
           formUtils={formUtils}
         />
       )}
 
-      {/* Remember me and submit button */}
       <div className="pt-4 flex items-center justify-between">
         <RememberCheckbox
           checked={remember}
           onChange={(e) => setValue("remember", e.target.checked)}
         />
-
         <button
           type="submit"
           disabled={!isValid || isSubmitting}
@@ -144,7 +134,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
         </button>
       </div>
 
-      {/* Display root-level errors */}
       {errors.root && (
         <p className="text-sm text-red-600 mt-3 text-center">
           {errors.root.message}

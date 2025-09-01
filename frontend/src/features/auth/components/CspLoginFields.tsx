@@ -1,7 +1,7 @@
-// Renders CSP login fields: Region selector and secure API key input
+// Renders CSP login fields: (Region selector temporarily disabled) and secure API Key input
 import React, { useState } from "react";
 import { FieldErrors, UseFormRegister } from "react-hook-form";
-import { Region } from "@/types/enum/region.enum";
+// import { Region } from "@/types/enum/region.enum"; // REGION: temporarily disabled
 import { LoginFormData } from "../forms/LoginForm";
 import ShowHideToggleButton from "./ShowHideToggleButton";
 import { FormUtils } from "../forms/LoginForm";
@@ -10,7 +10,7 @@ import { FormUtils } from "../forms/LoginForm";
 interface Props {
   errors: FieldErrors<LoginFormData>;
   register: UseFormRegister<LoginFormData>;
-  region: Region;
+  // region: Region; // REGION: temporarily disabled
   inputRef: React.RefObject<HTMLInputElement | null>;
   formUtils: FormUtils;
 }
@@ -18,17 +18,17 @@ interface Props {
 const CspLoginFields: React.FC<Props> = ({
   register,
   errors,
-  region,
+  // region, // REGION: temporarily disabled
   inputRef,
   formUtils,
 }) => {
   const [showApiKey, setShowApiKey] = useState(false);
-  // current API key value, fallback to empty string
   const apiKeyValue = formUtils.watch("apiKey") ?? "";
 
   return (
     <div className="space-y-8 pt-6">
-      {/* Region selector */}
+      {/* Region selector (temporarily disabled) */}
+      {/*
       <div className="space-y-2">
         <label className="block text-sm font-semibold uppercase tracking-wider text-[var(--foreground)] mb-1">
           Region
@@ -54,6 +54,7 @@ const CspLoginFields: React.FC<Props> = ({
           })}
         </div>
       </div>
+      */}
 
       {/* API key input */}
       <div className="space-y-2">

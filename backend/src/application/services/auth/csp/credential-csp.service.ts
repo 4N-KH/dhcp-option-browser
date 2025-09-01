@@ -7,7 +7,6 @@ import {
   decrypt,
   EncryptedPayload,
 } from '@/shared/parser/credential-encryptor';
-import { Region } from '@/domain/enums/csp/region.enum';
 
 @Injectable()
 export class CredentialCspService {
@@ -16,30 +15,30 @@ export class CredentialCspService {
     private readonly credentialRepo: Repository<CspCredentialEntity>,
   ) {}
 
-  // Stores an encrypted API key for a user and region
+  // Store or update encrypted API key for a user
   async saveCredential(
     userId: string,
-    region: Region,
     apiKey: string,
   ): Promise<CspCredentialEntity> {
     const payload: EncryptedPayload = encrypt(apiKey);
-    // Create and save entity
-    const entity = this.credentialRepo.create({
-      userId,
-      region,
-      encryptedApiKey: payload.encrypted,
-      iv: payload.iv,
-      tag: payload.tag,
-    });
+
+    // Upsert by userId
+    let entity = await this.credentialRepo.findOne({ where: { userId } });
+    if (!entity) {
+      entity = this.credentialRepo.create({ userId, region: null });
+    }
+    entity.encryptedApiKey = payload.encrypted;
+    entity.iv = payload.iv;
+    entity.tag = payload.tag;
+
     return this.credentialRepo.save(entity);
   }
 
-  // Retrieves and decrypts the API key for a user and region
-  async getCredential(userId: string, region: Region): Promise<string | null> {
-    const entity = await this.credentialRepo.findOne({
-      where: { userId, region },
-    });
+  // Retrieve and decrypt the API key by userId
+  async getCredential(userId: string): Promise<string | null> {
+    const entity = await this.credentialRepo.findOne({ where: { userId } });
     if (!entity) return null;
+
     const payload: EncryptedPayload = {
       encrypted: entity.encryptedApiKey,
       iv: entity.iv,
@@ -48,8 +47,8 @@ export class CredentialCspService {
     return decrypt(payload);
   }
 
-  // Deletes credentials for a user and region
-  async deleteCredential(userId: string, region: Region): Promise<void> {
-    await this.credentialRepo.delete({ userId, region });
+  // Delete credentials by userId
+  async deleteCredential(userId: string): Promise<void> {
+    await this.credentialRepo.delete({ userId });
   }
 }

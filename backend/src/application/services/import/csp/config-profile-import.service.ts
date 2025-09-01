@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CspDataClient } from '@/infrastructure/api-clients/csp/data.client';
 import { CspConfigProfileDto } from '@/domain/dto/csp/config-profile.dto';
-import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
 type InterruptibleImportOptions = {
@@ -54,13 +54,15 @@ export class CspConfigProfileImportService {
         comment: profile.comment
           ? this.encodingSanitizer.sanitize(profile.comment)
           : undefined,
-        dhcp_options: normalizeDhcpOptions(profile.dhcp_options).map((opt) => ({
-          ...opt,
-          option_value:
-            typeof opt.option_value === 'string'
-              ? this.encodingSanitizer.sanitize(opt.option_value)
-              : opt.option_value,
-        })),
+        dhcp_options: normalizeAndDedupeDhcpOptions(profile.dhcp_options).map(
+          (opt) => ({
+            ...opt,
+            option_value:
+              typeof opt.option_value === 'string'
+                ? this.encodingSanitizer.sanitize(opt.option_value)
+                : opt.option_value,
+          }),
+        ),
       };
       profiles.push(normalisedProfile);
 

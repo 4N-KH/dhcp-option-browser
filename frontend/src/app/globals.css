@@ -31,20 +31,35 @@
 }
 
 /* Base styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   position: relative;
   z-index: 0;
+
+  /* visual stability */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Subtle overlays */
 body::before {
   content: "";
-  background: 
+  background:
     radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 55%),
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.07) 0%, transparent 60%), 
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.07) 0%, transparent 60%),
     radial-gradient(circle at 70% 70%, rgba(255,255,255,0.04) 0%, transparent 60%);
   background-size: cover;
   opacity: 0.05;
@@ -53,4 +68,44 @@ body::before {
   z-index: 0;
   pointer-events: none;
   mix-blend-mode: overlay;
+}
+
+/* ------------------------ Tree stability helpers ------------------------ */
+
+/* Wrapping the tree pane with this */
+.tree-container {
+  overflow-y: scroll;                  /* stable scrollbar, no layout jump */
+  scrollbar-gutter: stable both-edges; /* reserve gutter */
+  contain: layout paint;               /* isolate layout/paint */
+  backface-visibility: hidden;         /* reduce subpixel jitter */
+  transform: translateZ(0);            /* GPU hint */
+  overscroll-behavior: contain;        /* avoid bounce */
+}
+
+/* Pixel-stable rows */
+.tree-row {
+  line-height: 1.25rem;  /* 20px */
+  min-height: 1.75rem;   /* breathing room (28px) */
+  white-space: nowrap;   /* no wrap */
+}
+
+/* No baseline shift for SVGs */
+.tree-row svg {
+  display: block;
+}
+
+/* Fixed width for toggle/icon placeholders */
+.tree-row .w-5,
+.tree-row .h-5 {
+  flex: 0 0 20px;
+}
+
+/* hover without layout shift */
+.tree-row button {
+  border-width: 0;
+}
+
+/* Consistent separators */
+.tree-row + .tree-row {
+  border-top: 0 solid transparent; /* placeholder: no theme jump */
 }

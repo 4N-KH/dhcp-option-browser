@@ -17,6 +17,7 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import type { CspRangeDto } from '@/domain/dto/csp/range.dto';
 
 type InterruptibleImportOptions = {
@@ -126,23 +127,12 @@ export class CspRangeImportService {
 
       // DHCP options
       await this.dhcpOptionRepo.delete({ rangeId: range.id });
-      if (Array.isArray(dto.dhcp_options) && dto.dhcp_options.length > 0) {
-        const validOptions = dto.dhcp_options.filter(
-          (
-            opt,
-          ): opt is {
-            group?: string | null;
-            option_code: string;
-            option_value: string;
-            type: string;
-          } =>
-            !!opt &&
-            typeof opt.option_code === 'string' &&
-            typeof opt.option_value === 'string' &&
-            typeof opt.type === 'string' &&
-            opt.type !== 'group',
-        );
-        const dhcpOptionEntities = validOptions.map((opt) =>
+      {
+        const normalized = normalizeAndDedupeDhcpOptions(
+          dto.dhcp_options ?? [],
+        ).filter((o) => o.type !== 'group');
+
+        const dhcpOptionEntities = normalized.map((opt) =>
           this.dhcpOptionRepo.create({
             ...mapDhcpOptionToEntity<RangeDhcpOption>(opt, optionCodeMap),
             range,
@@ -155,19 +145,9 @@ export class CspRangeImportService {
 
       // OptionGroups
       await this.rangeOptionGroupRepo.delete({ rangeId: range.id });
-      let groupKeys = Array.isArray(dto.dhcp_options)
-        ? dto.dhcp_options
-            .map((opt) =>
-              typeof opt.group === 'string'
-                ? opt.group.trim().toLowerCase()
-                : null,
-            )
-            .filter((g): g is string => !!g)
-        : [];
-      groupKeys = Array.from(new Set(groupKeys));
 
       const foundGroups = resolveOptionGroupsFromOptions(
-        dto.dhcp_options,
+        normalizeAndDedupeDhcpOptions(dto.dhcp_options ?? []),
         optionGroupMap,
         null,
       );
@@ -179,11 +159,6 @@ export class CspRangeImportService {
             optionGroup,
             optionGroupId: optionGroup.id,
           }),
-        );
-      }
-      if (foundGroups.length === 0 && groupKeys.length > 0) {
-        this.logger.warn(
-          `[NO_MATCH] Range '${range.start} - ${range.end}' (ID=${range.id}) - no OptionGroups found for: ${groupKeys.join(', ')}`,
         );
       }
 

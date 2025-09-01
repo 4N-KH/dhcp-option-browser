@@ -4,8 +4,74 @@ import { OptionGroupMetaFactory } from '@/application/services/option-hierarchy/
 import { OptionInheritanceStackEntryDto } from '@/domain/dto/csp/effective-dhcp-option-stack.dto';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { DhcpOptionRaw } from '../dhcp-option-raw.type';
-import type { ContextObj } from './types/context-obj.type'; // **Robust typisiert!**
+import type { ContextObj } from './types/context-obj.type';
 import { GroupStatus } from './helpers/group-status.helper';
+
+/** --- Safe access helpers (no `any`, no unsafe member access) --- */
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function getStrField(
+  obj: unknown,
+  primary: string,
+  fallback?: string,
+  defaultValue = '',
+): string {
+  if (!isRecord(obj)) return defaultValue;
+
+  if (primary in obj) {
+    const v: unknown = obj[primary];
+    if (typeof v === 'string') return v;
+  }
+  if (fallback && fallback in obj) {
+    const v: unknown = obj[fallback];
+    if (typeof v === 'string') return v;
+  }
+  return defaultValue;
+}
+
+function getNullableStrField(
+  obj: unknown,
+  primary: string,
+  fallback?: string,
+): string | null {
+  if (!isRecord(obj)) return null;
+
+  if (primary in obj) {
+    const v: unknown = obj[primary];
+    if (typeof v === 'string') return v;
+    if (v === null) return null;
+  }
+  if (fallback && fallback in obj) {
+    const v: unknown = obj[fallback];
+    if (typeof v === 'string') return v;
+    if (v === null) return null;
+  }
+  return null;
+}
+
+function codeOf(o: unknown): string {
+  return getStrField(o, 'code', 'option_code', '');
+}
+function valueOf(o: unknown): string | null {
+  return getNullableStrField(o, 'value', 'option_value');
+}
+function typeOf(o: unknown): string {
+  return getStrField(o, 'type', undefined, '');
+}
+
+function dedupeOptionList(list: DhcpOptionRaw[]): DhcpOptionRaw[] {
+  const seen = new Set<string>();
+  const out: DhcpOptionRaw[] = [];
+  for (const o of list ?? []) {
+    const key = [codeOf(o), String(valueOf(o) ?? ''), typeOf(o)].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(o);
+  }
+  return out;
+}
 
 @Injectable()
 export class StackBuilderService {
@@ -24,32 +90,56 @@ export class StackBuilderService {
     const allCodes = new Set<string>();
     const groupStatus = new Map<number, GroupStatus>();
 
-    // Codes und Gruppenstatus initial sammeln
-    for (let i = 0; i < contexts.length; ++i) {
-      const ctx = contexts[i];
-      ctx.options.forEach((opt) =>
-        allCodes.add(String(opt.code ?? opt.option_code)),
-      );
-      ctx.optionGroups.forEach((groupObj) => {
-        groupObj.options.forEach((opt) =>
-          allCodes.add(String(opt.code ?? opt.option_code)),
-        );
+    // 1) defensiv bereinigen & Codes/Gruppenstatus sammeln
+    const contextsClean: ContextObj[] = contexts.map((ctx) => {
+      const cleanGroups: { group: OptionGroup; options: DhcpOptionRaw[] }[] =
+        [];
+      const seenGroupIds = new Set<number>();
+      for (const g of ctx.optionGroups) {
+        if (!g?.group?.id) continue;
+        if (seenGroupIds.has(g.group.id)) continue;
+        seenGroupIds.add(g.group.id);
+        cleanGroups.push({
+          group: g.group,
+          options: dedupeOptionList(g.options ?? []),
+        });
+      }
+      const options = dedupeOptionList(ctx.options ?? []);
+      // Codes einsammeln
+      options.forEach((opt) => allCodes.add(codeOf(opt)));
+      cleanGroups.forEach((groupObj) => {
+        groupObj.options.forEach((opt) => allCodes.add(codeOf(opt)));
         if (
           groupObj.options.length > 0 &&
           !groupStatus.has(groupObj.group.id)
         ) {
           groupStatus.set(groupObj.group.id, {
             group: groupObj.group,
-            explicitAt: i,
+            explicitAt: 0, // Platzhalter, setzen wir gleich korrekt
           });
         }
       });
+      return { ...ctx, options, optionGroups: cleanGroups };
+    });
+
+    // explicitAt korrekt setzen (wir kennen jetzt die Indizes)
+    for (let i = 0; i < contextsClean.length; ++i) {
+      for (const groupObj of contextsClean[i].optionGroups) {
+        if (
+          groupObj.options.length > 0 &&
+          groupObj.group?.id !== undefined &&
+          groupStatus.has(groupObj.group.id)
+        ) {
+          const s = groupStatus.get(groupObj.group.id)!;
+          if (s.explicitAt === 0) s.explicitAt = i;
+        }
+      }
     }
 
-    // Gruppen, die später überschrieben werden, tracken
+    // 2) Gruppen, die später überschrieben werden, tracken
     for (const [groupId, stat] of groupStatus.entries()) {
-      for (let j = stat.explicitAt + 1; j < contexts.length; ++j) {
-        const nextCtx = contexts[j];
+      for (let j = stat.explicitAt + 1; j < contextsClean.length; ++j) {
+        const nextCtx = contextsClean[j];
         const existsExplicit = nextCtx.optionGroups.some(
           (g) => g.group.id === groupId && g.options.length > 0,
         );
@@ -60,15 +150,15 @@ export class StackBuilderService {
       }
     }
 
-    // Gruppen in nachfolgenden Kontexten als inherited sichtbar machen
-    for (const [groupId, stat] of groupStatus.entries()) {
-      for (let i = stat.explicitAt + 1; i < contexts.length; ++i) {
-        const ctx = contexts[i];
+    // 3) Gruppen in nachfolgenden Kontexten als "inherited" sichtbar machen
+    for (const [, stat] of groupStatus.entries()) {
+      for (let i = stat.explicitAt + 1; i < contextsClean.length; ++i) {
+        const ctx = contextsClean[i];
         const alreadyExplicit = ctx.optionGroups.some(
-          (g) => g.group.id === groupId && g.options.length > 0,
+          (g) => g.group.id === stat.group.id && g.options.length > 0,
         );
         const alreadyInherited = ctx.optionGroups.some(
-          (g) => g.group.id === groupId && g.options.length === 0,
+          (g) => g.group.id === stat.group.id && g.options.length === 0,
         );
         if (!alreadyExplicit && !alreadyInherited) {
           ctx.optionGroups.push({ group: stat.group, options: [] });
@@ -76,36 +166,37 @@ export class StackBuilderService {
       }
     }
 
-    // Alle Gruppen zusammenstellen
+    // 4) Alle Gruppen zusammenstellen
     const allGroups = new Map<
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
     >();
-    for (let i = 0; i < contexts.length; ++i) {
-      for (const g of contexts[i].optionGroups) {
+    for (let i = 0; i < contextsClean.length; ++i) {
+      for (const g of contextsClean[i].optionGroups) {
         if (!allGroups.has(g.group.id)) {
           allGroups.set(g.group.id, {
             group: g.group,
             ctxIdx: i,
-            ctx: contexts[i],
+            ctx: contextsClean[i],
           });
         }
       }
     }
 
-    // Für jeden Option-Code den Stack bauen
+    // 5) Für jeden Option-Code den Stack bauen
     const stacks = new Map<string, OptionInheritanceStackEntryDto[]>();
+
     for (const code of allCodes) {
       const stack: OptionInheritanceStackEntryDto[] = [];
       let lastExplicit: OptionInheritanceStackEntryDto | null = null;
       let lastExplicitIdx: number | null = null;
       let lastExplicitGroupId: number | null = null;
 
-      for (let i = 0; i < contexts.length; ++i) {
-        const ctx = contexts[i];
-        const foundOpt = ctx.options.find(
-          (opt) => String(opt.code ?? opt.option_code) === code,
-        );
+      for (let i = 0; i < contextsClean.length; ++i) {
+        const ctx = contextsClean[i];
+
+        // 5a) direkte Option am Kontext
+        const foundOpt = ctx.options.find((opt) => codeOf(opt) === code);
         if (foundOpt) {
           const entry = this.stackEntryFactory.toStackEntry(
             ctx.level,
@@ -115,8 +206,8 @@ export class StackBuilderService {
             false,
             false,
             null,
-            foundOpt.comment ?? null,
-            foundOpt.name ?? null,
+            (foundOpt as { comment?: string | null }).comment ?? null,
+            (foundOpt as { name?: string | null }).name ?? null,
           );
           stack.push(entry);
           lastExplicit = entry;
@@ -124,15 +215,16 @@ export class StackBuilderService {
           lastExplicitGroupId = null;
           continue;
         }
+
+        // 5b) Option via OptionGroup im Kontext
         let groupMeta:
           | ReturnType<OptionGroupMetaFactory['fromEntity']>
           | undefined;
         let foundGroupOpt: DhcpOptionRaw | undefined;
         let foundGroup: OptionGroup | undefined;
+
         for (const groupObj of ctx.optionGroups) {
-          const groupOpt = groupObj.options.find(
-            (opt) => String(opt.code ?? opt.option_code) === code,
-          );
+          const groupOpt = groupObj.options.find((opt) => codeOf(opt) === code);
           if (groupOpt) {
             groupMeta = this.optionGroupMetaFactory.fromEntity(
               groupObj.group,
@@ -145,6 +237,7 @@ export class StackBuilderService {
             break;
           }
         }
+
         if (foundGroupOpt && groupMeta && foundGroup) {
           const entry = this.stackEntryFactory.toStackEntry(
             ctx.level,
@@ -154,8 +247,8 @@ export class StackBuilderService {
             false,
             false,
             groupMeta,
-            foundGroupOpt.comment ?? null,
-            foundGroupOpt.name ?? null,
+            (foundGroupOpt as { comment?: string | null }).comment ?? null,
+            (foundGroupOpt as { name?: string | null }).name ?? null,
           );
           stack.push(entry);
           lastExplicit = entry;
@@ -163,8 +256,13 @@ export class StackBuilderService {
           lastExplicitGroupId = foundGroup.id;
           continue;
         }
+
+        // 5c) ggf. vererben
         if (lastExplicit && lastExplicitIdx !== null) {
           let shouldBeInherited = true;
+
+          // Wenn letzte explizite aus Gruppe kam und die selbe Gruppe
+          // im aktuellen Kontext den Code anders setzt -> kein Inherit
           if (
             lastExplicitGroupId !== null &&
             ctx.optionGroups.some(
@@ -172,8 +270,7 @@ export class StackBuilderService {
                 g.group.id === lastExplicitGroupId &&
                 g.options.some(
                   (o) =>
-                    String(o.code ?? o.option_code) === code &&
-                    o.value !== lastExplicit!.value,
+                    codeOf(o) === code && valueOf(o) !== lastExplicit!.value,
                 ),
             )
           ) {
@@ -182,6 +279,7 @@ export class StackBuilderService {
             lastExplicitIdx = null;
             lastExplicitGroupId = null;
           }
+
           if (shouldBeInherited && lastExplicit) {
             const inherited: OptionInheritanceStackEntryDto = {
               ...lastExplicit,
@@ -199,7 +297,7 @@ export class StackBuilderService {
         }
       }
 
-      // Overridden-Status berechnen
+      // 6) Overridden-Status berechnen
       for (let i = 0; i < stack.length; ++i) {
         const current = stack[i];
         if (!current.isExplicit) {
@@ -207,34 +305,38 @@ export class StackBuilderService {
           current.overriddenBy = undefined;
           continue;
         }
+
         let overridden = false;
-        let overriddenBy: OptionInheritanceStackEntryDto | undefined =
-          undefined;
+        let overriddenBy: OptionInheritanceStackEntryDto | undefined;
+
         for (let j = i + 1; j < stack.length; ++j) {
           const next = stack[j];
-          if (next.isExplicit) {
-            if (!current.optionGroup && !next.optionGroup) {
-              overridden = true;
-              overriddenBy = next;
-              break;
-            }
-            if (
-              current.optionGroup &&
-              next.optionGroup &&
-              current.optionGroup.id === next.optionGroup.id &&
-              (current.level !== next.level || current.levelId !== next.levelId)
-            ) {
-              overridden = true;
-              overriddenBy = next;
-              break;
-            }
+          if (!next.isExplicit) continue;
+
+          if (!current.optionGroup && !next.optionGroup) {
+            overridden = true;
+            overriddenBy = next;
+            break;
+          }
+
+          if (
+            current.optionGroup &&
+            next.optionGroup &&
+            current.optionGroup.id === next.optionGroup.id &&
+            (current.level !== next.level || current.levelId !== next.levelId)
+          ) {
+            overridden = true;
+            overriddenBy = next;
+            break;
           }
         }
+
         current.isOverridden = overridden;
         if (overridden && overriddenBy) {
           let optionGroupMeta:
             | { id: number; name: string; comment?: string | null }
             | undefined;
+
           if (overriddenBy.optionGroup) {
             optionGroupMeta = {
               id: overriddenBy.optionGroup.id,
@@ -242,6 +344,7 @@ export class StackBuilderService {
               comment: overriddenBy.optionGroup.comment ?? null,
             };
           }
+
           current.overriddenBy = {
             level: overriddenBy.level,
             levelId: overriddenBy.levelId,
@@ -252,6 +355,7 @@ export class StackBuilderService {
           current.overriddenBy = undefined;
         }
       }
+
       stacks.set(code, stack);
     }
 

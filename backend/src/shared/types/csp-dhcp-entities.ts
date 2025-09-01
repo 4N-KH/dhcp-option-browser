@@ -1,8 +1,6 @@
-// src/shared/types/csp-dhcp-entities.ts
-
 export interface IpSpaceEntity {
   id: number;
-  name: string; // Niemals optional!
+  name: string;
   comment?: string;
 }
 

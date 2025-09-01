@@ -18,6 +18,7 @@ import {
 } from '@/shared/utils/dhcp-option-mapper.util';
 import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapper.util';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import type { CspSubnetDto } from '@/domain/dto/csp/subnet.dto';
 
 type InterruptibleImportOptions = {
@@ -165,23 +166,12 @@ export class CspSubnetImportService {
 
       await this.subnetDhcpOptionRepo.delete({ subnetId: subnet.id });
 
-      if (Array.isArray(dto.dhcp_options)) {
-        const validOptions = dto.dhcp_options.filter(
-          (
-            opt,
-          ): opt is {
-            group?: string | null;
-            option_code: string;
-            option_value: string;
-            type: string;
-          } =>
-            !!opt &&
-            typeof opt.option_code === 'string' &&
-            typeof opt.option_value === 'string' &&
-            typeof opt.type === 'string' &&
-            opt.type !== 'group',
-        );
-        const entities = validOptions.map((opt) =>
+      {
+        const normalized = normalizeAndDedupeDhcpOptions(
+          dto.dhcp_options ?? [],
+        ).filter((o) => o.type !== 'group');
+
+        const entities = normalized.map((opt) =>
           this.subnetDhcpOptionRepo.create({
             ...mapDhcpOptionToEntity<SubnetDhcpOption>(opt, optionCodeMap),
             subnet,
@@ -205,19 +195,8 @@ export class CspSubnetImportService {
 
       await this.subnetOptionGroupRepo.delete({ subnetId: subnet.id });
 
-      let groupKeys = Array.isArray(dto.dhcp_options)
-        ? dto.dhcp_options
-            .map((opt) =>
-              typeof opt.group === 'string'
-                ? opt.group.trim().toLowerCase()
-                : null,
-            )
-            .filter((g): g is string => !!g)
-        : [];
-      groupKeys = Array.from(new Set(groupKeys));
-
       const foundGroups = resolveOptionGroupsFromOptions(
-        dto.dhcp_options,
+        normalizeAndDedupeDhcpOptions(dto.dhcp_options ?? []),
         optionGroupMap,
         null,
       );

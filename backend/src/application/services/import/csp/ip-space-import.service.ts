@@ -8,7 +8,7 @@ import { IpSpaceDhcpOption } from '@/infrastructure/database/csp/ip-space-dhcp-o
 import { IpSpaceOptionGroup } from '@/infrastructure/database/csp/ip-space-option-group.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
-import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import {
   buildOptionCodeMap,
   mapDhcpOptionToEntity,
@@ -110,7 +110,7 @@ export class CspIpSpaceImportService {
       // Clear old DHCP options for idempotency
       await this.ipSpaceDhcpOptionRepo.delete({ ipSpaceId: entity.id });
 
-      const normalizedOptions = normalizeDhcpOptions(
+      const normalizedOptions = normalizeAndDedupeDhcpOptions(
         dto.dhcp_options ?? [],
       ).filter((opt) => opt.type !== 'group');
 
@@ -137,7 +137,7 @@ export class CspIpSpaceImportService {
 
       // Resolve OptionGroups and create joins
       const foundGroups = resolveOptionGroupsFromOptions(
-        dto.dhcp_options ?? [],
+        normalizeAndDedupeDhcpOptions(dto.dhcp_options ?? []),
         optionGroupMap,
         null,
       );

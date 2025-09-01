@@ -17,43 +17,70 @@ export function getOriginLevelLabel(
   },
 ): string | undefined {
   if (!originLevel || originLevelId == null) return undefined;
+
+  // Global bleibt ausformuliert, damit "Inherited from Global DHCP Configuration" klar lesbar ist.
   if (
     originLevel === 'global' &&
     contextTreeMaps?.globalConfigId === originLevelId
-  )
+  ) {
     return 'Global DHCP Configuration';
-  if (originLevel === 'ipSpace' && contextTreeMaps?.ipSpacesById) {
-    const ipSpace = contextTreeMaps.ipSpacesById.get(originLevelId);
-    if (ipSpace?.name && ipSpace.name.trim().length > 0)
-      return `ipSpace ${ipSpace.name}`;
-    return `ipSpace #${originLevelId}`;
   }
+
+  // ipSpace
+  if (originLevel === 'ipSpace' && contextTreeMaps?.ipSpacesById) {
+    const ip = contextTreeMaps.ipSpacesById.get(originLevelId);
+    const base =
+      ip?.name && ip.name.trim().length > 0 ? ip.name : `#${originLevelId}`;
+    return `ipSpace ${base}`;
+  }
+
+  // address block
   if (originLevel === 'addressBlock' && contextTreeMaps?.addressBlocksById) {
     const ab = contextTreeMaps.addressBlocksById.get(originLevelId);
-    if (ab?.name && ab.name.trim().length > 0) return ab.name;
-    if (ab?.address && ab.cidr != null) return `${ab.address}/${ab.cidr}`;
-    if (ab?.address) return ab.address;
-    return `address block #${originLevelId}`;
+    const base =
+      ab?.name && ab.name.trim().length > 0
+        ? ab.name
+        : ab?.address
+          ? ab.cidr != null
+            ? `${ab.address}/${ab.cidr}`
+            : ab.address
+          : `#${originLevelId}`;
+    return `address block ${base}`;
   }
+
+  // subnet
   if (originLevel === 'subnet' && contextTreeMaps?.subnetsById) {
     const sn = contextTreeMaps.subnetsById.get(originLevelId);
-    if (sn?.name && sn.name.trim().length > 0) return sn.name;
-    if (sn?.address && sn.cidr != null) return `${sn.address}/${sn.cidr}`;
-    if (sn?.address) return sn.address;
-    return `subnet #${originLevelId}`;
+    const base =
+      sn?.name && sn.name.trim().length > 0
+        ? sn.name
+        : sn?.address
+          ? sn.cidr != null
+            ? `${sn.address}/${sn.cidr}`
+            : sn.address
+          : `#${originLevelId}`;
+    return `subnet ${base}`;
   }
+
+  // range
   if (originLevel === 'range' && contextTreeMaps?.rangesById) {
     const rg = contextTreeMaps.rangesById.get(originLevelId);
-    if (rg?.name && rg.name.trim().length > 0) return rg.name;
-    if (rg?.start && rg?.end) return `${rg.start} – ${rg.end}`;
-    if (rg?.start) return rg.start;
-    return `range #${originLevelId}`;
+    const name = rg?.name && rg.name.trim().length > 0 ? rg.name : null;
+    const startEnd = rg?.start && rg?.end ? `${rg.start}–${rg.end}` : undefined;
+    const base = name ?? startEnd ?? `#${originLevelId}`;
+    return `range ${base}`;
   }
+
+  // fixed address
   if (originLevel === 'fixedAddress' && contextTreeMaps?.fixedAddressesById) {
     const fa = contextTreeMaps.fixedAddressesById.get(originLevelId);
-    if (fa?.name && fa.name.trim().length > 0) return fa.name;
-    if (fa?.address) return fa.address;
-    return `fixed address #${originLevelId}`;
+    const base =
+      fa?.name && fa.name.trim().length > 0
+        ? fa.name
+        : (fa?.address ?? `#${originLevelId}`);
+    return `fixed address ${base}`;
   }
+
+  // Fallback (sollte selten greifen)
   return `${originLevel} #${originLevelId}`;
 }

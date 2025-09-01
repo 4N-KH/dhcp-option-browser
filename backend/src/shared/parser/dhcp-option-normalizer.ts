@@ -20,9 +20,43 @@ export function normalizeDhcpOptions<T extends RawDhcpOption>(
   if (!Array.isArray(options)) return [];
   return options.map((opt) => ({
     ...opt,
-    option_code: opt.option_code ?? '',
-    option_value: opt.option_value ?? '',
-    type: opt.type ?? '',
-    // group bleibt optional/nullable, da DTO das erlaubt
+    option_code: (opt.option_code ?? '').trim(),
+    option_value: (opt.option_value ?? '').trim(),
+    type: (opt.type ?? '').trim(),
+    group:
+      typeof opt.group === 'string' ? opt.group.trim() : (opt.group ?? null),
   }));
+}
+
+/**
+ * Normalisiert + dedupliziert in einem Schritt.
+ * - Nicht-Gruppen-Optionen: Key = option_code|option_value|type
+ * - "group"-Einträge: Key = group (nur einmal je eindeutigem Gruppennamen)
+ */
+export function normalizeAndDedupeDhcpOptions<T extends RawDhcpOption>(
+  options: T[] | undefined | null,
+): NormalizedDhcpOption[] {
+  const normalized = normalizeDhcpOptions(options);
+  const seenRegular = new Set<string>();
+  const seenGroups = new Set<string>();
+  const res: NormalizedDhcpOption[] = [];
+
+  for (const opt of normalized) {
+    if (opt.type === 'group') {
+      const gkey = (opt.group ?? '').toLowerCase();
+      if (!gkey) continue;
+      if (seenGroups.has(gkey)) continue;
+      seenGroups.add(gkey);
+      res.push(opt);
+      continue;
+    }
+
+    const key = [opt.option_code, opt.option_value, opt.type]
+      .join('|')
+      .toLowerCase();
+    if (seenRegular.has(key)) continue;
+    seenRegular.add(key);
+    res.push(opt);
+  }
+  return res;
 }

@@ -9,7 +9,7 @@ import { DhcpGlobalConfigOptionGroup } from '@/infrastructure/database/csp/globa
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 
-import { normalizeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
+import { normalizeAndDedupeDhcpOptions } from '@/shared/parser/dhcp-option-normalizer';
 import {
   buildOptionCodeMap,
   mapDhcpOptionToEntity,
@@ -19,7 +19,6 @@ import { resolveOptionGroupsFromOptions } from '@/shared/utils/option-group-mapp
 import { EncodingSanitizer } from '../transformers/encoding-sanitizer.interface';
 import { DefaultEncodingSanitizerService } from '../transformers/default-encoding-sanitizer.service';
 
-// Zod-Validierung & -Narrowing: stellt sicher, dass dhcp_options immer ein Array ist
 import {
   CspGlobalDhcpConfigSchema,
   CspGlobalDhcpConfig,
@@ -59,13 +58,11 @@ export class CspGlobalConfigImportService {
 
     checkCancel();
 
-    // Rohdaten holen und via Zod zu einem sicheren Typ verengen
     const raw = await this.cspDataClient.fetchGlobalDhcpConfig();
     const globalCfg: CspGlobalDhcpConfig | null = raw
       ? CspGlobalDhcpConfigSchema.parse(raw)
       : null;
 
-    // leer? -> alle evtl. vorhandenen GlobalConfigs entfernen und null zurückgeben
     const isEmpty =
       !globalCfg ||
       (globalCfg.dhcp_options.length === 0 &&
@@ -83,7 +80,6 @@ export class CspGlobalConfigImportService {
       return null;
     }
 
-    // vorhandene GlobalConfig (falls eine) weg, damit idempotent
     const existing = await this.globalConfigRepo.findOne({
       relations: ['dhcpOptions', 'optionGroups'],
       where: {},
@@ -96,8 +92,10 @@ export class CspGlobalConfigImportService {
       await this.globalConfigRepo.delete(existing.id);
     }
 
-    // Normalisieren (filtert Gruppen etc.)
-    const normalisedDhcpOptions = normalizeDhcpOptions(globalCfg.dhcp_options);
+    // Normalisieren + deduplizieren
+    const normalisedDhcpOptions = normalizeAndDedupeDhcpOptions(
+      globalCfg.dhcp_options,
+    );
     const realOptions = normalisedDhcpOptions.filter(
       (opt) => opt.type !== 'group',
     );
@@ -112,19 +110,16 @@ export class CspGlobalConfigImportService {
       globalCfg.comment ?? '',
     );
 
-    // GlobalConfig anlegen
     checkCancel();
     const globalConfig = this.globalConfigRepo.create({
       comment: sanitizedComment,
     });
     await this.globalConfigRepo.save(globalConfig);
 
-    // OptionCode-Lookup
     const optionCodeMap = buildOptionCodeMap(
       await this.optionCodeRepo.find({ relations: ['optionSpace'] }),
     );
 
-    // Reale Optionen speichern
     if (realOptions.length > 0) {
       for (const opt of realOptions) {
         checkCancel();
@@ -146,7 +141,6 @@ export class CspGlobalConfigImportService {
       }
     }
 
-    // OptionGroups aus allen (inkl. group-Einträgen) ableiten
     const optionGroupMap = new Map<string, OptionGroup>();
     for (const og of await this.optionGroupRepo.find()) {
       if (!og) continue;

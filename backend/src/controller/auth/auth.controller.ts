@@ -16,7 +16,7 @@ export class AuthController {
     if (dto.mode === AuthMode.CSP) {
       const result = await this.cspAuth.login(
         dto.apiKey!,
-        dto.region!,
+        // dto.region!,
         dto.remember ?? false,
       );
       return {
