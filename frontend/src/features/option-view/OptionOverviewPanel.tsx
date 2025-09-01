@@ -79,7 +79,13 @@ type Props = {
 // Unique key for an option (code + name)
 const getOptionKey = (opt: OptionCodeOverviewDto) => `${opt.code}:${opt.name}`;
 
-const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchValues, fetchOccurrences }) => {
+const OptionOverviewPanel: React.FC<Props> = ({
+  options,
+  loading,
+  error,
+  fetchValues,
+  fetchOccurrences,
+}) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [values, setValues] = React.useState<OptionValueOverviewDto[] | null>(null);
   const [occurrences, setOccurrences] = React.useState<OptionOccurrenceDto[] | null>(null);
@@ -207,9 +213,11 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
                             <li
                               key={valueKey}
                               className={`px-4 py-3 rounded-lg cursor-pointer font-mono transition
-                                ${state.selectedValue === val.value
-                                  ? "bg-blue-800/90 text-white"
-                                  : "hover:bg-blue-800/40 text-blue-200"}`}
+                                ${
+                                  state.selectedValue === val.value
+                                    ? "bg-blue-800/90 text-white"
+                                    : "hover:bg-blue-800/40 text-blue-200"
+                                }`}
                               onClick={() => dispatch({ type: "SELECT_VALUE", value: val.value ?? "" })}
                               tabIndex={0}
                               onKeyDown={(e) => {
@@ -217,7 +225,9 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
                               }}
                             >
                               {val.value ?? <span className="italic text-blue-300">null</span>}
-                              <span className="ml-3 text-xs text-blue-200">{val.count} Object{val.count !== 1 && "s"}</span>
+                              <span className="ml-3 text-xs text-blue-200">
+                                {val.count} Object{val.count !== 1 && "s"}
+                              </span>
                             </li>
                           );
                         })}
@@ -244,7 +254,10 @@ const OptionOverviewPanel: React.FC<Props> = ({ options, loading, error, fetchVa
 };
 
 // Table of objects where selected option/value occurs
-const ObjectsTable: React.FC<{ loading: boolean; occurrences: OptionOccurrenceDto[] }> = ({ loading, occurrences }) => (
+const ObjectsTable: React.FC<{
+  loading: boolean;
+  occurrences: OptionOccurrenceDto[];
+}> = ({ loading, occurrences }) => (
   <div className="overflow-auto h-full custom-scrollbar" tabIndex={0} aria-label={t("Objects Table")}>
     {loading ? (
       <Shimmer count={4} />

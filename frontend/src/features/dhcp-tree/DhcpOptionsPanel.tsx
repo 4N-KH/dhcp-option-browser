@@ -172,7 +172,7 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
 
       {/* UX hint */}
       <div className="text-xs text-gray-500 mt-3 ml-2">
-        Tip: Click a group to expand. Status (Explicit / Inherited / Overridden)
+        Tip: Click a group to expand.
         is shown for each group.
       </div>
     </div>

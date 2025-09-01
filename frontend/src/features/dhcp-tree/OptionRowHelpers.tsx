@@ -2,33 +2,40 @@ import React from "react";
 import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
 import { getInheritedLabel } from "./helpers/labels";
 
-// Determine origin label for a single option with fallback logic
-function getOriginLevelLabel(option: EffectiveDhcpOptionSlimDto): string | undefined {
-  if (option.source.originLevelLabel) return option.source.originLevelLabel;
-  if (option.source.optionGroup?.originLevelLabel)
-    return option.source.optionGroup.originLevelLabel;
-  if (option.source.optionGroup?.groupOriginLevel)
-    return option.source.optionGroup.groupOriginLevel;
-  return undefined;
+/** solid, high-contrast palette (used only for blinking/redundant rows) */
+type Tone = { bg: string; text: string };
+const TONES: Tone[] = [
+  { bg: "bg-red-600",    text: "text-white" },
+  { bg: "bg-green-600",  text: "text-white" },
+  { bg: "bg-yellow-400", text: "text-black" },
+  { bg: "bg-orange-500", text: "text-black" },
+  { bg: "bg-blue-600",   text: "text-white" },
+  { bg: "bg-purple-600", text: "text-white" },
+  { bg: "bg-teal-600",   text: "text-white" },
+  { bg: "bg-pink-600",   text: "text-white" },
+];
+
+/** deterministic tone by option code */
+export function getSolidByCode(code: string | number): Tone {
+  const s = String(code);
+  const n = /^\d+$/.test(s)
+    ? parseInt(s, 10)
+    : Array.from(s).reduce((a, c) => a + c.charCodeAt(0), 0);
+  return TONES[Math.abs(n) % TONES.length];
 }
 
-// Determine origin level ID with fallback
-function getOriginLevelId(option: EffectiveDhcpOptionSlimDto): number | undefined {
-  if (option.source.originLevelId) return option.source.originLevelId;
-  if (option.source.optionGroup?.groupOriginLevelId)
-    return option.source.optionGroup.groupOriginLevelId;
-  return undefined;
+/** origin helpers (minimal) */
+function getOriginLevelLabel(o: EffectiveDhcpOptionSlimDto): string | undefined {
+  return o.source.originLevelLabel ?? o.source.optionGroup?.originLevelLabel ?? o.source.optionGroup?.groupOriginLevel;
+}
+function getOriginLevelId(o: EffectiveDhcpOptionSlimDto): number | undefined {
+  return o.source.originLevelId ?? o.source.optionGroup?.groupOriginLevelId;
+}
+function getOriginLevel(o: EffectiveDhcpOptionSlimDto): string | undefined {
+  return o.source.originLevel ?? o.source.optionGroup?.groupOriginLevel;
 }
 
-// Determine origin level type with fallback
-function getOriginLevel(option: EffectiveDhcpOptionSlimDto): string | undefined {
-  if (option.source.originLevel) return option.source.originLevel;
-  if (option.source.optionGroup?.groupOriginLevel)
-    return option.source.optionGroup.groupOriginLevel;
-  return undefined;
-}
-
-// Badge component indicating status: Explicit, Inherited, or Overridden
+/** status badge */
 export function StatusBadge({
   status,
   overridden,
@@ -42,28 +49,28 @@ export function StatusBadge({
   originLevelId?: number;
   originLevelLabel?: string;
 }) {
-  if (overridden)
+  if (overridden) {
     return (
-      <span className="bg-yellow-900 text-yellow-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
+      <span className="bg-yellow-900 text-yellow-200 px-2 py-0.5 rounded text-xs font-semibold ring-1 ring-white/10">
         Overridden
       </span>
     );
-  if (status === "INHERITED" || status === "GROUP_INHERITED")
+  }
+  if (status === "INHERITED" || status === "GROUP_INHERITED") {
     return (
-      <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
-        {originLevelLabel
-          ? <>Inherited from <b>{originLevelLabel}</b></>
-          : getInheritedLabel(originLevel, undefined, originLevelId)}
+      <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold ring-1 ring-white/10">
+        {originLevelLabel ? <>Inherited from <b>{originLevelLabel}</b></> : getInheritedLabel(originLevel, undefined, originLevelId)}
       </span>
     );
+  }
   return (
-    <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold shadow-sm ring-1 ring-inset ring-white/10">
+    <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold ring-1 ring-white/10">
       Explicit
     </span>
   );
 }
 
-// Table row for displaying a single DHCP option
+/** table row */
 export function DhcpOptionRow({
   option,
   rowIndex,
@@ -71,24 +78,24 @@ export function DhcpOptionRow({
   option: EffectiveDhcpOptionSlimDto;
   rowIndex: number;
 }) {
-  const originLevelLabel = getOriginLevelLabel(option); // Human-readable origin label
+  const originLevelLabel = getOriginLevelLabel(option);
   const originLevelId = getOriginLevelId(option);
   const originLevel = getOriginLevel(option);
-
   const isRedundant = option.redundant === true;
 
-  // Apply alternating row background and redundancy highlighting
-  const trClass = [
-    rowIndex % 2 === 0 ? "bg-blue-950/40" : "",
-    "hover:bg-blue-900/40 transition",
-    isRedundant ? "bg-red-900/80 text-red-200 font-bold animate-pulse" : "",
-  ].join(" ");
+  const tone = isRedundant ? getSolidByCode(option.code) : null;
+  const trClass = isRedundant
+    ? `animate-pulse ${tone!.bg} ${tone!.text} font-semibold`
+    : rowIndex % 2
+      ? "hover:bg-white/5"
+      : "hover:bg-white/5";
 
   return (
-    <tr className={trClass}>
-      <td className="font-mono px-3 py-1">{option.code}</td>
+    <tr className={`transition ${trClass}`}>
+      {/* code stays plain */}
+      <td className="px-3 py-1 font-mono">{option.code}</td>
       <td className="px-3 py-1">{option.name ?? "–"}</td>
-      <td className="font-mono px-3 py-1">{option.effectiveValue ?? "–"}</td>
+      <td className="px-3 py-1 font-mono">{option.effectiveValue ?? "–"}</td>
       <td className="px-3 py-1">
         {option.optionSpace
           ? `${option.optionSpace.name}${option.optionSpace.protocol ? " (" + option.optionSpace.protocol + ")" : ""}`

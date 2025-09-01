@@ -20,18 +20,18 @@ import RedundancyOverviewPanel from "@/features/redundancy/RedundancyOverviewPan
 import OptionGroupOverviewPanel from "@/features/option-view/OptionGroupOverviewPanel";
 import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 
-// safe access for optional fixed addresses on address block
+// Safe access for optional fixed addresses on address blocks
 function getFixedUnderAddressBlock(ab: LightAddressBlockDto): LightFixedAddressDto[] {
   const possible = (ab as unknown as { fixedAddresses?: unknown }).fixedAddresses;
   return Array.isArray(possible) ? (possible as LightFixedAddressDto[]) : [];
 }
 
-// build ancestor path from root to target node
-type NodeKey = { type: "ipSpace"|"addressBlock"|"subnet"|"range"|"fixedAddress"; id: number };
+// Build ancestor path from root to target node
+type NodeKey = { type: "ipSpace" | "addressBlock" | "subnet" | "range" | "fixedAddress"; id: number };
 
 function buildPath(
   tree: DhcpLightTreeDto,
-  level: Exclude<RedundancyLevel,"global">,
+  level: Exclude<RedundancyLevel, "global">,
   id: number
 ): NodeKey[] {
   const path: NodeKey[] = [];
@@ -44,14 +44,20 @@ function buildPath(
     }
 
     for (const ab of (ip.addressBlocks ?? []) as LightAddressBlockDto[]) {
-      const pushAb = () => { pushIp(); path.push({ type: "addressBlock", id: ab.id }); };
+      const pushAb = () => {
+        pushIp();
+        path.push({ type: "addressBlock", id: ab.id });
+      };
       if (level === "addressBlock" && ab.id === id) {
         pushAb();
         return path;
       }
 
       for (const sn of (ab.subnets ?? []) as LightSubnetDto[]) {
-        const pushSn = () => { pushAb(); path.push({ type: "subnet", id: sn.id }); };
+        const pushSn = () => {
+          pushAb();
+          path.push({ type: "subnet", id: sn.id });
+        };
         if (level === "subnet" && sn.id === id) {
           pushSn();
           return path;
@@ -87,10 +93,10 @@ function buildPath(
   return path;
 }
 
-// find the concrete object for selection
+// Find the concrete object for selection
 function findSelection(
   tree: DhcpLightTreeDto,
-  level: Exclude<RedundancyLevel,"global">,
+  level: Exclude<RedundancyLevel, "global">,
   id: number
 ): TreeSelection | null {
   for (const ip of (tree.ipSpaces ?? []) as LightIpSpaceDto[]) {
@@ -172,12 +178,41 @@ export default function OverviewPage() {
 
   return (
     <div className="flex flex-col h-[80vh] w-full">
-      <div className="flex justify-between items-center mb-4">
+      {/* Header with tab buttons and import control */}
+      <div className="flex justify-between items-center mb-4 px-2">
         <div className="flex gap-4">
-          <button className={`px-6 py-2 rounded-lg font-bold transition ${tab === "tree" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"}`} onClick={() => setTab("tree")}>DHCP Tree</button>
-          <button className={`px-6 py-2 rounded-lg font-bold transition ${tab === "overview" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"}`} onClick={() => setTab("overview")}>Option Overview</button>
-          <button className={`px-6 py-2 rounded-lg font-bold transition ${tab === "groups" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"}`} onClick={() => setTab("groups")}>Groups</button>
-          <button className={`px-6 py-2 rounded-lg font-bold transition ${tab === "redundancies" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"}`} onClick={() => setTab("redundancies")}>Redundancies</button>
+          <button
+            className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
+              tab === "tree" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+            }`}
+            onClick={() => setTab("tree")}
+          >
+            DHCP Tree
+          </button>
+          <button
+            className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
+              tab === "overview" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+            }`}
+            onClick={() => setTab("overview")}
+          >
+            Option Overview
+          </button>
+          <button
+            className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
+              tab === "groups" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+            }`}
+            onClick={() => setTab("groups")}
+          >
+            Group Overview
+          </button>
+          <button
+            className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
+              tab === "redundancies" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+            }`}
+            onClick={() => setTab("redundancies")}
+          >
+            Redundancies
+          </button>
         </div>
         <ImportWithProgress onComplete={onImportComplete} />
       </div>

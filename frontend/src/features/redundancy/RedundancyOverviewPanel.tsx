@@ -22,7 +22,7 @@ const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] 
         </div>
         {onJump && (
           <button
-            className="text-sm px-3 py-1 rounded-md bg-[var(--accent)] text-white hover:opacity-90"
+            className="ml-4 text-sm px-3 py-1 rounded-md bg-[var(--accent)] text-white hover:opacity-90"
             onClick={() => onJump(level, objectId)}
             aria-label="Open in DHCP Tree"
             title="Open in DHCP Tree"
@@ -61,8 +61,8 @@ const RedundancyOverviewPanel: React.FC<Props> = ({ onJump }) => {
     );
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="mb-3 flex items-center gap-3">
+    <div className="h-full flex flex-col p-2">
+      <div className="mb-4 mt-2 flex items-center gap-3">
         <button
           onClick={() => refetch()}
           disabled={isFetching}

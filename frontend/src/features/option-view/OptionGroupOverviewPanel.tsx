@@ -12,13 +12,22 @@ import {
   OptionGroupOccurrenceDto,
   OptionInGroupDto,
 } from '@/types/dto/option-group-overview.dto';
+import { RedundancyLevel } from '@/types/dto/redundancy-overview-item.dto';
+
+type Props = {
+  /** Jump-to-tree callback: expand tree to this level/id */
+  onShowInTree?: (level: RedundancyLevel, objectId: number) => void;
+};
 
 const LevelOrder: Array<'global' | 'ipSpace' | 'addressBlock' | 'subnet' | 'range' | 'fixedAddress'> = [
   'global', 'ipSpace', 'addressBlock', 'subnet', 'range', 'fixedAddress',
 ];
 
 const StatPill: React.FC<{ label: string; value: number; title?: string }> = ({ label, value, title }) => (
-  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-[var(--border)] bg-white/5" title={title}>
+  <span
+    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-[var(--border)] bg-white/5"
+    title={title}
+  >
     <span className="opacity-70">{label}:</span> <strong>{value}</strong>
   </span>
 );
@@ -116,16 +125,40 @@ const GroupRow: React.FC<{
   );
 };
 
-const OccRow: React.FC<{ o: OptionGroupOccurrenceDto }> = ({ o }) => (
+const OccRow: React.FC<{
+  o: OptionGroupOccurrenceDto;
+  onShowInTree?: (level: RedundancyLevel, objectId: number) => void;
+}> = ({ o, onShowInTree }) => (
   <div className="text-sm px-3 py-2 rounded-lg border border-[var(--border)] bg-white/5">
-    <div className="font-medium">{o.objectType} • {o.objectLabel}</div>
-    <div className="opacity-70">{o.objectDisplay}</div>
-    <div className="opacity-70">{o.ipSpace ?? ''}{o.cidr ? ` • ${o.cidr}` : ''}{o.address ? ` • ${o.address}` : ''}</div>
-    <div className="mt-1 text-xs"><span className="opacity-70">status:</span> <strong>{o.setStatus}</strong></div>
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="font-medium">{o.objectType} • {o.objectLabel}</div>
+        <div className="opacity-70">{o.objectDisplay}</div>
+        <div className="opacity-70">
+          {o.ipSpace ?? ''}
+          {o.cidr ? ` • ${o.cidr}` : ''}
+          {o.address ? ` • ${o.address}` : ''}
+        </div>
+        <div className="mt-1 text-xs">
+          <span className="opacity-70">status:</span> <strong>{o.setStatus}</strong>
+        </div>
+      </div>
+
+      {onShowInTree && o.objectId != null && o.objectType !== 'global' && (
+        <button
+          className="m-2 px-3 py-1 rounded-md bg-[var(--accent)] text-white text-xs hover:opacity-90"
+          onClick={() => onShowInTree(o.objectType as RedundancyLevel, o.objectId)}
+          title="Show in DHCP Tree"
+          aria-label="Show in DHCP Tree"
+        >
+          Show in Tree
+        </button>
+      )}
+    </div>
   </div>
 );
 
-const OptionGroupOverviewPanel: React.FC = () => {
+const OptionGroupOverviewPanel: React.FC<Props> = ({ onShowInTree }) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['group-overview'],
     queryFn: fetchOptionGroupOverview,
@@ -164,7 +197,9 @@ const OptionGroupOverviewPanel: React.FC = () => {
           )}
         </div>
         <div className="grid gap-2 overflow-auto pr-2">
-          {open && (occ ?? []).map((o, idx) => <OccRow key={idx} o={o} />)}
+          {open && (occ ?? []).map((o, idx) => (
+            <OccRow key={idx} o={o} onShowInTree={onShowInTree} />
+          ))}
           {!open && <div className="opacity-60">Select a group on the left…</div>}
         </div>
       </div>

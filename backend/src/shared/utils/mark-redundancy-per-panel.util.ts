@@ -2,53 +2,49 @@ import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-opti
 import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/option-stack-assembler/types/group-option-dto.type';
 
 /**
- * Panel-strikte Redundanz (über Gruppen hinweg!): Markiert alle Optionen im Panel (egal in welcher Gruppe),
- * die exakt gleichen Key haben (code + value). Einzeloptionen UND alle Gruppenoptionen werden gemeinsam geprüft.
+ * Panel-strikte Redundanz (über Gruppen hinweg!):
+ * Markiert alle Optionen im aktuellen Panel als redundant, wenn
+ * derselbe **Optionscode** (unabhängig vom Wert) mindestens zweimal vorkommt.
+ *
+ * Einzeloptionen UND alle Gruppenoptionen werden gemeinsam geprüft.
  */
 export function markRedundancyPerPanelStrict(
   options: EffectiveDhcpOptionSlimDto[],
 ): void {
-  // Alle Optionen im Panel – sowohl flache als auch aus Gruppen – einsammeln!
   type Ref = { opt?: EffectiveDhcpOptionSlimDto; groupOpt?: GroupOptionDto };
-  const allKeys = new Map<string, Ref[]>();
+  const byCode = new Map<string, Ref[]>();
 
-  // Einzeloptionen
-  options.forEach((opt) => {
-    if (
-      opt.code &&
-      (!opt.source?.optionGroup ||
-        !Array.isArray(opt.source?.optionGroup?.options))
-    ) {
-      const key = `${String(opt.code)}§${String(opt.effectiveValue ?? '')}`;
-      if (!allKeys.has(key)) allKeys.set(key, []);
-      allKeys.get(key)!.push({ opt });
+  for (const opt of options) {
+    const isGroupContainer =
+      !!opt.source?.optionGroup &&
+      Array.isArray(opt.source.optionGroup.options);
+
+    if (opt.code && !isGroupContainer) {
+      const key = String(opt.code);
+      if (!byCode.has(key)) byCode.set(key, []);
+      byCode.get(key)!.push({ opt });
     }
-    // Gruppenoptionen (verschachtelt, alle flatten!)
-    if (
-      opt.source?.optionGroup &&
-      Array.isArray(opt.source.optionGroup.options)
-    ) {
-      opt.source.optionGroup.options.forEach((groupOptRaw) => {
+
+    if (isGroupContainer) {
+      for (const groupOptRaw of opt.source.optionGroup!.options) {
         const groupOpt = groupOptRaw as GroupOptionDto;
-        const key = `${String(groupOpt.code)}§${String(groupOpt.value ?? '')}`;
-        if (!allKeys.has(key)) allKeys.set(key, []);
-        allKeys.get(key)!.push({ groupOpt });
-      });
+        const key = String(groupOpt.code);
+        if (!byCode.has(key)) byCode.set(key, []);
+        byCode.get(key)!.push({ groupOpt });
+      }
     }
-  });
-
-  // Jetzt Markierung setzen (redundant nur, wenn der gleiche Key mehr als einmal im Panel vorkommt)
-  for (const occurrences of allKeys.values()) {
-    if (occurrences.length > 1) {
-      occurrences.forEach((entry) => {
-        if (entry.opt) entry.opt.redundant = true;
-        if (entry.groupOpt) entry.groupOpt.redundant = true;
-      });
-    } else {
-      occurrences.forEach((entry) => {
-        if (entry.opt) delete entry.opt.redundant;
-        if (entry.groupOpt) delete entry.groupOpt.redundant;
-      });
+  }
+  for (const occurrences of byCode.values()) {
+    const redundant = occurrences.length > 1;
+    for (const entry of occurrences) {
+      if (entry.opt) {
+        if (redundant) entry.opt.redundant = true;
+        else delete entry.opt.redundant;
+      }
+      if (entry.groupOpt) {
+        if (redundant) entry.groupOpt.redundant = true;
+        else delete entry.groupOpt.redundant;
+      }
     }
   }
 }
