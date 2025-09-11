@@ -1,5 +1,3 @@
-// src/infrastructure/database/csp/all-dhcp-option-assignment.entity.ts
-
 import { ViewEntity, ViewColumn } from 'typeorm';
 
 @ViewEntity({ name: 'all_dhcp_option_assignments' })
