@@ -1,11 +1,10 @@
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
-import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/option-stack-assembler/types/group-option-dto.type';
+import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/group-option-dto.type';
 
 /**
  * Panel-strikte Redundanz (über Gruppen hinweg!):
  * Markiert alle Optionen im aktuellen Panel als redundant, wenn
- * derselbe **Optionscode** (unabhängig vom Wert) mindestens zweimal vorkommt.
- *
+ * derselbe Optionscode (unabhängig vom Wert) mindestens zweimal vorkommt.
  * Einzeloptionen UND alle Gruppenoptionen werden gemeinsam geprüft.
  */
 export function markRedundancyPerPanelStrict(

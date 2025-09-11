@@ -3,8 +3,8 @@ import { OptionInheritanceStackEntryFactory } from '@/application/services/optio
 import { OptionGroupMetaFactory } from '@/application/services/option-hierarchy/csp/option-group-meta.factory';
 import { OptionInheritanceStackEntryDto } from '@/domain/dto/csp/effective-dhcp-option-stack.dto';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
-import { DhcpOptionRaw } from '../dhcp-option-raw.type';
-import type { ContextObj } from './types/context-obj.type';
+import { DhcpOptionRaw } from '@/application/services/option-hierarchy/csp/types/dhcp-option-raw.type';
+import type { ContextObj } from '../types/context-obj.type';
 import { GroupStatus } from './helpers/group-status.helper';
 
 /** --- Safe access helpers (no `any`, no unsafe member access) --- */

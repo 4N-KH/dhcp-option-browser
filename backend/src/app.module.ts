@@ -111,9 +111,9 @@ import { EffectiveDhcpOptionStackService } from './application/services/option-h
 import { ContextChainBuilder } from './application/services/option-hierarchy/csp/context-chain.builder';
 import { ExplicitOptionsLoader } from './application/services/option-hierarchy/csp/types/explicit-options.loader';
 import { OptionGroupsLoader } from './application/services/option-hierarchy/csp/types/option-groups.loader';
-import { OptionStackAssemblerService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/option-stack-assembler-orchestrator.service';
-import { StackBuilderService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/stack-builder.service';
-import { SlimDtoFactoryService } from './application/services/option-hierarchy/csp/types/option-stack-assembler/slim-dto-factory.service';
+import { OptionStackAssemblerService } from './application/services/option-hierarchy/csp/option-stack-assembler/option-stack-assembler-orchestrator.service';
+import { StackBuilderService } from './application/services/option-hierarchy/csp/option-stack-assembler/stack-builder.service';
+import { SlimDtoFactoryService } from './application/services/option-hierarchy/csp/option-stack-assembler/slim-dto-factory.service';
 import { OptionInheritanceStackEntryFactory } from './application/services/option-hierarchy/csp/option-stack-entry.factory';
 import { OptionGroupMetaFactory } from './application/services/option-hierarchy/csp/option-group-meta.factory';
 import { DhcpOptionRawMapper } from './application/services/option-hierarchy/csp/dhcp-option-raw.mapper';

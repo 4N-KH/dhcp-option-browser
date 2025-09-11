@@ -7,7 +7,7 @@ import {
 import { ExplicitOptionsLoader } from './types/explicit-options.loader';
 import { OptionGroupsLoader } from './types/option-groups.loader';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
-import { OptionStackAssemblerService } from './types/option-stack-assembler/option-stack-assembler-orchestrator.service';
+import { OptionStackAssemblerService } from './option-stack-assembler/option-stack-assembler-orchestrator.service';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 
 import { IpSpace } from '@/infrastructure/database/csp/ip-space.entity';
@@ -18,7 +18,7 @@ import { DhcpGlobalConfig } from '@/infrastructure/database/csp/global-config.en
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import type { ContextObj } from './types/option-stack-assembler/types/context-obj.type';
+import type { ContextObj } from './types/context-obj.type';
 
 // Redundanz & Dedupe-Utility:
 import { markRedundancyPerPanelStrict } from '@/shared/utils/mark-redundancy-per-panel.util';

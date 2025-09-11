@@ -1,16 +1,12 @@
 import { DataSource } from 'typeorm';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
-import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/option-stack-assembler/types/group-option-dto.type';
+import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/group-option-dto.type';
 
-/**
- * Entfernt 100% identische Einzeloptionen (Key) und Duplikate von Gruppen-Panels (selbe ID/Namen).
- * Nur der erste Panel-Eintrag einer Gruppe bleibt, alle weiteren werden entfernt.
- */
 export function dedupeEffectiveDhcpOptionSlimDtoArray(
   options: EffectiveDhcpOptionSlimDto[],
 ): EffectiveDhcpOptionSlimDto[] {
   const singleOptKeys = new Set<string>();
-  const seenGroupIds = new Set<number>(); // Nur EIN Panel pro Gruppe
+  const seenGroupIds = new Set<number>();
   const result: EffectiveDhcpOptionSlimDto[] = [];
 
   function getOptionSpaceId(opt: {

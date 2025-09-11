@@ -1,4 +1,3 @@
-// src/application/services/option-hierarchy/csp/types/dhcp-option-raw.type.ts
 import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.entity';
 import { OptionSpaceMetaDto } from '@/domain/dto/csp/option-space-meta.dto';
 
@@ -9,9 +8,9 @@ import { OptionSpaceMetaDto } from '@/domain/dto/csp/option-space-meta.dto';
  * - optional kann auch `value` existieren (Legacy, je nach Quelle/Mapping)
  */
 export interface DhcpOptionRaw {
-  option_code: string; // Immer befüllt, Infoblox/UUID
-  option_value: string | null; // Hauptwert, immer vorhanden (auch wenn null)
-  value?: string | null; // Alternativ für Legacy/andere Quellen
+  option_code: string;
+  option_value: string | null;
+  value?: string | null;
 
   type?: string | null;
   array?: boolean | null;
