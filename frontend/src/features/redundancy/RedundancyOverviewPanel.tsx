@@ -1,16 +1,26 @@
 "use client";
+
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchRedundancyOverview } from "@/services/redundancy.service";
-import { RedundancyOverviewItemDto, RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
+import {
+  RedundancyOverviewItemDto,
+  RedundancyLevel,
+} from "@/types/dto/redundancy-overview-item.dto";
 
 type Props = {
   onJump?: (level: RedundancyLevel, objectId: number) => void;
 };
 
-const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] }> = ({ item, onJump }) => {
+const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] }> = ({
+  item,
+  onJump,
+}) => {
   const { level, name, address, redundantOption, objectId } = item;
-  const setIn = redundantOption.setIn.map(s => `${s.from} (${s.inheritanceType})`).join("; ");
+
+  const setIn = redundantOption.setIn
+    .map((s) => `${s.from} (${s.inheritanceType})`)
+    .join("; ");
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-white/5 p-4">
@@ -18,8 +28,10 @@ const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] 
 
       <div className="flex items-center justify-between gap-3">
         <div className="font-semibold">
-          {name ?? "—"}{address ? `  •  ${address}` : ""}
+          {name ?? "—"}
+          {address ? `  •  ${address}` : ""}
         </div>
+
         {onJump && (
           <button
             className="ml-4 text-sm px-3 py-1 rounded-md bg-[var(--accent)] text-white hover:opacity-90"
@@ -34,7 +46,8 @@ const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] 
 
       <div className="mt-2 text-sm">
         <span className="opacity-80">redundant option:</span>{" "}
-        code: {String(redundantOption.code)} • name: {redundantOption.name} • value: {redundantOption.value}
+        code: {String(redundantOption.code)} • name: {redundantOption.name} • value:{" "}
+        {redundantOption.value}
         {redundantOption.type ? <> • type: {redundantOption.type}</> : null}
       </div>
 
@@ -44,17 +57,21 @@ const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] 
 };
 
 const RedundancyOverviewPanel: React.FC<Props> = ({ onJump }) => {
-  const { data, isLoading, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery<RedundancyOverviewItemDto[]>({
     queryKey: ["redundancy-overview"],
     queryFn: fetchRedundancyOverview,
   });
 
   if (isLoading) return <div className="p-6 text-blue-200">Loading redundancies…</div>;
+
   if (error)
     return (
       <div className="p-6 text-red-300">
         Failed to load redundancies: {String(error)}{" "}
-        <button className="ml-3 px-3 py-1 rounded bg-[var(--accent)] text-white" onClick={() => refetch()}>
+        <button
+          className="ml-3 px-3 py-1 rounded bg-[var(--accent)] text-white"
+          onClick={() => refetch()}
+        >
           Retry
         </button>
       </div>

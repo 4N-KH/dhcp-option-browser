@@ -17,6 +17,8 @@ interface LightTreeViewProps {
   autoExpandPath?: NodeKey[] | null;
   /** Called after path has been applied once */
   onAutoExpandConsumed?: () => void;
+  /** expand/scroll when 'selected' changes (default: false) */
+  followSelection?: boolean;
 }
 
 /* ---------------- helpers: robust, type-aware keys (no any) ---------------- */
@@ -35,7 +37,7 @@ function toStr(v: unknown): string | null {
   return null;
 }
 
-/** Build a stable id for any selection; prefers numeric/string id. */
+/** Build a stable id for any selection; prefers numeric/string id. Matches the LightTree DTO. */
 function stableIdFor(sel: TreeSelection): string {
   const t = sel.type as NodeType;
   const o = sel.object as unknown;
@@ -44,26 +46,40 @@ function stableIdFor(sel: TreeSelection): string {
   if (rawId) return rawId;
 
   switch (t) {
-    case "ipSpace":
+    case "ipSpace": {
+      // IpSpace hat 'name'
       return toStr(read(o, "name")) ?? "ipSpace:unknown";
-    case "addressBlock":
-      return toStr(read(o, "address")) ?? toStr(read(o, "name")) ?? "addressBlock:unknown";
-    case "subnet":
-      return toStr(read(o, "address")) ?? "subnet:unknown";
+    }
+    case "addressBlock": {
+      // AddressBlock hat 'address' + 'cidr' und 'name'
+      const addr = toStr(read(o, "address"));
+      const cidr = toStr(read(o, "cidr"));
+      const combo = addr && cidr ? `${addr}/${cidr}` : null;
+      return combo ?? toStr(read(o, "name")) ?? "addressBlock:unknown";
+    }
+    case "subnet": {
+      // Subnet hat 'address' + 'cidr' und 'name'
+      const addr = toStr(read(o, "address"));
+      const cidr = toStr(read(o, "cidr"));
+      const combo = addr && cidr ? `${addr}/${cidr}` : null;
+      return combo ?? toStr(read(o, "name")) ?? "subnet:unknown";
+    }
     case "range": {
+      // Range hat 'subnetId', 'start', 'end'
       const sid = toStr(read(o, "subnetId")) ?? toStr(read(read(o, "subnet"), "id")) ?? "?:";
-      const start = toStr(read(o, "start")) ?? toStr(read(o, "from")) ?? "start?";
-      const end = toStr(read(o, "end")) ?? toStr(read(o, "to")) ?? "end?";
+      const start = toStr(read(o, "start")) ?? "start?";
+      const end = toStr(read(o, "end")) ?? "end?";
       return `${sid}:${start}-${end}`;
     }
     case "fixedAddress": {
+      // Fixed hat 'ip' und 'subnetId' ODER (wenn unter Range) 'range.subnetId'
       const sid =
         toStr(read(o, "subnetId")) ??
-        toStr(read(read(o, "subnet"), "id")) ??
         toStr(read(read(o, "range"), "subnetId")) ??
+        toStr(read(read(o, "subnet"), "id")) ??
         "?:";
-      const addr = toStr(read(o, "address")) ?? toStr(read(o, "name")) ?? "addr?";
-      return `${sid}:${addr}`;
+      const ip = toStr(read(o, "ip")) ?? toStr(read(o, "name")) ?? "ip?";
+      return `${sid}:${ip}`;
     }
     case "global":
     default:
@@ -176,6 +192,7 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
   onSelect,
   autoExpandPath,
   onAutoExpandConsumed,
+  followSelection = false,
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const parentOfRef = useRef<Map<string, string | null>>(new Map()); // childKeyStr -> parentKeyStr|null
@@ -257,64 +274,56 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
     setTimeout(() => el.classList.remove("ring-2", "ring-[var(--accent)]"), 650);
   };
 
-  const scrollToKey = useCallback((targetKeyStr: string) => {
-    let done = false;
+  const scrollToKey = useCallback(
+    (targetKeyStr: string, { highlight = false }: { highlight?: boolean } = {}) => {
+      let done = false;
 
-    const tryScroll = () => {
-      if (done) return true;
-      const el = findRowEl(targetKeyStr);
-      if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        try {
-          el.focus({ preventScroll: true });
-        } catch {
-          /* ignore */
+      const tryScroll = () => {
+        if (done) return true;
+        const el = findRowEl(targetKeyStr);
+        if (el) {
+          el.scrollIntoView({ block: "center", behavior: "smooth" });
+          try { el.focus({ preventScroll: true }); } catch { /* ignore */ }
+          if (highlight) flash(el);
+          done = true;
+          return true;
         }
-        flash(el);
-        done = true;
-        return true;
-      }
-      return false;
-    };
+        return false;
+      };
 
-    if (tryScroll()) return;
+      if (tryScroll()) return;
 
-    const obs = new MutationObserver(() => {
-      tryScroll();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+      const obs = new MutationObserver(() => { tryScroll(); });
+      obs.observe(document.body, { childList: true, subtree: true });
 
-    const raf1 = requestAnimationFrame(() => tryScroll());
-    const raf2 = requestAnimationFrame(() => tryScroll());
-    const timeout = setTimeout(() => {
-      obs.disconnect();
-    }, 3000);
+      const raf1 = requestAnimationFrame(() => tryScroll());
+      const raf2 = requestAnimationFrame(() => tryScroll());
+      const timeout = setTimeout(() => { obs.disconnect(); }, 3000);
 
-    const cleanup = () => {
-      obs.disconnect();
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      clearTimeout(timeout);
-    };
+      const cleanup = () => {
+        obs.disconnect();
+        cancelAnimationFrame(raf1);
+        cancelAnimationFrame(raf2);
+        clearTimeout(timeout);
+      };
 
-    // Ensure cleanup after success
-    const watcher = new MutationObserver(() => {
-      if (tryScroll()) cleanup();
-    });
-    watcher.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => watcher.disconnect(), 3200);
-  }, [findRowEl]);
+      const watcher = new MutationObserver(() => { if (tryScroll()) cleanup(); });
+      watcher.observe(document.body, { childList: true, subtree: true });
+      setTimeout(() => watcher.disconnect(), 3200);
+    },
+    [findRowEl],
+  );
 
-  // Selected → expand + scroll
+  // Selected → expand + scroll (ONLY if followSelection = true)
   useEffect(() => {
     if (!selected) return;
+    if (!followSelection) return;
     const targetKeyStr = nodeKeyToString(selectionToNodeKey(selected));
     expandAncestors(targetKeyStr);
-    // wait a tick for expansion to render, then scroll
-    requestAnimationFrame(() => scrollToKey(targetKeyStr));
-  }, [selected, expandAncestors, scrollToKey, expanded.size]);
+    requestAnimationFrame(() => scrollToKey(targetKeyStr, { highlight: false }));
+  }, [selected, followSelection, expandAncestors, scrollToKey, expanded.size]);
 
-  // autoExpandPath → expand + scroll to leaf (even wenn selected noch nicht gesetzt)
+  // autoExpandPath → expand + scroll to leaf (highlight)
   useEffect(() => {
     if (!autoExpandPath || autoExpandPath.length === 0) return;
     const leaf = autoExpandPath[autoExpandPath.length - 1];
@@ -328,10 +337,9 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
       return next;
     });
 
-    // after paint, scroll to the leaf
     requestAnimationFrame(() => {
       if (pendingKeyRef.current) {
-        scrollToKey(pendingKeyRef.current);
+        scrollToKey(pendingKeyRef.current, { highlight: true });
         pendingKeyRef.current = null;
       }
       onAutoExpandConsumed?.();

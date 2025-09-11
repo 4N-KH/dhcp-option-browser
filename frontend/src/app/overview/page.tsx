@@ -20,32 +20,29 @@ import RedundancyOverviewPanel from "@/features/redundancy/RedundancyOverviewPan
 import OptionGroupOverviewPanel from "@/features/option-view/OptionGroupOverviewPanel";
 import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 
+/* ---------------- optional Hints vom Redundancy-Panel ---------------- */
+export type JumpHint = {
+  name?: string;     // z. B. "labor_vm"
+  address?: string;  // z. B. "10.10.0.0/24" ODER "10.10.0.0" (wir unterstützen beide Formen)
+  ipSpaceName?: string;
+  subnetId?: number;
+  start?: string;
+  end?: string;
+};
+
 /* ---------------- safe helpers for optional arrays ---------------- */
 
-function arr<T>(v: unknown): T[] {
-  return Array.isArray(v) ? (v as T[]) : [];
-}
-function getAddressBlocks(ip: LightIpSpaceDto): LightAddressBlockDto[] {
-  return arr<LightAddressBlockDto>((ip as unknown as { addressBlocks?: unknown }).addressBlocks);
-}
-function getSubnets(ab: LightAddressBlockDto): LightSubnetDto[] {
-  return arr<LightSubnetDto>((ab as unknown as { subnets?: unknown }).subnets);
-}
-function getRanges(sn: LightSubnetDto): LightRangeDto[] {
-  return arr<LightRangeDto>((sn as unknown as { ranges?: unknown }).ranges);
-}
-function getFixedUnderIpSpace(ip: LightIpSpaceDto): LightFixedAddressDto[] {
-  return arr<LightFixedAddressDto>((ip as unknown as { fixedAddresses?: unknown }).fixedAddresses);
-}
-function getFixedUnderAddressBlock(ab: LightAddressBlockDto): LightFixedAddressDto[] {
-  return arr<LightFixedAddressDto>((ab as unknown as { fixedAddresses?: unknown }).fixedAddresses);
-}
-function getFixedUnderSubnet(sn: LightSubnetDto): LightFixedAddressDto[] {
-  return arr<LightFixedAddressDto>((sn as unknown as { fixedAddresses?: unknown }).fixedAddresses);
-}
-function getFixedUnderRange(rg: LightRangeDto): LightFixedAddressDto[] {
-  return arr<LightFixedAddressDto>((rg as unknown as { fixedAddresses?: unknown }).fixedAddresses);
-}
+const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+const ipSpaceAddressBlocks = (ip: LightIpSpaceDto): LightAddressBlockDto[] => arr<LightAddressBlockDto>(ip.addressBlocks);
+const ipSpaceSubnets       = (ip: LightIpSpaceDto): LightSubnetDto[]       => arr<LightSubnetDto>(ip.subnets);
+
+const abChildren = (ab: LightAddressBlockDto): LightAddressBlockDto[] => arr<LightAddressBlockDto>(ab.children);
+const abSubnets  = (ab: LightAddressBlockDto): LightSubnetDto[]       => arr<LightSubnetDto>(ab.subnets);
+
+const subnetRanges = (sn: LightSubnetDto): LightRangeDto[]                    => arr<LightRangeDto>(sn.ranges);
+const subnetFixed  = (sn: LightSubnetDto): LightFixedAddressDto[]             => arr<LightFixedAddressDto>(sn.fixedAddresses ?? []);
+const rangeFixed   = (rg: LightRangeDto): LightFixedAddressDto[]              => arr<LightFixedAddressDto>(rg.fixedAddresses);
 
 /* ---------------- key helpers (MUST MATCH LightTreeView) ---------------- */
 
@@ -64,7 +61,7 @@ function s(v: unknown): string | null {
   return null;
 }
 
-/** Build the SAME stable key id as LightTreeView.stableIdFor */
+/** Build SAME stable key id as LightTreeView.stableIdFor */
 function stableIdForSelection(sel: TreeSelection): string {
   const t = sel.type as TreeNodeKey["type"];
   const o = sel.object as unknown;
@@ -73,26 +70,35 @@ function stableIdForSelection(sel: TreeSelection): string {
   if (rawId) return rawId;
 
   switch (t) {
-    case "ipSpace":
+    case "ipSpace": {
       return s(rd(o, "name")) ?? "ipSpace:unknown";
-    case "addressBlock":
-      return s(rd(o, "address")) ?? s(rd(o, "name")) ?? "addressBlock:unknown";
-    case "subnet":
-      return s(rd(o, "address")) ?? "subnet:unknown";
+    }
+    case "addressBlock": {
+      const addr = s(rd(o, "address"));
+      const cidr = s(rd(o, "cidr"));
+      const combo = addr && cidr ? `${addr}/${cidr}` : null;
+      return combo ?? s(rd(o, "name")) ?? "addressBlock:unknown";
+    }
+    case "subnet": {
+      const addr = s(rd(o, "address"));
+      const cidr = s(rd(o, "cidr"));
+      const combo = addr && cidr ? `${addr}/${cidr}` : null;
+      return combo ?? s(rd(o, "name")) ?? "subnet:unknown";
+    }
     case "range": {
       const sid = s(rd(o, "subnetId")) ?? s(rd(rd(o, "subnet"), "id")) ?? "?:";
-      const start = s(rd(o, "start")) ?? s(rd(o, "from")) ?? "start?";
-      const end = s(rd(o, "end")) ?? s(rd(o, "to")) ?? "end?";
+      const start = s(rd(o, "start")) ?? "start?";
+      const end = s(rd(o, "end")) ?? "end?";
       return `${sid}:${start}-${end}`;
     }
     case "fixedAddress": {
       const sid =
         s(rd(o, "subnetId")) ??
-        s(rd(rd(o, "subnet"), "id")) ??
         s(rd(rd(o, "range"), "subnetId")) ??
+        s(rd(rd(o, "subnet"), "id")) ??
         "?:";
-      const addr = s(rd(o, "address")) ?? s(rd(o, "name")) ?? "addr?";
-      return `${sid}:${addr}`;
+      const ip = s(rd(o, "ip")) ?? s(rd(o, "name")) ?? "ip?";
+      return `${sid}:${ip}`;
     }
     case "global":
     default:
@@ -102,82 +108,164 @@ function stableIdForSelection(sel: TreeSelection): string {
 const keyStrOfSelection = (sel: TreeSelection): KeyStr =>
   `${sel.type}:${stableIdForSelection(sel)}`;
 
-/* ---------------- index builder: parent map + id lookup ---------------- */
+/* ---------------- index builder: parent map + id & natural keys ---------------- */
 
 function buildIndex(tree: DhcpLightTreeDto) {
   const parent = new Map<KeyStr, KeyStr | null>();
   const nodeByKey = new Map<KeyStr, TreeSelection>();
   const idToKey = new Map<KeyStr, KeyStr>();
 
+  // natürliche Schlüssel (für Fallbacks)
+  const ipSpaceByName = new Map<string, KeyStr>();
+  const addressBlockByAddress = new Map<string, KeyStr>(); // akzeptiert "addr" UND "addr/cidr"
+  const addressBlockByName = new Map<string, KeyStr>();
+  const subnetByAddress = new Map<string, KeyStr>();       // akzeptiert "addr" UND "addr/cidr"
+  const subnetByName = new Map<string, KeyStr>();
+  const rangeByTuple = new Map<string, KeyStr>();          // `${subnetId}:${start}-${end}`
+  const fixedByTuple = new Map<string, KeyStr>();          // `${subnetId}:${ip}`
+
   const rootKey: KeyStr = "global:root";
   parent.set(rootKey, null);
 
-  const indexSel = (sel: TreeSelection, parentKey: KeyStr) => {
-    const key = keyStrOfSelection(sel);
-    if (!parent.has(key)) parent.set(key, parentKey);
-    nodeByKey.set(key, sel);
-
+  const setId = (sel: TreeSelection, key: KeyStr) => {
     const idVal = rd(sel.object as unknown, "id");
     if (typeof idVal === "number" || typeof idVal === "string") {
       idToKey.set(`${sel.type}:${String(idVal)}`, key);
     }
   };
 
-  for (const ip of (tree.ipSpaces ?? []) as LightIpSpaceDto[]) {
-    const ipSel: TreeSelection = { type: "ipSpace", object: ip };
-    indexSel(ipSel, rootKey);
+  const indexSel = (sel: TreeSelection, parentKey: KeyStr) => {
+    const key = keyStrOfSelection(sel);
+    if (!parent.has(key)) parent.set(key, parentKey);
+    nodeByKey.set(key, sel);
+    setId(sel, key);
 
-    // optional fixed under ipSpace
-    for (const fa of getFixedUnderIpSpace(ip)) {
-      indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(ipSel));
+    // natürliche Schlüssel registrieren
+    switch (sel.type) {
+      case "ipSpace": {
+        const name = s(rd(sel.object, "name"));
+        if (name) ipSpaceByName.set(name, key);
+        break;
+      }
+      case "addressBlock": {
+        const addr = s(rd(sel.object, "address"));
+        const cidr = s(rd(sel.object, "cidr"));
+        const name = s(rd(sel.object, "name"));
+        if (addr) {
+          addressBlockByAddress.set(addr, key); // reine Adresse
+          if (cidr) addressBlockByAddress.set(`${addr}/${cidr}`, key); // addr/cidr
+        }
+        if (name) addressBlockByName.set(name, key);
+        break;
+      }
+      case "subnet": {
+        const addr = s(rd(sel.object, "address"));
+        const cidr = s(rd(sel.object, "cidr"));
+        const name = s(rd(sel.object, "name"));
+        if (addr) {
+          subnetByAddress.set(addr, key);
+          if (cidr) subnetByAddress.set(`${addr}/${cidr}`, key);
+        }
+        if (name) subnetByName.set(name, key);
+        break;
+      }
+      case "range": {
+        const sid = s(rd(sel.object, "subnetId"));
+        const start = s(rd(sel.object, "start"));
+        const end = s(rd(sel.object, "end"));
+        if (sid && start && end) rangeByTuple.set(`${sid}:${start}-${end}`, key);
+        break;
+      }
+      case "fixedAddress": {
+        const ip = s(rd(sel.object, "ip"));
+        const sid =
+          s(rd(sel.object, "subnetId")) ??
+          s(rd(rd(sel.object, "range"), "subnetId"));
+        if (sid && ip) fixedByTuple.set(`${sid}:${ip}`, key);
+        break;
+      }
+    }
+  };
+
+  // --- Walk: IpSpace → AddressBlocks (rekursiv children) + Subnets → Ranges + Fixeds ---
+
+  const walkAddressBlock = (ab: LightAddressBlockDto, parentKey: KeyStr) => {
+    const abSel: TreeSelection = { type: "addressBlock", object: ab };
+    const abKey = keyStrOfSelection(abSel);
+    indexSel(abSel, parentKey);
+
+    // child address blocks
+    for (const child of abChildren(ab)) {
+      walkAddressBlock(child, abKey);
+    }
+    // subnets under block
+    for (const sn of abSubnets(ab)) {
+      walkSubnet(sn, abKey);
+    }
+  };
+
+  const walkSubnet = (sn: LightSubnetDto, parentKey: KeyStr) => {
+    const snSel: TreeSelection = { type: "subnet", object: sn };
+    const snKey = keyStrOfSelection(snSel);
+    indexSel(snSel, parentKey);
+
+    for (const rg of subnetRanges(sn)) {
+      const rgSel: TreeSelection = { type: "range", object: rg };
+      const rgKey = keyStrOfSelection(rgSel);
+      indexSel(rgSel, snKey);
+
+      for (const fa of rangeFixed(rg)) {
+        // range-fixed has ip, rangeId, and inherits subnetId via rg.subnetId
+        const faWithRange: LightFixedAddressDto & { range?: Pick<LightRangeDto, "subnetId"> } = {
+          ...fa,
+          range: { subnetId: rg.subnetId },
+        };
+        indexSel({ type: "fixedAddress", object: faWithRange }, rgKey);
+      }
     }
 
-    // address blocks
-    for (const ab of getAddressBlocks(ip)) {
-      const abSel: TreeSelection = { type: "addressBlock", object: ab };
-      indexSel(abSel, keyStrOfSelection(ipSel));
+    for (const fa of subnetFixed(sn)) {
+      indexSel({ type: "fixedAddress", object: fa }, snKey);
+    }
+  };
 
-      // fixed under addressBlock
-      for (const fa of getFixedUnderAddressBlock(ab)) {
-        indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(abSel));
-      }
+  for (const ip of (tree.ipSpaces ?? []) as LightIpSpaceDto[]) {
+    const ipSel: TreeSelection = { type: "ipSpace", object: ip };
+    const ipKey = keyStrOfSelection(ipSel);
+    indexSel(ipSel, rootKey);
 
-      // subnets
-      for (const sn of getSubnets(ab)) {
-        const snSel: TreeSelection = { type: "subnet", object: sn };
-        indexSel(snSel, keyStrOfSelection(abSel));
-
-        // ranges
-        for (const rg of getRanges(sn)) {
-          const rgSel: TreeSelection = { type: "range", object: rg };
-          indexSel(rgSel, keyStrOfSelection(snSel));
-
-          // fixed under range
-          for (const fa of getFixedUnderRange(rg)) {
-            indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(rgSel));
-          }
-        }
-
-        // fixed under subnet
-        for (const fa of getFixedUnderSubnet(sn)) {
-          indexSel({ type: "fixedAddress", object: fa }, keyStrOfSelection(snSel));
-        }
-      }
+    // top-level address blocks (recursive)
+    for (const ab of ipSpaceAddressBlocks(ip)) {
+      walkAddressBlock(ab, ipKey);
+    }
+    // top-level subnets directly under ipSpace
+    for (const sn of ipSpaceSubnets(ip)) {
+      walkSubnet(sn, ipKey);
     }
   }
 
-  return { parent, nodeByKey, idToKey, rootKey };
+  return {
+    parent,
+    nodeByKey,
+    idToKey,
+    rootKey,
+    // natürliche Schlüssel
+    ipSpaceByName,
+    addressBlockByAddress,
+    addressBlockByName,
+    subnetByAddress,
+    subnetByName,
+    rangeByTuple,
+    fixedByTuple,
+  };
 }
 
 /* ---------------- path & selection using index (stable keys) ---------------- */
 
 function pathFromIndex(
   parent: Map<KeyStr, KeyStr | null>,
-  idToKey: Map<KeyStr, KeyStr>,
-  type: NT,
-  id: number
+  keyStart: KeyStr | null
 ): TreeNodeKey[] {
-  const keyStart = idToKey.get(`${type}:${String(id)}`);
   if (!keyStart) return [];
 
   const rev: TreeNodeKey[] = [];
@@ -196,14 +284,96 @@ function pathFromIndex(
   return rev.reverse();
 }
 
-function selectionFromIndex(
+function selectionFromKey(
   nodeByKey: Map<KeyStr, TreeSelection>,
-  idToKey: Map<KeyStr, KeyStr>,
-  type: NT,
-  id: number
+  key: KeyStr | null
 ): TreeSelection | null {
-  const key = idToKey.get(`${type}:${String(id)}`);
   return key ? nodeByKey.get(key) ?? null : null;
+}
+
+/* ---------------- robust lookup ---------------- */
+
+function resolveKeyForJump(
+  level: NT,
+  objectId: number,
+  hint: JumpHint | undefined,
+  index: ReturnType<typeof buildIndex>
+): KeyStr | null {
+  const {
+    idToKey,
+    ipSpaceByName,
+    addressBlockByAddress,
+    addressBlockByName,
+    subnetByAddress,
+    subnetByName,
+    rangeByTuple,
+    fixedByTuple,
+  } = index;
+
+  // 1) exakte ID
+  const byId = idToKey.get(`${level}:${String(objectId)}`);
+  if (byId) return byId;
+
+  // 2) Fallback nach Typ/Hints
+  switch (level) {
+    case "ipSpace": {
+      const fromName = hint?.ipSpaceName ?? hint?.name;
+      if (fromName) {
+        const k = ipSpaceByName.get(fromName);
+        if (k) return k;
+      }
+      break;
+    }
+    case "addressBlock": {
+      // zuerst CIDR/address (wir akzeptieren "addr" und "addr/cidr"), dann name
+      const addr = hint?.address;
+      if (addr) {
+        const byAddr = addressBlockByAddress.get(addr);
+        if (byAddr) return byAddr;
+      }
+      const nm = hint?.name;
+      if (nm) {
+        const byName = addressBlockByName.get(nm);
+        if (byName) return byName;
+      }
+      break;
+    }
+    case "subnet": {
+      // zuerst CIDR/address (wir akzeptieren "addr" und "addr/cidr"), dann name (z. B. „labor_vm“)
+      const addr = hint?.address;
+      if (addr) {
+        const byAddr = subnetByAddress.get(addr);
+        if (byAddr) return byAddr;
+      }
+      const nm = hint?.name;
+      if (nm) {
+        const byName = subnetByName.get(nm);
+        if (byName) return byName;
+      }
+      break;
+    }
+    case "range": {
+      const sid = hint?.subnetId;
+      const s = hint?.start;
+      const e = hint?.end;
+      if (sid && s && e) {
+        const k = rangeByTuple.get(`${sid}:${s}-${e}`);
+        if (k) return k;
+      }
+      break;
+    }
+    case "fixedAddress": {
+      const sid = hint?.subnetId;
+      const ip = hint?.address;
+      if (sid && ip) {
+        const k = fixedByTuple.get(`${sid}:${ip}`);
+        if (k) return k;
+      }
+      break;
+    }
+  }
+
+  return null;
 }
 
 /* ---------------- component ---------------- */
@@ -226,7 +396,8 @@ export default function OverviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleJumpToTree = (level: RedundancyLevel, objectId: number) => {
+  /** Robust: akzeptiert optional Hints vom Redundancy-Panel */
+  const handleJumpToTree = (level: RedundancyLevel, objectId: number, hint?: JumpHint) => {
     setTab("tree");
     if (!tree) return;
 
@@ -236,11 +407,16 @@ export default function OverviewPage() {
       return;
     }
 
-    // Build index once per jump – ensures exact mapping for ALL object IDs.
-    const { parent, nodeByKey, idToKey } = buildIndex(tree);
+    const index = buildIndex(tree);
+    const key = resolveKeyForJump(level as NT, objectId, hint, index);
 
-    const sel = selectionFromIndex(nodeByKey, idToKey, level as NT, objectId);
-    const path = pathFromIndex(parent, idToKey, level as NT, objectId);
+    if (!key) {
+      console.warn("[Jump] No matching node for", { level, objectId, hint });
+      return;
+    }
+
+    const sel = selectionFromKey(index.nodeByKey, key);
+    const path = pathFromIndex(index.parent, key);
 
     if (sel) setSelected(sel);
     if (path.length) setAutoExpandPath(path);
@@ -320,6 +496,7 @@ export default function OverviewPage() {
                 onSelect={setSelected}
                 autoExpandPath={autoExpandPath}
                 onAutoExpandConsumed={() => setAutoExpandPath(null)}
+                followSelection={false}
               />
             </div>
             <div className="flex-1 p-8 overflow-y-auto">
