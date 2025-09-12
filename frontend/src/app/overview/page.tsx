@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { fetchDhcpLightTree } from "@/services/dhcp-hierarchy.service";
 import LightTreeView, {
   type NodeKey as TreeNodeKey,
@@ -25,12 +25,53 @@ import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 /* ---------------- optional Hints vom Redundancy-Panel ---------------- */
 export type JumpHint = {
   name?: string; // z. B. "labor_vm"
-  address?: string; // z. B. "10.10.0.0/24" ODER "10.10.0.0" (wir unterstützen beide Formen)
+  address?: string; // z. B. "10.10.0.0/24" ODER "10.10.0.0"
   ipSpaceName?: string;
   subnetId?: number;
   start?: string;
   end?: string;
 };
+
+/* ---------------- Suchleiste (inline, ohne separates File) ---------------- */
+function SearchBar({
+  placeholder = "Find name, address/CIDR, IP or range…",
+  onSearch,
+  className = "",
+}: {
+  placeholder?: string;
+  onSearch: (query: string) => void;
+  className?: string;
+}) {
+  const [q, setQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    inputRef.current?.setAttribute("aria-label", "DHCP tree search");
+  }, []);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSearch(q.trim());
+      }}
+      className={`flex items-center gap-2 p-2 ${className}`}
+    >
+      <input
+        ref={inputRef}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        className="flex-1 px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      <button
+        type="submit"
+        className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-semibold hover:bg-[var(--accent-hover)]"
+      >
+        Search
+      </button>
+    </form>
+  );
+}
 
 /* ---------------- safe helpers for optional arrays ---------------- */
 
@@ -95,7 +136,7 @@ function stableIdForSelection(sel: TreeSelection): string {
       return combo ?? s(rd(o, "name")) ?? "subnet:unknown";
     }
     case "range": {
-      const sid = s(rd(o, "subnetId")) ?? s(rd(rd(o, "subnet"), "id")) ?? "?:";
+      const sid = s(rd(o, "subnetId")) ?? s(rd(rd(o, "subnet"), "id")) ?? "?:"; // fallback
       const start = s(rd(o, "start")) ?? "start?";
       const end = s(rd(o, "end")) ?? "end?";
       return `${sid}:${start}-${end}`;
@@ -105,7 +146,7 @@ function stableIdForSelection(sel: TreeSelection): string {
         s(rd(o, "subnetId")) ??
         s(rd(rd(o, "range"), "subnetId")) ??
         s(rd(rd(o, "subnet"), "id")) ??
-        "?:";
+        "?:"; // fallback
       const ip = s(rd(o, "ip")) ?? s(rd(o, "name")) ?? "ip?";
       return `${sid}:${ip}`;
     }
@@ -124,7 +165,7 @@ function buildIndex(tree: DhcpLightTreeDto) {
   const nodeByKey = new Map<KeyStr, TreeSelection>();
   const idToKey = new Map<KeyStr, KeyStr>();
 
-  // natürliche Schlüssel (für Fallbacks)
+  // natürliche Schlüssel (für Suche & Fallbacks)
   const ipSpaceByName = new Map<string, KeyStr>();
   const addressBlockByAddress = new Map<string, KeyStr>(); // akzeptiert "addr" UND "addr/cidr"
   const addressBlockByName = new Map<string, KeyStr>();
@@ -303,7 +344,7 @@ function selectionFromKey(
   return key ? (nodeByKey.get(key) ?? null) : null;
 }
 
-/* ---------------- robust lookup ---------------- */
+/* ---------------- robust lookup for Jump (Redundancy Panel) ---------------- */
 
 function resolveKeyForJump(
   level: NT,
@@ -337,7 +378,6 @@ function resolveKeyForJump(
       break;
     }
     case "addressBlock": {
-      // zuerst CIDR/address (wir akzeptieren "addr" und "addr/cidr"), dann name
       const addr = hint?.address;
       if (addr) {
         const byAddr = addressBlockByAddress.get(addr);
@@ -351,7 +391,6 @@ function resolveKeyForJump(
       break;
     }
     case "subnet": {
-      // zuerst CIDR/address (wir akzeptieren "addr" und "addr/cidr"), dann name (z. B. „labor_vm“)
       const addr = hint?.address;
       if (addr) {
         const byAddr = subnetByAddress.get(addr);
@@ -388,6 +427,124 @@ function resolveKeyForJump(
   return null;
 }
 
+/* ---------------- Suche: Parser & Finder (ohne any) ---------------- */
+
+function parseQuery(raw: string) {
+  const q = raw.trim();
+  const lower = q.toLowerCase();
+
+  // Range: "subnetId:start-end" ODER "start-end"
+  const withSubnet = q.match(
+    /^(\d+):(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,3}(?:\.\d{1,3}){3})$/,
+  );
+  const rangeOnly = q.match(
+    /^(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,3}(?:\.\d{1,3}){3})$/,
+  );
+
+  // CIDR/IP: "addr" oder "addr/cidr"
+  const cidrMatch = q.match(
+    /^(\d{1,3}(?:\.\d{1,3}){3})(?:\/(\d|[12]\d|3[0-2]))?$/,
+  );
+
+  return { q, lower, withSubnet, rangeOnly, cidrMatch };
+}
+
+type SearchableNode = {
+  name?: string | number;
+  address?: string | number;
+  start?: string | number;
+  end?: string | number;
+  ip?: string | number;
+};
+
+function toStr(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return "";
+}
+
+function findKeyByQuery(
+  q: string,
+  index: ReturnType<typeof buildIndex>,
+): KeyStr | null {
+  const { lower, withSubnet, rangeOnly, cidrMatch } = parseQuery(q);
+  const {
+    ipSpaceByName,
+    addressBlockByAddress,
+    addressBlockByName,
+    subnetByAddress,
+    subnetByName,
+    rangeByTuple,
+    fixedByTuple,
+    nodeByKey,
+  } = index;
+
+  // 1) Exakte Maps
+
+  // CIDR / IP → prefer subnet/addressBlock maps & FixedAddress
+  if (cidrMatch) {
+    const addr = cidrMatch[1];
+    const cidr = cidrMatch[2];
+
+    if (cidr) {
+      const cidrStr = `${addr}/${cidr}`;
+      return (
+        subnetByAddress.get(cidrStr) ??
+        addressBlockByAddress.get(cidrStr) ??
+        null
+      );
+    }
+
+    // pure IP → FixedAddress (wenn subnetId unbekannt → heuristisch)
+    const fixedGuess = [...fixedByTuple.keys()].find((k) => k.endsWith(`:${addr}`));
+    if (fixedGuess) return fixedByTuple.get(fixedGuess) ?? null;
+
+    return subnetByAddress.get(addr) ?? addressBlockByAddress.get(addr) ?? null;
+  }
+
+  // Range
+  if (withSubnet) {
+    const [, sid, start, end] = withSubnet;
+    return rangeByTuple.get(`${sid}:${start}-${end}`) ?? null;
+  }
+  if (rangeOnly) {
+    const [, start, end] = rangeOnly;
+    const any = [...rangeByTuple.keys()].find((k) =>
+      k.endsWith(`:${start}-${end}`),
+    );
+    if (any) return rangeByTuple.get(any) ?? null;
+  }
+
+  // IP-Space / AB / Subnet Name exakt
+  const ipSpace = ipSpaceByName.get(q) ?? ipSpaceByName.get(q.toUpperCase());
+  if (ipSpace) return ipSpace;
+
+  const abByName = addressBlockByName.get(q);
+  if (abByName) return abByName;
+
+  const snByName = subnetByName.get(q);
+  if (snByName) return snByName;
+
+  // 2) Fallback: contains-scan über node props (typisiert)
+  const cand = [...nodeByKey.entries()].find(([, sel]) => {
+    const obj = (sel.object ?? {}) as Partial<SearchableNode>;
+    const name = toStr(obj.name).toLowerCase();
+    const addr = toStr(obj.address).toLowerCase();
+    const start = toStr(obj.start).toLowerCase();
+    const end = toStr(obj.end).toLowerCase();
+    const ip = toStr(obj.ip).toLowerCase();
+
+    return (
+      (name && name.includes(lower)) ||
+      (addr && addr.includes(lower)) ||
+      ((start || end) && `${start}-${end}`.includes(lower)) ||
+      (ip && ip.includes(lower))
+    );
+  });
+
+  return cand?.[0] ?? null;
+}
+
 /* ---------------- component ---------------- */
 
 export default function OverviewPage() {
@@ -401,12 +558,18 @@ export default function OverviewPage() {
     null,
   );
 
+  // Suchindex cachen
+  const [index, setIndex] = useState<ReturnType<typeof buildIndex> | null>(
+    null,
+  );
+
   useEffect(() => {
     fetchDhcpLightTree()
       .then((data) => {
         if (data?.ipSpaces) {
           setTree(data);
           if (data.ipSpaces.length > 0) setSelected(getDefaultSelection(data));
+          setIndex(data ? buildIndex(data) : null);
         }
       })
       .finally(() => setLoading(false));
@@ -427,16 +590,18 @@ export default function OverviewPage() {
       return;
     }
 
-    const index = buildIndex(tree);
-    const key = resolveKeyForJump(level as NT, objectId, hint, index);
+    const idx = index ?? buildIndex(tree);
+    if (!index) setIndex(idx);
+
+    const key = resolveKeyForJump(level as NT, objectId, hint, idx);
 
     if (!key) {
       console.warn("[Jump] No matching node for", { level, objectId, hint });
       return;
     }
 
-    const sel = selectionFromKey(index.nodeByKey, key);
-    const path = pathFromIndex(index.parent, key);
+    const sel = selectionFromKey(idx.nodeByKey, key);
+    const path = pathFromIndex(idx.parent, key);
 
     if (sel) setSelected(sel);
     if (path.length) setAutoExpandPath(path);
@@ -446,6 +611,19 @@ export default function OverviewPage() {
     const updated = await fetchDhcpLightTree();
     setTree(updated);
     if (updated?.ipSpaces?.length) setSelected(getDefaultSelection(updated));
+    setIndex(updated ? buildIndex(updated) : null);
+  };
+
+  // Suche → Pfad aufklappen & selektieren
+  const handleSearch = (query: string) => {
+    if (!tree || !index || !query) return;
+    setTab("tree");
+    const key = findKeyByQuery(query, index);
+    if (!key) return;
+    const sel = selectionFromKey(index.nodeByKey, key);
+    const path = pathFromIndex(index.parent, key);
+    if (sel) setSelected(sel);
+    if (path.length) setAutoExpandPath(path);
   };
 
   if (loading) {
@@ -518,6 +696,12 @@ export default function OverviewPage() {
         {tab === "tree" ? (
           <div className="flex h-full w-full">
             <div className="w-1/3 min-w-[340px] max-w-[480px] border-r border-[var(--border)] bg-[rgba(255,255,255,0.02)] overflow-y-auto">
+              {/* Suchleiste */}
+              <SearchBar
+                onSearch={handleSearch}
+                className="border-b border-[var(--border)]"
+              />
+
               <LightTreeView
                 tree={tree}
                 selected={selected}
