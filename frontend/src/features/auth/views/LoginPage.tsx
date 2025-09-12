@@ -13,7 +13,9 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const [initialValues, setInitialValues] = useState<Partial<AuthCredentialDto>>({});
+  const [initialValues, setInitialValues] = useState<
+    Partial<AuthCredentialDto>
+  >({});
 
   useEffect(() => {
     getCspCredential().then((result) => {

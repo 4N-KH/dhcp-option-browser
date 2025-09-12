@@ -2,8 +2,13 @@
 
 /* Theme variables */
 :root {
-  --background: radial-gradient(circle at top center, rgba(59,130,246,0.25) 0%, rgba(15,23,42,0.7) 70%),
-                linear-gradient(135deg, #1c355e 0%, #2b60c5 50%, #5faaff 100%);
+  --background:
+    radial-gradient(
+      circle at top center,
+      rgba(59, 130, 246, 0.25) 0%,
+      rgba(15, 23, 42, 0.7) 70%
+    ),
+    linear-gradient(135deg, #1c355e 0%, #2b60c5 50%, #5faaff 100%);
   --foreground: #f8fafc;
   --accent: #3b7fff;
   --accent-hover: #2152a3;
@@ -11,15 +16,21 @@
   --border: rgba(255, 255, 255, 0.12);
   --danger: #f87171;
   --success: #22c55e;
-  --font-sans: var(--font-geist-sans), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans:
+    var(--font-geist-sans), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 }
 
 /* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: radial-gradient(circle at top center, rgba(59,130,246,0.25) 0%, rgba(15,23,42,0.7) 70%),
-                  linear-gradient(135deg, #0a1120 0%, #1c355e 50%, #2b60c5 100%);
+    --background:
+      radial-gradient(
+        circle at top center,
+        rgba(59, 130, 246, 0.25) 0%,
+        rgba(15, 23, 42, 0.7) 70%
+      ),
+      linear-gradient(135deg, #0a1120 0%, #1c355e 50%, #2b60c5 100%);
     --foreground: #f8fafc;
     --accent: #3b82f6;
     --accent-hover: #60a5fa;
@@ -37,7 +48,9 @@
   box-sizing: border-box;
 }
 
-html, body, #__next {
+html,
+body,
+#__next {
   height: 100%;
 }
 
@@ -58,9 +71,21 @@ body {
 body::before {
   content: "";
   background:
-    radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 55%),
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.07) 0%, transparent 60%),
-    radial-gradient(circle at 70% 70%, rgba(255,255,255,0.04) 0%, transparent 60%);
+    radial-gradient(
+      circle at center,
+      rgba(255, 255, 255, 0.08) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 255, 255, 0.07) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 70% 70%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 60%
+    );
   background-size: cover;
   opacity: 0.05;
   position: fixed;
@@ -74,19 +99,19 @@ body::before {
 
 /* Wrapping the tree pane with this */
 .tree-container {
-  overflow-y: scroll;                  /* stable scrollbar, no layout jump */
+  overflow-y: scroll; /* stable scrollbar, no layout jump */
   scrollbar-gutter: stable both-edges; /* reserve gutter */
-  contain: layout paint;               /* isolate layout/paint */
-  backface-visibility: hidden;         /* reduce subpixel jitter */
-  transform: translateZ(0);            /* GPU hint */
-  overscroll-behavior: contain;        /* avoid bounce */
+  contain: layout paint; /* isolate layout/paint */
+  backface-visibility: hidden; /* reduce subpixel jitter */
+  transform: translateZ(0); /* GPU hint */
+  overscroll-behavior: contain; /* avoid bounce */
 }
 
 /* Pixel-stable rows */
 .tree-row {
-  line-height: 1.25rem;  /* 20px */
-  min-height: 1.75rem;   /* breathing room (28px) */
-  white-space: nowrap;   /* no wrap */
+  line-height: 1.25rem; /* 20px */
+  min-height: 1.75rem; /* breathing room (28px) */
+  white-space: nowrap; /* no wrap */
 }
 
 /* No baseline shift for SVGs */

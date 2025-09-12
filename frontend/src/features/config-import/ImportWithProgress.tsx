@@ -39,7 +39,9 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
       if (res.status === "error") setError(res.error || "Import failed.");
     } catch (e) {
       setStatus("error");
-      setError(e instanceof Error ? e.message : "Could not retrieve import status.");
+      setError(
+        e instanceof Error ? e.message : "Could not retrieve import status.",
+      );
     }
   }, []);
 
@@ -77,7 +79,10 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
 
   // UI logic
   const showButton =
-    status === "idle" || status === "success" || status === "error" || status === "queued";
+    status === "idle" ||
+    status === "success" ||
+    status === "error" ||
+    status === "queued";
   const buttonDisabled = activeStatuses.includes(status as ImportJobStatus);
 
   return (
@@ -88,14 +93,14 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
           onClick={startImport}
           disabled={buttonDisabled}
           className={`m-3 px-8 py-3 rounded-2xl border-2
-            ${buttonDisabled
-              ? "border-gray-300 bg-gray-100 text-gray-400"
-              : "border-blue-800 bg-white text-blue-900 hover:bg-blue-100 hover:border-blue-900"}
+            ${
+              buttonDisabled
+                ? "border-gray-300 bg-gray-100 text-gray-400"
+                : "border-blue-800 bg-white text-blue-900 hover:bg-blue-100 hover:border-blue-900"
+            }
             font-semibold text-xl shadow-md transition-all duration-150`}
         >
-          {status === "success"
-            ? "Import again"
-            : "Import DHCP data"}
+          {status === "success" ? "Import again" : "Import DHCP data"}
         </button>
       )}
 
@@ -121,7 +126,9 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
         </span>
       )}
       {status === "error" && (
-        <span className="text-base text-[var(--danger)] font-mono">{error}</span>
+        <span className="text-base text-[var(--danger)] font-mono">
+          {error}
+        </span>
       )}
     </div>
   );

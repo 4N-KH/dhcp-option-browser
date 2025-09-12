@@ -1,4 +1,4 @@
-export type GroupSetStatus = 'explicit' | 'inherited' | 'overridden';
+export type GroupSetStatus = "explicit" | "inherited" | "overridden";
 
 export interface OptionGroupOverviewDto {
   groupId: number;
@@ -10,17 +10,53 @@ export interface OptionGroupOverviewDto {
     overridden: number;
   };
   byLevel: {
-    global:      { total: number; explicit: number; inherited: number; overridden: number; };
-    ipSpace:     { total: number; explicit: number; inherited: number; overridden: number; };
-    addressBlock:{ total: number; explicit: number; inherited: number; overridden: number; };
-    subnet:      { total: number; explicit: number; inherited: number; overridden: number; };
-    range:       { total: number; explicit: number; inherited: number; overridden: number; };
-    fixedAddress:{ total: number; explicit: number; inherited: number; overridden: number; };
+    global: {
+      total: number;
+      explicit: number;
+      inherited: number;
+      overridden: number;
+    };
+    ipSpace: {
+      total: number;
+      explicit: number;
+      inherited: number;
+      overridden: number;
+    };
+    addressBlock: {
+      total: number;
+      explicit: number;
+      inherited: number;
+      overridden: number;
+    };
+    subnet: {
+      total: number;
+      explicit: number;
+      inherited: number;
+      overridden: number;
+    };
+    range: {
+      total: number;
+      explicit: number;
+      inherited: number;
+      overridden: number;
+    };
+    fixedAddress: {
+      total: number;
+      explicit: number;
+      inherited: number;
+      overridden: number;
+    };
   };
 }
 
 export interface OptionGroupOccurrenceDto {
-  objectType: 'global' | 'ipSpace' | 'addressBlock' | 'subnet' | 'range' | 'fixedAddress';
+  objectType:
+    | "global"
+    | "ipSpace"
+    | "addressBlock"
+    | "subnet"
+    | "range"
+    | "fixedAddress";
   objectId: number;
   objectLabel: string;
   objectDisplay: string;

@@ -8,7 +8,12 @@ import {
   LightFixedAddressDto,
 } from "@/types/dto/dhcp-light-tree.dto";
 import { TreeSelection } from "../../types/types";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/components/ui/tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/app/components/ui/tabs";
 import DhcpOptionsPanel from "./DhcpOptionsPanel";
 import { fetchEffectiveDhcpOptions } from "@/services/dhcp-options.service";
 import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
@@ -55,11 +60,13 @@ const FIELD_CONFIG = {
   ] as PropertyDef<LightFixedAddressDto>[],
 } as const;
 
-export const DhcpPropertiesPanel: React.FC<{ selected: TreeSelection | null }> = ({
-  selected,
-}) => {
+export const DhcpPropertiesPanel: React.FC<{
+  selected: TreeSelection | null;
+}> = ({ selected }) => {
   const [tab, setTab] = useState("properties");
-  const [options, setOptions] = useState<EffectiveDhcpOptionSlimDto[] | null>(null);
+  const [options, setOptions] = useState<EffectiveDhcpOptionSlimDto[] | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,16 +114,16 @@ export const DhcpPropertiesPanel: React.FC<{ selected: TreeSelection | null }> =
             {type === "global"
               ? "Global DHCP Configuration"
               : type === "ipSpace"
-              ? "IP Space"
-              : type === "addressBlock"
-              ? "Address Block"
-              : type === "subnet"
-              ? "Subnet"
-              : type === "range"
-              ? "Range"
-              : type === "fixedAddress"
-              ? "Fixed Address"
-              : type}
+                ? "IP Space"
+                : type === "addressBlock"
+                  ? "Address Block"
+                  : type === "subnet"
+                    ? "Subnet"
+                    : type === "range"
+                      ? "Range"
+                      : type === "fixedAddress"
+                        ? "Fixed Address"
+                        : type}
           </h2>
           <table className="w-full text-left text-base border-separate border-spacing-y-2">
             <tbody>

@@ -15,7 +15,7 @@ const API_BASE_URL = getApiBaseUrl();
 // Fetch effective DHCP options for a specific object (type + ID)
 export async function fetchEffectiveDhcpOptions(
   objectType: string,
-  objectId: number
+  objectId: number,
 ): Promise<EffectiveDhcpOptionSlimDto[]> {
   const url = `${API_BASE_URL}/api/csp/effective-options/${objectType}/${objectId}`;
   const res = await fetch(url, { credentials: "include" }); // Include credentials for session authentication

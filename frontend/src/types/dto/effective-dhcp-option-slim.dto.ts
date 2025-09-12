@@ -67,7 +67,11 @@ export interface EffectiveDhcpOptionSlimDto {
   comment?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
-  inheritanceType?: "EXPLICIT" | "INHERITED" | "GROUP_EXPLICIT" | "GROUP_INHERITED";
+  inheritanceType?:
+    | "EXPLICIT"
+    | "INHERITED"
+    | "GROUP_EXPLICIT"
+    | "GROUP_INHERITED";
   isInherited?: boolean;
   isOverridden?: boolean;
   originChain?: {

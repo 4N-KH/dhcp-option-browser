@@ -1,8 +1,10 @@
-'use client';
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { fetchDhcpLightTree } from "@/services/dhcp-hierarchy.service";
-import LightTreeView, { type NodeKey as TreeNodeKey } from "@/features/dhcp-tree/LightTreeView";
+import LightTreeView, {
+  type NodeKey as TreeNodeKey,
+} from "@/features/dhcp-tree/LightTreeView";
 import DhcpPropertiesPanel from "@/features/dhcp-tree/DhcpPropertiesPanel";
 import { getDefaultSelection } from "@/features/dhcp-tree/helpers/tree-node-helpers";
 import { TreeSelection } from "@/types/types";
@@ -22,8 +24,8 @@ import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 
 /* ---------------- optional Hints vom Redundancy-Panel ---------------- */
 export type JumpHint = {
-  name?: string;     // z. B. "labor_vm"
-  address?: string;  // z. B. "10.10.0.0/24" ODER "10.10.0.0" (wir unterstützen beide Formen)
+  name?: string; // z. B. "labor_vm"
+  address?: string; // z. B. "10.10.0.0/24" ODER "10.10.0.0" (wir unterstützen beide Formen)
   ipSpaceName?: string;
   subnetId?: number;
   start?: string;
@@ -34,15 +36,22 @@ export type JumpHint = {
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
-const ipSpaceAddressBlocks = (ip: LightIpSpaceDto): LightAddressBlockDto[] => arr<LightAddressBlockDto>(ip.addressBlocks);
-const ipSpaceSubnets       = (ip: LightIpSpaceDto): LightSubnetDto[]       => arr<LightSubnetDto>(ip.subnets);
+const ipSpaceAddressBlocks = (ip: LightIpSpaceDto): LightAddressBlockDto[] =>
+  arr<LightAddressBlockDto>(ip.addressBlocks);
+const ipSpaceSubnets = (ip: LightIpSpaceDto): LightSubnetDto[] =>
+  arr<LightSubnetDto>(ip.subnets);
 
-const abChildren = (ab: LightAddressBlockDto): LightAddressBlockDto[] => arr<LightAddressBlockDto>(ab.children);
-const abSubnets  = (ab: LightAddressBlockDto): LightSubnetDto[]       => arr<LightSubnetDto>(ab.subnets);
+const abChildren = (ab: LightAddressBlockDto): LightAddressBlockDto[] =>
+  arr<LightAddressBlockDto>(ab.children);
+const abSubnets = (ab: LightAddressBlockDto): LightSubnetDto[] =>
+  arr<LightSubnetDto>(ab.subnets);
 
-const subnetRanges = (sn: LightSubnetDto): LightRangeDto[]                    => arr<LightRangeDto>(sn.ranges);
-const subnetFixed  = (sn: LightSubnetDto): LightFixedAddressDto[]             => arr<LightFixedAddressDto>(sn.fixedAddresses ?? []);
-const rangeFixed   = (rg: LightRangeDto): LightFixedAddressDto[]              => arr<LightFixedAddressDto>(rg.fixedAddresses);
+const subnetRanges = (sn: LightSubnetDto): LightRangeDto[] =>
+  arr<LightRangeDto>(sn.ranges);
+const subnetFixed = (sn: LightSubnetDto): LightFixedAddressDto[] =>
+  arr<LightFixedAddressDto>(sn.fixedAddresses ?? []);
+const rangeFixed = (rg: LightRangeDto): LightFixedAddressDto[] =>
+  arr<LightFixedAddressDto>(rg.fixedAddresses);
 
 /* ---------------- key helpers (MUST MATCH LightTreeView) ---------------- */
 
@@ -119,10 +128,10 @@ function buildIndex(tree: DhcpLightTreeDto) {
   const ipSpaceByName = new Map<string, KeyStr>();
   const addressBlockByAddress = new Map<string, KeyStr>(); // akzeptiert "addr" UND "addr/cidr"
   const addressBlockByName = new Map<string, KeyStr>();
-  const subnetByAddress = new Map<string, KeyStr>();       // akzeptiert "addr" UND "addr/cidr"
+  const subnetByAddress = new Map<string, KeyStr>(); // akzeptiert "addr" UND "addr/cidr"
   const subnetByName = new Map<string, KeyStr>();
-  const rangeByTuple = new Map<string, KeyStr>();          // `${subnetId}:${start}-${end}`
-  const fixedByTuple = new Map<string, KeyStr>();          // `${subnetId}:${ip}`
+  const rangeByTuple = new Map<string, KeyStr>(); // `${subnetId}:${start}-${end}`
+  const fixedByTuple = new Map<string, KeyStr>(); // `${subnetId}:${ip}`
 
   const rootKey: KeyStr = "global:root";
   parent.set(rootKey, null);
@@ -173,7 +182,8 @@ function buildIndex(tree: DhcpLightTreeDto) {
         const sid = s(rd(sel.object, "subnetId"));
         const start = s(rd(sel.object, "start"));
         const end = s(rd(sel.object, "end"));
-        if (sid && start && end) rangeByTuple.set(`${sid}:${start}-${end}`, key);
+        if (sid && start && end)
+          rangeByTuple.set(`${sid}:${start}-${end}`, key);
         break;
       }
       case "fixedAddress": {
@@ -216,7 +226,9 @@ function buildIndex(tree: DhcpLightTreeDto) {
 
       for (const fa of rangeFixed(rg)) {
         // range-fixed has ip, rangeId, and inherits subnetId via rg.subnetId
-        const faWithRange: LightFixedAddressDto & { range?: Pick<LightRangeDto, "subnetId"> } = {
+        const faWithRange: LightFixedAddressDto & {
+          range?: Pick<LightRangeDto, "subnetId">;
+        } = {
           ...fa,
           range: { subnetId: rg.subnetId },
         };
@@ -264,7 +276,7 @@ function buildIndex(tree: DhcpLightTreeDto) {
 
 function pathFromIndex(
   parent: Map<KeyStr, KeyStr | null>,
-  keyStart: KeyStr | null
+  keyStart: KeyStr | null,
 ): TreeNodeKey[] {
   if (!keyStart) return [];
 
@@ -286,9 +298,9 @@ function pathFromIndex(
 
 function selectionFromKey(
   nodeByKey: Map<KeyStr, TreeSelection>,
-  key: KeyStr | null
+  key: KeyStr | null,
 ): TreeSelection | null {
-  return key ? nodeByKey.get(key) ?? null : null;
+  return key ? (nodeByKey.get(key) ?? null) : null;
 }
 
 /* ---------------- robust lookup ---------------- */
@@ -297,7 +309,7 @@ function resolveKeyForJump(
   level: NT,
   objectId: number,
   hint: JumpHint | undefined,
-  index: ReturnType<typeof buildIndex>
+  index: ReturnType<typeof buildIndex>,
 ): KeyStr | null {
   const {
     idToKey,
@@ -381,9 +393,13 @@ function resolveKeyForJump(
 export default function OverviewPage() {
   const [tree, setTree] = useState<DhcpLightTreeDto | null>(null);
   const [selected, setSelected] = useState<TreeSelection | null>(null);
-  const [tab, setTab] = useState<"tree" | "overview" | "groups" | "redundancies">("tree");
+  const [tab, setTab] = useState<
+    "tree" | "overview" | "groups" | "redundancies"
+  >("tree");
   const [loading, setLoading] = useState(true);
-  const [autoExpandPath, setAutoExpandPath] = useState<TreeNodeKey[] | null>(null);
+  const [autoExpandPath, setAutoExpandPath] = useState<TreeNodeKey[] | null>(
+    null,
+  );
 
   useEffect(() => {
     fetchDhcpLightTree()
@@ -397,7 +413,11 @@ export default function OverviewPage() {
   }, []);
 
   /** Robust: akzeptiert optional Hints vom Redundancy-Panel */
-  const handleJumpToTree = (level: RedundancyLevel, objectId: number, hint?: JumpHint) => {
+  const handleJumpToTree = (
+    level: RedundancyLevel,
+    objectId: number,
+    hint?: JumpHint,
+  ) => {
     setTab("tree");
     if (!tree) return;
 
@@ -452,7 +472,9 @@ export default function OverviewPage() {
         <div className="flex gap-4">
           <button
             className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
-              tab === "tree" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+              tab === "tree"
+                ? "bg-[var(--accent)] text-white"
+                : "bg-white/10 text-blue-200"
             }`}
             onClick={() => setTab("tree")}
           >
@@ -460,7 +482,9 @@ export default function OverviewPage() {
           </button>
           <button
             className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
-              tab === "overview" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+              tab === "overview"
+                ? "bg-[var(--accent)] text-white"
+                : "bg-white/10 text-blue-200"
             }`}
             onClick={() => setTab("overview")}
           >
@@ -468,7 +492,9 @@ export default function OverviewPage() {
           </button>
           <button
             className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
-              tab === "groups" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+              tab === "groups"
+                ? "bg-[var(--accent)] text-white"
+                : "bg-white/10 text-blue-200"
             }`}
             onClick={() => setTab("groups")}
           >
@@ -476,7 +502,9 @@ export default function OverviewPage() {
           </button>
           <button
             className={`m-2 px-6 py-2 rounded-lg font-bold transition ${
-              tab === "redundancies" ? "bg-[var(--accent)] text-white" : "bg-white/10 text-blue-200"
+              tab === "redundancies"
+                ? "bg-[var(--accent)] text-white"
+                : "bg-white/10 text-blue-200"
             }`}
             onClick={() => setTab("redundancies")}
           >

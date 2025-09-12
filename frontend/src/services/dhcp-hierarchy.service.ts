@@ -1,4 +1,4 @@
-import { DhcpLightTreeDto } from '@/types/dto/dhcp-light-tree.dto';
+import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 
 // --- Resolves API base URL for client vs. server (Docker) ---
 function getApiBaseUrl(): string {
@@ -22,5 +22,5 @@ async function fetchJson<T>(path: string): Promise<T> {
 
 // Fetch DHCP Light-Tree (lightweight tree structure for UI display)
 export function fetchDhcpLightTree(): Promise<DhcpLightTreeDto> {
-  return fetchJson('/api/csp/tree/light');
+  return fetchJson("/api/csp/tree/light");
 }

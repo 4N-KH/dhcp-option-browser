@@ -7,7 +7,10 @@ interface AuthModeTabsProps {
 }
 
 // Renders tab buttons to select authentication mode
-const AuthModeTabs: React.FC<AuthModeTabsProps> = ({ selectedMode, onSelect }) => {
+const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
+  selectedMode,
+  onSelect,
+}) => {
   return (
     <div className="flex justify-center space-x-4 text-base font-medium mb-6">
       {[AuthMode.GRID, AuthMode.CSP].map((mode) => {
@@ -26,7 +29,9 @@ const AuthModeTabs: React.FC<AuthModeTabsProps> = ({ selectedMode, onSelect }) =
                   : "bg-[var(--accent-light)]/50 text-[var(--foreground)]/80 hover:ring-1 hover:ring-[var(--accent)] hover:ring-offset-1 hover:ring-offset-[var(--background)] hover:scale-[1.03] hover:bg-[var(--accent-light)]/70 active:scale-[0.98]"
               }`}
           >
-            {mode === AuthMode.GRID ? "Grid Manager" : "Cloud Service Platform (CSP)"}
+            {mode === AuthMode.GRID
+              ? "Grid Manager"
+              : "Cloud Service Platform (CSP)"}
           </button>
         );
       })}

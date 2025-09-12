@@ -1,7 +1,7 @@
 export function getInheritedLabel(
   originLevel?: string,
   originLevelLabel?: string,
-  originLevelId?: number
+  originLevelId?: number,
 ) {
   if (!originLevel) return "Inherited";
   if (originLevelLabel && originLevelLabel.trim().length > 0) {

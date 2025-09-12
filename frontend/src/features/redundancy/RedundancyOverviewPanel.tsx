@@ -12,10 +12,10 @@ type Props = {
   onJump?: (level: RedundancyLevel, objectId: number) => void;
 };
 
-const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] }> = ({
-  item,
-  onJump,
-}) => {
+const Row: React.FC<{
+  item: RedundancyOverviewItemDto;
+  onJump?: Props["onJump"];
+}> = ({ item, onJump }) => {
   const { level, name, address, redundantOption, objectId } = item;
 
   const setIn = redundantOption.setIn
@@ -45,8 +45,8 @@ const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] 
       </div>
 
       <div className="mt-2 text-sm">
-        <span className="opacity-80">redundant option:</span>{" "}
-        code: {String(redundantOption.code)} • name: {redundantOption.name} • value:{" "}
+        <span className="opacity-80">redundant option:</span> code:{" "}
+        {String(redundantOption.code)} • name: {redundantOption.name} • value:{" "}
         {redundantOption.value}
         {redundantOption.type ? <> • type: {redundantOption.type}</> : null}
       </div>
@@ -57,12 +57,15 @@ const Row: React.FC<{ item: RedundancyOverviewItemDto; onJump?: Props["onJump"] 
 };
 
 const RedundancyOverviewPanel: React.FC<Props> = ({ onJump }) => {
-  const { data, isLoading, error, refetch, isFetching } = useQuery<RedundancyOverviewItemDto[]>({
+  const { data, isLoading, error, refetch, isFetching } = useQuery<
+    RedundancyOverviewItemDto[]
+  >({
     queryKey: ["redundancy-overview"],
     queryFn: fetchRedundancyOverview,
   });
 
-  if (isLoading) return <div className="p-6 text-blue-200">Loading redundancies…</div>;
+  if (isLoading)
+    return <div className="p-6 text-blue-200">Loading redundancies…</div>;
 
   if (error)
     return (
@@ -88,13 +91,19 @@ const RedundancyOverviewPanel: React.FC<Props> = ({ onJump }) => {
           {isFetching ? "Refreshing…" : "Refresh Overview"}
         </button>
         <div className="text-sm opacity-70">
-          {data?.length ? `${data.length} redundancies` : "No redundancies found"}
+          {data?.length
+            ? `${data.length} redundancies`
+            : "No redundancies found"}
         </div>
       </div>
 
       <div className="grid gap-3 overflow-auto pr-2">
         {(data ?? []).map((item, idx) => (
-          <Row key={`${item.level}-${item.objectId}-${idx}`} item={item} onJump={onJump} />
+          <Row
+            key={`${item.level}-${item.objectId}-${idx}`}
+            item={item}
+            onJump={onJump}
+          />
         ))}
       </div>
     </div>

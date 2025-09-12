@@ -36,9 +36,7 @@ function withAuthHeaders() {
 }
 
 // Type guard for Axios errors
-function isAxiosError(
-  error: unknown
-): error is {
+function isAxiosError(error: unknown): error is {
   response?: {
     data?: {
       message?: string;
@@ -50,13 +48,13 @@ function isAxiosError(
 
 // ---- Login-Flow (Grid & CSP) ----
 export const login = async (
-  credentials: AuthCredentialDto
+  credentials: AuthCredentialDto,
 ): Promise<AuthResponse> => {
   try {
     const response = await axios.post<AuthResponse>(
       `${API_BASE_URL}/auth/login`,
       credentials,
-      { withCredentials: true }
+      { withCredentials: true },
     );
     // If login succeeds and a token is returned, save it
     if (response.data.success && response.data.token) {
@@ -79,7 +77,7 @@ export const login = async (
 
 // ---- Save CSP credentials (API key) for current user ----
 export const saveCspCredential = async (
-  apiKey: string
+  apiKey: string,
   // , region: Region // REGION: vorläufig deaktiviert
 ): Promise<AuthResponse> => {
   try {
@@ -87,7 +85,7 @@ export const saveCspCredential = async (
       `${API_BASE_URL}/credentials/csp`,
       // { apiKey, region }, // REGION: vorläufig deaktiviert
       { apiKey },
-      withAuthHeaders()
+      withAuthHeaders(),
     );
     return response.data;
   } catch (error: unknown) {
@@ -105,51 +103,51 @@ export const saveCspCredential = async (
 };
 
 // ---- Get CSP credentials for autofill (regionlos) ----
-export const getCspCredential = async (
-  // region: Region // REGION: vorläufig deaktiviert
-): Promise<{ apiKey?: string; success: boolean; message?: string }> => {
-  try {
-    const response = await axios.get<{ apiKey: string }>(
-      `${API_BASE_URL}/credentials/csp`,
-      // { params: { region }, ...withAuthHeaders() } // REGION: vorläufig deaktiviert
-      { ...withAuthHeaders() }
-    );
-    return { apiKey: response.data.apiKey, success: true };
-  } catch (error: unknown) {
-    if (isAxiosError(error)) {
+export const getCspCredential =
+  async () // region: Region // REGION: vorläufig deaktiviert
+  : Promise<{ apiKey?: string; success: boolean; message?: string }> => {
+    try {
+      const response = await axios.get<{ apiKey: string }>(
+        `${API_BASE_URL}/credentials/csp`,
+        // { params: { region }, ...withAuthHeaders() } // REGION: vorläufig deaktiviert
+        { ...withAuthHeaders() },
+      );
+      return { apiKey: response.data.apiKey, success: true };
+    } catch (error: unknown) {
+      if (isAxiosError(error)) {
+        return {
+          success: false,
+          message: error.response?.data?.message || "Unknown server error",
+        };
+      }
       return {
         success: false,
-        message: error.response?.data?.message || "Unknown server error",
+        message: "Unexpected error occurred",
       };
     }
-    return {
-      success: false,
-      message: "Unexpected error occurred",
-    };
-  }
-};
+  };
 
 // ---- (Optional) Delete CSP credentials (regionlos) ----
-export const deleteCspCredential = async (
-  // region: Region // REGION: vorläufig deaktiviert
-): Promise<AuthResponse> => {
-  try {
-    const response = await axios.delete<AuthResponse>(
-      `${API_BASE_URL}/credentials/csp`,
-      // { params: { region }, ...withAuthHeaders() } // REGION: vorläufig deaktiviert
-      { ...withAuthHeaders() }
-    );
-    return response.data;
-  } catch (error: unknown) {
-    if (isAxiosError(error)) {
+export const deleteCspCredential =
+  async () // region: Region // REGION: vorläufig deaktiviert
+  : Promise<AuthResponse> => {
+    try {
+      const response = await axios.delete<AuthResponse>(
+        `${API_BASE_URL}/credentials/csp`,
+        // { params: { region }, ...withAuthHeaders() } // REGION: vorläufig deaktiviert
+        { ...withAuthHeaders() },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (isAxiosError(error)) {
+        return {
+          success: false,
+          message: error.response?.data?.message || "Unknown server error",
+        };
+      }
       return {
         success: false,
-        message: error.response?.data?.message || "Unknown server error",
+        message: "Unexpected error occurred",
       };
     }
-    return {
-      success: false,
-      message: "Unexpected error occurred",
-    };
-  }
-};
+  };

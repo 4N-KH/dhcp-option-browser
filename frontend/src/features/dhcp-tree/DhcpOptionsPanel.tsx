@@ -46,9 +46,9 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
         if (!groupMap.has(group.id)) {
           groupMap.set(group.id, {
             group,
-            status:
-              (group.groupInheritanceType ||
-                opt.source.type) as "GROUP_EXPLICIT" | "GROUP_INHERITED",
+            status: (group.groupInheritanceType || opt.source.type) as
+              | "GROUP_EXPLICIT"
+              | "GROUP_INHERITED",
             originLevel: group.groupOriginLevel || opt.source.originLevel,
             originLevelId: group.groupOriginLevelId || opt.source.originLevelId,
             originLevelLabel: group.originLevelLabel,
@@ -63,8 +63,8 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
                 gopt.redundantWith.value ?? null,
                 gopt.redundantWith.level,
                 gopt.redundantWith.levelId,
-                gopt.redundantWith.groupId
-              )
+                gopt.redundantWith.groupId,
+              ),
             );
           }
         }
@@ -84,8 +84,8 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
             opt.redundantWith.value ?? null,
             opt.redundantWith.level,
             opt.redundantWith.levelId,
-            opt.redundantWith.groupId
-          )
+            opt.redundantWith.groupId,
+          ),
         );
       }
     }
@@ -103,9 +103,7 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
     return <div className="p-6 text-lg text-red-400">Error: {error}</div>;
   if (!options || (directOptions.length === 0 && groupPanels.length === 0))
     return (
-      <div className="p-6 text-gray-400">
-        No options found for this object.
-      </div>
+      <div className="p-6 text-gray-400">No options found for this object.</div>
     );
 
   return (
@@ -131,7 +129,11 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
             <tbody>
               {directOptions.length > 0 ? (
                 directOptions.map((opt, i) => (
-                  <DhcpOptionRow key={opt.code + String(i)} option={opt} rowIndex={i} />
+                  <DhcpOptionRow
+                    key={opt.code + String(i)}
+                    option={opt}
+                    rowIndex={i}
+                  />
                 ))
               ) : (
                 <tr>
@@ -152,7 +154,13 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
         </div>
         {groupPanels.length > 0 ? (
           groupPanels.map(
-            ({ group, status, originLevel, originLevelLabel, originLevelId }) => (
+            ({
+              group,
+              status,
+              originLevel,
+              originLevelLabel,
+              originLevelId,
+            }) => (
               <OptionGroupPanel
                 key={group.id}
                 group={group}
@@ -163,7 +171,7 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
                 options={group.options}
                 partnerKeys={partnerKeys}
               />
-            )
+            ),
           )
         ) : (
           <div className="text-gray-500 py-2 px-4">No option groups</div>
@@ -172,8 +180,7 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
 
       {/* UX hint */}
       <div className="text-xs text-gray-500 mt-3 ml-2">
-        Tip: Click a group to expand.
-        is shown for each group.
+        Tip: Click a group to expand. is shown for each group.
       </div>
     </div>
   );

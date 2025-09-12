@@ -20,7 +20,10 @@ import { Client } from 'pg';
 dotenv.config({ path: __dirname + '/../.env' });
 
 async function main(): Promise<void> {
-  console.log('DB_PASSWORD (ENV, raw):', JSON.stringify(process.env.DB_PASSWORD));
+  console.log(
+    'DB_PASSWORD (ENV, raw):',
+    JSON.stringify(process.env.DB_PASSWORD),
+  );
 
   // Direktverbindung zur DB testen (ohne TypeORM)
   const client = new Client({
@@ -33,7 +36,9 @@ async function main(): Promise<void> {
 
   try {
     await client.connect();
-    console.log('✅ Direkter PG-Connect erfolgreich mit gegebenen ENV-Variablen');
+    console.log(
+      '✅ Direkter PG-Connect erfolgreich mit gegebenen ENV-Variablen',
+    );
   } catch (err) {
     console.error('❌ Direkter PG-Connect fehlgeschlagen:', err);
     process.exit(1); // Abbrechen, wenn schon hier kein Connect geht
@@ -73,9 +78,13 @@ async function main(): Promise<void> {
     console.log(`Nachher: ${afterCount} AddressBlocks`);
 
     if (beforeCount === afterCount) {
-      console.log('✅ Transaktion wurde korrekt zurückgerollt – keine Teilzustände gespeichert.');
+      console.log(
+        '✅ Transaktion wurde korrekt zurückgerollt – keine Teilzustände gespeichert.',
+      );
     } else {
-      console.warn('⚠️ Achtung: Datensätze haben sich geändert, Rollback evtl. nicht wie erwartet.');
+      console.warn(
+        '⚠️ Achtung: Datensätze haben sich geändert, Rollback evtl. nicht wie erwartet.',
+      );
     }
   } finally {
     await app.close();

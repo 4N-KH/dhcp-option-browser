@@ -1,10 +1,10 @@
 import {
-  Globe,      // Global config
-  Network,    // IP Space
-  SquareStack,// Address Block
-  GitBranch,  // Subnet
-  Server,     // Range
-  Computer,   // Fixed Address
+  Globe, // Global config
+  Network, // IP Space
+  SquareStack, // Address Block
+  GitBranch, // Subnet
+  Server, // Range
+  Computer, // Fixed Address
 } from "lucide-react";
 import { DhcpObjectType } from "../../types/types";
 

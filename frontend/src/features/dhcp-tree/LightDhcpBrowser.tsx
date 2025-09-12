@@ -51,11 +51,7 @@ const LightDhcpBrowser: React.FC = () => {
     <div className="flex flex-col md:flex-row gap-6 w-full h-[85vh] px-4 py-6 overflow-hidden bg-[var(--background)]">
       {/* Tree (left side) */}
       <div className="w-full md:w-1/3 max-w-[410px] min-w-[250px] bg-[var(--accent-light)]/30 rounded-2xl shadow-lg overflow-y-auto">
-        <LightTreeView
-          tree={data}
-          selected={selected}
-          onSelect={setSelected}
-        />
+        <LightTreeView tree={data} selected={selected} onSelect={setSelected} />
       </div>
 
       {/* Properties panel (right side) */}

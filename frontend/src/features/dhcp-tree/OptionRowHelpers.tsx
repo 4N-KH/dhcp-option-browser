@@ -5,14 +5,14 @@ import { getInheritedLabel } from "./helpers/labels";
 /** solid, high-contrast palette (used only for blinking/redundant rows) */
 type Tone = { bg: string; text: string };
 const TONES: Tone[] = [
-  { bg: "bg-red-600",    text: "text-white" },
-  { bg: "bg-green-600",  text: "text-white" },
+  { bg: "bg-red-600", text: "text-white" },
+  { bg: "bg-green-600", text: "text-white" },
   { bg: "bg-yellow-400", text: "text-black" },
   { bg: "bg-orange-500", text: "text-black" },
-  { bg: "bg-blue-600",   text: "text-white" },
+  { bg: "bg-blue-600", text: "text-white" },
   { bg: "bg-purple-600", text: "text-white" },
-  { bg: "bg-teal-600",   text: "text-white" },
-  { bg: "bg-pink-600",   text: "text-white" },
+  { bg: "bg-teal-600", text: "text-white" },
+  { bg: "bg-pink-600", text: "text-white" },
 ];
 
 /** deterministic tone by option code */
@@ -25,8 +25,14 @@ export function getSolidByCode(code: string | number): Tone {
 }
 
 /** origin helpers (minimal) */
-function getOriginLevelLabel(o: EffectiveDhcpOptionSlimDto): string | undefined {
-  return o.source.originLevelLabel ?? o.source.optionGroup?.originLevelLabel ?? o.source.optionGroup?.groupOriginLevel;
+function getOriginLevelLabel(
+  o: EffectiveDhcpOptionSlimDto,
+): string | undefined {
+  return (
+    o.source.originLevelLabel ??
+    o.source.optionGroup?.originLevelLabel ??
+    o.source.optionGroup?.groupOriginLevel
+  );
 }
 function getOriginLevelId(o: EffectiveDhcpOptionSlimDto): number | undefined {
   return o.source.originLevelId ?? o.source.optionGroup?.groupOriginLevelId;
@@ -59,7 +65,13 @@ export function StatusBadge({
   if (status === "INHERITED" || status === "GROUP_INHERITED") {
     return (
       <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold ring-1 ring-white/10">
-        {originLevelLabel ? <>Inherited from <b>{originLevelLabel}</b></> : getInheritedLabel(originLevel, undefined, originLevelId)}
+        {originLevelLabel ? (
+          <>
+            Inherited from <b>{originLevelLabel}</b>
+          </>
+        ) : (
+          getInheritedLabel(originLevel, undefined, originLevelId)
+        )}
       </span>
     );
   }

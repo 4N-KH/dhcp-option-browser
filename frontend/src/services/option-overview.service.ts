@@ -15,7 +15,9 @@ function getApiBaseUrl(): string {
 const API_BASE_URL = getApiBaseUrl();
 
 // 1. Fetch all option codes with metadata (code, name, type, source)
-export async function fetchOptionCodeOverview(): Promise<OptionCodeOverviewDto[]> {
+export async function fetchOptionCodeOverview(): Promise<
+  OptionCodeOverviewDto[]
+> {
   const res = await fetch(`${API_BASE_URL}/api/option-overview`, {
     credentials: "include", // Include cookies/session
   });
@@ -30,7 +32,7 @@ export async function fetchOptionValues(
 ): Promise<OptionValueOverviewDto[]> {
   const res = await fetch(
     `${API_BASE_URL}/api/option-overview/${code}/${name}/values`,
-    { credentials: "include" }
+    { credentials: "include" },
   );
   if (!res.ok) throw new Error("Failed to fetch Option Values");
   return res.json();
@@ -42,11 +44,11 @@ export async function fetchOptionValueOccurrences(
   name: string,
   value: string,
   type?: string,
-  source?: string
+  source?: string,
 ): Promise<OptionOccurrenceDto[]> {
   const url = new URL(
     `${API_BASE_URL}/api/option-overview/${code}/${name}/values/${encodeURIComponent(value)}/objects`,
-    API_BASE_URL
+    API_BASE_URL,
   );
   if (type) url.searchParams.append("type", type);
   if (source) url.searchParams.append("source", source);

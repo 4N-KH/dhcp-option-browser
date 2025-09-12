@@ -65,7 +65,10 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
             <span className="text-xs text-gray-400 ml-2">{group.comment}</span>
           )}
         </div>
-        <button className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-200" tabIndex={-1}>
+        <button
+          className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-200"
+          tabIndex={-1}
+        >
           {open ? "Hide Options" : "Show Options"}
         </button>
       </div>
@@ -102,7 +105,9 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
                       {/* code stays plain */}
                       <td className="py-1 px-2 font-mono">{opt.code}</td>
                       <td className="py-1 px-2">{opt.name ?? "–"}</td>
-                      <td className="py-1 px-2 font-mono">{opt.value ?? "–"}</td>
+                      <td className="py-1 px-2 font-mono">
+                        {opt.value ?? "–"}
+                      </td>
                       <td className="py-1 px-2">{opt.type ?? "–"}</td>
                       <td className="py-1 px-2">
                         {isRedundant && (

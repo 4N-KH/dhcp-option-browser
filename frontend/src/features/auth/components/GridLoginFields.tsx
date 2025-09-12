@@ -13,7 +13,12 @@ interface Props {
   formUtils: FormUtils;
 }
 
-const GridLoginFields: React.FC<Props> = ({ register, errors, inputRef, formUtils }) => {
+const GridLoginFields: React.FC<Props> = ({
+  register,
+  errors,
+  inputRef,
+  formUtils,
+}) => {
   const [showPassword, setShowPassword] = useState(false);
   // current password value, fallback to empty string
   const passwordValue = formUtils.watch("password") ?? "";
@@ -41,7 +46,9 @@ const GridLoginFields: React.FC<Props> = ({ register, errors, inputRef, formUtil
           placeholder="Enter your username"
         />
         {errors.username?.message && (
-          <p className="text-sm text-[var(--danger)] mt-1">{errors.username.message}</p>
+          <p className="text-sm text-[var(--danger)] mt-1">
+            {errors.username.message}
+          </p>
         )}
       </div>
 
@@ -70,7 +77,9 @@ const GridLoginFields: React.FC<Props> = ({ register, errors, inputRef, formUtil
           )}
         </div>
         {errors.password?.message && (
-          <p className="text-sm text-[var(--danger)] mt-1">{errors.password.message}</p>
+          <p className="text-sm text-[var(--danger)] mt-1">
+            {errors.password.message}
+          </p>
         )}
       </div>
     </div>

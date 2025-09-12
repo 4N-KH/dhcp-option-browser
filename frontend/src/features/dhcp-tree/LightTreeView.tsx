@@ -1,11 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { DhcpLightTreeDto } from "@/types/dto/dhcp-light-tree.dto";
 import { TreeSelection, DhcpObjectType } from "@/types/types";
 import { getChildren, getNodeLabel } from "./helpers/tree-node-helpers";
 import { getIcon } from "./tree-icons";
 
 /** Node types used in the tree */
-export type NodeType = "global" | "ipSpace" | "addressBlock" | "subnet" | "range" | "fixedAddress";
+export type NodeType =
+  | "global"
+  | "ipSpace"
+  | "addressBlock"
+  | "subnet"
+  | "range"
+  | "fixedAddress";
 /** Stable path key */
 export type NodeKey = { type: NodeType; id: string };
 
@@ -66,7 +78,10 @@ function stableIdFor(sel: TreeSelection): string {
     }
     case "range": {
       // Range hat 'subnetId', 'start', 'end'
-      const sid = toStr(read(o, "subnetId")) ?? toStr(read(read(o, "subnet"), "id")) ?? "?:";
+      const sid =
+        toStr(read(o, "subnetId")) ??
+        toStr(read(read(o, "subnet"), "id")) ??
+        "?:";
       const start = toStr(read(o, "start")) ?? "start?";
       const end = toStr(read(o, "end")) ?? "end?";
       return `${sid}:${start}-${end}`;
@@ -95,7 +110,10 @@ function nodeKeyToString(k: NodeKey): string {
   return `${k.type}:${k.id}`;
 }
 
-function sameSelection(a: TreeSelection | null, b: TreeSelection | null): boolean {
+function sameSelection(
+  a: TreeSelection | null,
+  b: TreeSelection | null,
+): boolean {
   if (!a || !b) return false;
   if (a.type !== b.type) return false;
   return stableIdFor(a) === stableIdFor(b);
@@ -104,7 +122,12 @@ function sameSelection(a: TreeSelection | null, b: TreeSelection | null): boolea
 /* ---------------- ui bits ---------------- */
 
 const Chevron: React.FC<{ open: boolean }> = ({ open }) => (
-  <svg aria-hidden viewBox="0 0 20 20" className="w-4 h-4" style={{ transform: `rotate(${open ? 90 : 0}deg)` }}>
+  <svg
+    aria-hidden
+    viewBox="0 0 20 20"
+    className="w-4 h-4"
+    style={{ transform: `rotate(${open ? 90 : 0}deg)` }}
+  >
     <path d="M7 5l6 5-6 5" fill="currentColor" />
   </svg>
 );
@@ -117,7 +140,15 @@ const Row: React.FC<{
   onToggle: (key: NodeKey) => void;
   isExpandedKey: (key: NodeKey) => boolean;
   level: number;
-}> = ({ selection, selected, onSelect, isOpen, onToggle, isExpandedKey, level }) => {
+}> = ({
+  selection,
+  selected,
+  onSelect,
+  isOpen,
+  onToggle,
+  isExpandedKey,
+  level,
+}) => {
   const children = useMemo(() => getChildren(selection), [selection]);
   const key = selectionToNodeKey(selection);
   const keyStr = nodeKeyToString(key);
@@ -150,11 +181,15 @@ const Row: React.FC<{
         </div>
 
         <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-          <span className="inline-block">{getIcon(selection.type as DhcpObjectType)}</span>
+          <span className="inline-block">
+            {getIcon(selection.type as DhcpObjectType)}
+          </span>
         </div>
 
         <div className={`min-w-0 flex-1 ${isSelected ? "font-semibold" : ""}`}>
-          <span className={`block truncate leading-5 ${isSelected ? "text-[var(--accent)]" : ""}`}>
+          <span
+            className={`block truncate leading-5 ${isSelected ? "text-[var(--accent)]" : ""}`}
+          >
             {getNodeLabel(selection)}
           </span>
         </div>
@@ -242,28 +277,33 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
   }, [rootSelection, rootKeyStr]);
 
   // helper: expand ancestor chain for a key string
-  const expandAncestors = useCallback((targetKeyStr: string) => {
-    const parentOf = parentOfRef.current;
-    if (!parentOf.size) return;
+  const expandAncestors = useCallback(
+    (targetKeyStr: string) => {
+      const parentOf = parentOfRef.current;
+      if (!parentOf.size) return;
 
-    const path: string[] = [];
-    let cur: string | null | undefined = targetKeyStr;
-    let guard = 0;
-    while (cur && guard++ < 1000) {
-      path.push(cur);
-      cur = parentOf.get(cur) ?? null;
-    }
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      for (const k of path) next.add(k);
-      next.add(rootKeyStr);
-      return next;
-    });
-  }, [rootKeyStr]);
+      const path: string[] = [];
+      let cur: string | null | undefined = targetKeyStr;
+      let guard = 0;
+      while (cur && guard++ < 1000) {
+        path.push(cur);
+        cur = parentOf.get(cur) ?? null;
+      }
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        for (const k of path) next.add(k);
+        next.add(rootKeyStr);
+        return next;
+      });
+    },
+    [rootKeyStr],
+  );
 
   // DOM query that works regardless of container
   const findRowEl = useCallback((targetKeyStr: string): HTMLElement | null => {
-    const q1 = document.querySelector<HTMLElement>(`.tree-row[data-tree-key="${targetKeyStr}"]`);
+    const q1 = document.querySelector<HTMLElement>(
+      `.tree-row[data-tree-key="${targetKeyStr}"]`,
+    );
     if (q1) return q1;
     const q2 = document.getElementById(`tree-node-${targetKeyStr}`);
     return q2 as HTMLElement | null;
@@ -271,11 +311,17 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
 
   const flash = (el: HTMLElement) => {
     el.classList.add("ring-2", "ring-[var(--accent)]");
-    setTimeout(() => el.classList.remove("ring-2", "ring-[var(--accent)]"), 650);
+    setTimeout(
+      () => el.classList.remove("ring-2", "ring-[var(--accent)]"),
+      650,
+    );
   };
 
   const scrollToKey = useCallback(
-    (targetKeyStr: string, { highlight = false }: { highlight?: boolean } = {}) => {
+    (
+      targetKeyStr: string,
+      { highlight = false }: { highlight?: boolean } = {},
+    ) => {
       let done = false;
 
       const tryScroll = () => {
@@ -283,7 +329,11 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
         const el = findRowEl(targetKeyStr);
         if (el) {
           el.scrollIntoView({ block: "center", behavior: "smooth" });
-          try { el.focus({ preventScroll: true }); } catch { /* ignore */ }
+          try {
+            el.focus({ preventScroll: true });
+          } catch {
+            /* ignore */
+          }
           if (highlight) flash(el);
           done = true;
           return true;
@@ -293,12 +343,16 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
 
       if (tryScroll()) return;
 
-      const obs = new MutationObserver(() => { tryScroll(); });
+      const obs = new MutationObserver(() => {
+        tryScroll();
+      });
       obs.observe(document.body, { childList: true, subtree: true });
 
       const raf1 = requestAnimationFrame(() => tryScroll());
       const raf2 = requestAnimationFrame(() => tryScroll());
-      const timeout = setTimeout(() => { obs.disconnect(); }, 3000);
+      const timeout = setTimeout(() => {
+        obs.disconnect();
+      }, 3000);
 
       const cleanup = () => {
         obs.disconnect();
@@ -307,7 +361,9 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
         clearTimeout(timeout);
       };
 
-      const watcher = new MutationObserver(() => { if (tryScroll()) cleanup(); });
+      const watcher = new MutationObserver(() => {
+        if (tryScroll()) cleanup();
+      });
       watcher.observe(document.body, { childList: true, subtree: true });
       setTimeout(() => watcher.disconnect(), 3200);
     },
@@ -320,7 +376,9 @@ const LightTreeView: React.FC<LightTreeViewProps> = ({
     if (!followSelection) return;
     const targetKeyStr = nodeKeyToString(selectionToNodeKey(selected));
     expandAncestors(targetKeyStr);
-    requestAnimationFrame(() => scrollToKey(targetKeyStr, { highlight: false }));
+    requestAnimationFrame(() =>
+      scrollToKey(targetKeyStr, { highlight: false }),
+    );
   }, [selected, followSelection, expandAncestors, scrollToKey, expanded.size]);
 
   // autoExpandPath → expand + scroll to leaf (highlight)

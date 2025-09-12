@@ -6,7 +6,10 @@ interface RememberCheckboxProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-const RememberCheckbox: React.FC<RememberCheckboxProps> = ({ checked, onChange }) => {
+const RememberCheckbox: React.FC<RememberCheckboxProps> = ({
+  checked,
+  onChange,
+}) => {
   return (
     <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)] cursor-pointer select-none">
       {/* checkbox input */}

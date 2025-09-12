@@ -13,8 +13,10 @@ const THEME = {
   color: {
     bgPanel: "bg-gradient-to-br from-blue-950 via-blue-900/80 to-blue-800/60",
     borderPanel: "border border-blue-900/50",
-    sectionLeft: "bg-gradient-to-b from-blue-950/85 via-blue-900/60 to-blue-800/50",
-    sectionRight: "bg-gradient-to-b from-blue-950/60 via-blue-900/40 to-blue-800/10",
+    sectionLeft:
+      "bg-gradient-to-b from-blue-950/85 via-blue-900/60 to-blue-800/50",
+    sectionRight:
+      "bg-gradient-to-b from-blue-950/60 via-blue-900/40 to-blue-800/10",
     treeItem: {
       base: "transition-colors",
       hover: "hover:bg-blue-900/40",
@@ -33,7 +35,11 @@ const t = (s: string) => s;
 
 // Loading shimmer placeholder
 const Shimmer: React.FC<{ count?: number }> = ({ count = 6 }) => (
-  <div aria-busy="true" aria-live="polite" className="space-y-3 p-10 flex flex-col h-[340px] justify-center">
+  <div
+    aria-busy="true"
+    aria-live="polite"
+    className="space-y-3 p-10 flex flex-col h-[340px] justify-center"
+  >
     {Array.from({ length: count }).map((_, i) => (
       <div
         key={i}
@@ -57,7 +63,11 @@ const initialState: State = { openOption: null, selectedValue: null };
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "TOGGLE_OPEN":
-      return { openOption: state.openOption === action.optionCode ? null : action.optionCode, selectedValue: null };
+      return {
+        openOption:
+          state.openOption === action.optionCode ? null : action.optionCode,
+        selectedValue: null,
+      };
     case "SELECT_VALUE":
       return { ...state, selectedValue: action.value };
     case "RESET":
@@ -72,8 +82,13 @@ type Props = {
   options: OptionCodeOverviewDto[] | null;
   loading?: boolean;
   error?: string | null;
-  fetchValues: (option: OptionCodeOverviewDto) => Promise<OptionValueOverviewDto[]>;
-  fetchOccurrences: (option: OptionCodeOverviewDto, value: string) => Promise<OptionOccurrenceDto[]>;
+  fetchValues: (
+    option: OptionCodeOverviewDto,
+  ) => Promise<OptionValueOverviewDto[]>;
+  fetchOccurrences: (
+    option: OptionCodeOverviewDto,
+    value: string,
+  ) => Promise<OptionOccurrenceDto[]>;
 };
 
 // Unique key for an option (code + name)
@@ -87,8 +102,12 @@ const OptionOverviewPanel: React.FC<Props> = ({
   fetchOccurrences,
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [values, setValues] = React.useState<OptionValueOverviewDto[] | null>(null);
-  const [occurrences, setOccurrences] = React.useState<OptionOccurrenceDto[] | null>(null);
+  const [values, setValues] = React.useState<OptionValueOverviewDto[] | null>(
+    null,
+  );
+  const [occurrences, setOccurrences] = React.useState<
+    OptionOccurrenceDto[] | null
+  >(null);
   const [loadingValues, setLoadingValues] = React.useState(false);
   const [loadingOccurrences, setLoadingOccurrences] = React.useState(false);
 
@@ -134,7 +153,10 @@ const OptionOverviewPanel: React.FC<Props> = ({
   if (loading) return <Shimmer count={6} />;
   if (error)
     return (
-      <div className="p-10 text-2xl text-red-400 font-semibold flex items-center justify-center h-[340px]" role="alert">
+      <div
+        className="p-10 text-2xl text-red-400 font-semibold flex items-center justify-center h-[340px]"
+        role="alert"
+      >
         {t("Error")}: {error}
       </div>
     );
@@ -160,8 +182,13 @@ const OptionOverviewPanel: React.FC<Props> = ({
       tabIndex={0}
     >
       {/* Left: Option List */}
-      <section className={`w-1/2 min-w-[280px] max-w-[500px] border-r border-blue-900/50 p-5 h-full flex flex-col ${THEME.color.sectionLeft}`}>
-        <h2 className="font-semibold text-blue-50 mb-4 text-xl tracking-wide select-none" tabIndex={0}>
+      <section
+        className={`w-1/2 min-w-[280px] max-w-[500px] border-r border-blue-900/50 p-5 h-full flex flex-col ${THEME.color.sectionLeft}`}
+      >
+        <h2
+          className="font-semibold text-blue-50 mb-4 text-xl tracking-wide select-none"
+          tabIndex={0}
+        >
           {t("DHCP Options")}
         </h2>
         <ul className="divide-y divide-blue-900 overflow-y-auto">
@@ -172,10 +199,13 @@ const OptionOverviewPanel: React.FC<Props> = ({
                 <div
                   className={`flex items-center justify-between cursor-pointer px-3 py-3 rounded-lg transition font-medium
                     ${state.openOption === optionKey ? "bg-blue-900/60 text-white" : "hover:bg-blue-900/30 text-blue-100"}`}
-                  onClick={() => dispatch({ type: "TOGGLE_OPEN", optionCode: optionKey })}
+                  onClick={() =>
+                    dispatch({ type: "TOGGLE_OPEN", optionCode: optionKey })
+                  }
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") dispatch({ type: "TOGGLE_OPEN", optionCode: optionKey });
+                    if (e.key === "Enter" || e.key === " ")
+                      dispatch({ type: "TOGGLE_OPEN", optionCode: optionKey });
                   }}
                 >
                   <span className="font-mono text-base">{opt.code}</span>
@@ -188,10 +218,21 @@ const OptionOverviewPanel: React.FC<Props> = ({
                       strokeWidth={2}
                       viewBox="0 0 24 24"
                       aria-hidden="true"
-                      animate={{ rotate: state.openOption === optionKey ? 90 : 0 }}
-                      transition={{ duration: 0.13, type: "spring", stiffness: 420, damping: 35 }}
+                      animate={{
+                        rotate: state.openOption === optionKey ? 90 : 0,
+                      }}
+                      transition={{
+                        duration: 0.13,
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 35,
+                      }}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
                     </motion.svg>
                   </span>
                 </div>
@@ -218,13 +259,26 @@ const OptionOverviewPanel: React.FC<Props> = ({
                                     ? "bg-blue-800/90 text-white"
                                     : "hover:bg-blue-800/40 text-blue-200"
                                 }`}
-                              onClick={() => dispatch({ type: "SELECT_VALUE", value: val.value ?? "" })}
+                              onClick={() =>
+                                dispatch({
+                                  type: "SELECT_VALUE",
+                                  value: val.value ?? "",
+                                })
+                              }
                               tabIndex={0}
                               onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") dispatch({ type: "SELECT_VALUE", value: val.value ?? "" });
+                                if (e.key === "Enter" || e.key === " ")
+                                  dispatch({
+                                    type: "SELECT_VALUE",
+                                    value: val.value ?? "",
+                                  });
                               }}
                             >
-                              {val.value ?? <span className="italic text-blue-300">null</span>}
+                              {val.value ?? (
+                                <span className="italic text-blue-300">
+                                  null
+                                </span>
+                              )}
                               <span className="ml-3 text-xs text-blue-200">
                                 {val.count} Object{val.count !== 1 && "s"}
                               </span>
@@ -241,12 +295,20 @@ const OptionOverviewPanel: React.FC<Props> = ({
       </section>
 
       {/* Right: Objects Table */}
-      <section className={`flex-1 min-w-[300px] p-5 h-full flex flex-col ${THEME.color.sectionRight}`}>
-        <h2 className="font-semibold text-blue-50 mb-4 text-xl tracking-wide select-none" tabIndex={0}>
+      <section
+        className={`flex-1 min-w-[300px] p-5 h-full flex flex-col ${THEME.color.sectionRight}`}
+      >
+        <h2
+          className="font-semibold text-blue-50 mb-4 text-xl tracking-wide select-none"
+          tabIndex={0}
+        >
           {t("On which objects is this option set?")}
         </h2>
         <div className="flex-1 min-h-0">
-          <ObjectsTable loading={loadingOccurrences} occurrences={occurrences ?? []} />
+          <ObjectsTable
+            loading={loadingOccurrences}
+            occurrences={occurrences ?? []}
+          />
         </div>
       </section>
     </div>
@@ -258,42 +320,77 @@ const ObjectsTable: React.FC<{
   loading: boolean;
   occurrences: OptionOccurrenceDto[];
 }> = ({ loading, occurrences }) => (
-  <div className="overflow-auto h-full custom-scrollbar" tabIndex={0} aria-label={t("Objects Table")}>
+  <div
+    className="overflow-auto h-full custom-scrollbar"
+    tabIndex={0}
+    aria-label={t("Objects Table")}
+  >
     {loading ? (
       <Shimmer count={4} />
     ) : (
       <table className="w-full border border-blue-900 text-base rounded-2xl overflow-hidden bg-gradient-to-tr from-blue-950/70 via-blue-900/40 to-blue-800/10 backdrop-blur">
         <thead>
           <tr className="bg-blue-950/90 text-blue-100 sticky top-0 z-10">
-            <th className="p-3 text-left font-bold tracking-wide">{t("Type")}</th>
-            <th className="p-3 text-left font-bold tracking-wide">{t("Name")}</th>
-            <th className="p-3 text-left font-bold tracking-wide">{t("Address")}</th>
-            <th className="p-3 text-left font-bold tracking-wide">{t("CIDR/Range")}</th>
-            <th className="p-3 text-left font-bold tracking-wide">{t("Value")}</th>
-            <th className="p-3 text-left font-bold tracking-wide">{t("Source")}</th>
-            <th className="p-3 text-left font-bold tracking-wide">{t("Option Type")}</th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("Type")}
+            </th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("Name")}
+            </th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("Address")}
+            </th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("CIDR/Range")}
+            </th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("Value")}
+            </th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("Source")}
+            </th>
+            <th className="p-3 text-left font-bold tracking-wide">
+              {t("Option Type")}
+            </th>
           </tr>
         </thead>
         <tbody>
           {occurrences.length === 0 && (
             <tr>
-              <td colSpan={7} className="text-blue-300 p-10 text-center text-lg font-semibold tracking-wider">
+              <td
+                colSpan={7}
+                className="text-blue-300 p-10 text-center text-lg font-semibold tracking-wider"
+              >
                 {t("No objects for this selection.")}
               </td>
             </tr>
           )}
           {occurrences.map((occ, idx) => (
             <tr
-              key={occ.objectId ? `${occ.objectType}:${occ.objectId}` : `${occ.objectType}:${idx}`}
+              key={
+                occ.objectId
+                  ? `${occ.objectType}:${occ.objectId}`
+                  : `${occ.objectType}:${idx}`
+              }
               className={idx % 2 === 0 ? "bg-blue-950/30" : ""}
             >
               <td className="p-3 font-mono">{occ.objectType}</td>
               <td className="p-3">{occ.objectLabel}</td>
-              <td className="p-3 font-mono">{occ.address ?? <span className="text-blue-300">–</span>}</td>
-              <td className="p-3 font-mono">{occ.cidr ?? <span className="text-blue-300">–</span>}</td>
-              <td className="p-3 font-mono">{occ.value ?? <span className="text-blue-300">–</span>}</td>
-              <td className="p-3">{occ.source ?? <span className="text-blue-300">–</span>}</td>
-              <td className="p-3">{occ.type ?? <span className="text-blue-300">–</span>}</td>
+              <td className="p-3 font-mono">
+                {occ.address ?? <span className="text-blue-300">–</span>}
+              </td>
+              <td className="p-3 font-mono">
+                {occ.cidr ?? <span className="text-blue-300">–</span>}
+              </td>
+              <td className="p-3 font-mono">
+                {occ.value ?? <span className="text-blue-300">–</span>}
+              </td>
+              <td className="p-3">
+                {occ.source ?? <span className="text-blue-300">–</span>}
+              </td>
+              <td className="p-3">
+                {occ.type ?? <span className="text-blue-300">–</span>}
+              </td>
             </tr>
           ))}
         </tbody>

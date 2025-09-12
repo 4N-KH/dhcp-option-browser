@@ -1,6 +1,11 @@
 import axios from "axios";
 
-export type ImportJobStatus = "queued" | "running" | "success" | "error" | "cancelled";
+export type ImportJobStatus =
+  | "queued"
+  | "running"
+  | "success"
+  | "error"
+  | "cancelled";
 export interface ImportJobState {
   id: string;
   status: ImportJobStatus;
@@ -25,16 +30,18 @@ export async function triggerFullCspImport(): Promise<{ jobId: string }> {
   const res = await axios.post<{ jobId: string }>(
     `${API_BASE_URL}/api/csp/import/all`,
     {},
-    { withCredentials: true } // Send credentials for session authentication
+    { withCredentials: true }, // Send credentials for session authentication
   );
   return res.data;
 }
 
 // Fetches the current status of a running import job
-export async function fetchImportStatus(jobId: string): Promise<ImportJobState> {
+export async function fetchImportStatus(
+  jobId: string,
+): Promise<ImportJobState> {
   const res = await axios.get<ImportJobState>(
     `${API_BASE_URL}/api/csp/import/status/${jobId}`,
-    { withCredentials: true } // Include credentials for secured API access
+    { withCredentials: true }, // Include credentials for secured API access
   );
   return res.data;
 }

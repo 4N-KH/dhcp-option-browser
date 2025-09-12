@@ -61,16 +61,19 @@ export function getChildren(selection: TreeSelection): TreeSelection[] {
           ...subnet.ranges.map((range) => ({
             type: "range" as const,
             object: range,
-          }))
+          })),
         );
       }
       // Include fixed addresses if explicitly listed
-      if (Array.isArray(subnet.fixedAddresses) && subnet.fixedAddresses.length > 0) {
+      if (
+        Array.isArray(subnet.fixedAddresses) &&
+        subnet.fixedAddresses.length > 0
+      ) {
         children.push(
           ...subnet.fixedAddresses.map((fa) => ({
             type: "fixedAddress" as const,
             object: fa,
-          }))
+          })),
         );
       }
       return children;
@@ -94,7 +97,8 @@ export function getNodeLabel(selection: TreeSelection): string {
   const { type, object } = selection;
 
   if (type === "global") return "Global DHCP Configuration";
-  if (type === "ipSpace") return (object as LightIpSpaceDto).name?.trim() || "IP Space";
+  if (type === "ipSpace")
+    return (object as LightIpSpaceDto).name?.trim() || "IP Space";
   if (type === "addressBlock") {
     const block = object as LightAddressBlockDto;
     if (block.name?.trim()) return block.name;
