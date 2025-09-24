@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+/**
+ * Creates or updates performance indexes on startup.
+ * Handles schema variants and analyzes tables if present.
+ */
 @Injectable()
 export class CreatePerformanceIndexesService implements OnModuleInit {
   private readonly logger = new Logger(CreatePerformanceIndexesService.name);
@@ -10,22 +14,19 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     this.logger.log('Ensuring performance indexes …');
 
-    // --------- Utils (mit sicheren Typen, kein `any`) -----------------------
     const q = (id: string): string => `"${id.replace(/"/g, '""')}"`;
 
+    // Safe query returning array of records
     const runQuery = async <T extends Record<string, unknown>>(
       sql: string,
       params: unknown[] = [],
     ): Promise<T[]> => {
       const resUnknown: unknown = await this.dataSource.query(sql, params);
       if (!Array.isArray(resUnknown)) return [];
-      // Wir erwarten eine Array-of-objects-Struktur von pg → schmaler Cast auf Record
       const arr = resUnknown as unknown[];
       const out: T[] = [];
       for (const item of arr) {
-        if (item !== null && typeof item === 'object') {
-          out.push(item as T);
-        }
+        if (item !== null && typeof item === 'object') out.push(item as T);
       }
       return out;
     };
@@ -35,8 +36,7 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
         `SELECT to_regclass($1) IS NOT NULL AS exists`,
         [`public.${table}`],
       );
-      const first = rows[0];
-      return first?.exists === true;
+      return rows[0]?.exists === true;
     };
 
     const listColumns = async (table: string): Promise<Set<string>> => {
@@ -59,12 +59,11 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
     ): Promise<string | null> => {
       if (!(await tableExists(table))) return null;
       const cols = await listColumns(table);
-      for (const c of candidates) {
-        if (cols.has(c)) return c;
-      }
+      for (const c of candidates) if (cols.has(c)) return c;
       return null;
     };
 
+    // Creates index if table and columns exist
     const ensureIndex = async (args: {
       name: string;
       table: string;
@@ -74,7 +73,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       using?: string;
     }): Promise<void> => {
       const { name, table, columns, include, where, using } = args;
-
       if (!(await tableExists(table))) {
         this.logger.warn(`Skip index ${name}: table ${table} not found`);
         return;
@@ -82,18 +80,14 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       const cols = await listColumns(table);
       for (const c of columns) {
         if (!cols.has(c)) {
-          this.logger.warn(
-            `Skip index ${name}: column ${c} not found on ${table}`,
-          );
+          this.logger.warn(`Skip index ${name}: column ${c} missing`);
           return;
         }
       }
       if (include) {
         for (const c of include) {
           if (!cols.has(c)) {
-            this.logger.warn(
-              `Skip index ${name}: INCLUDE column ${c} not found on ${table}`,
-            );
+            this.logger.warn(`Skip index ${name}: include column ${c} missing`);
             return;
           }
         }
@@ -128,7 +122,7 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       }
     };
 
-    // --------- Schemavarianten erkennen ------------------------------------
+    // Detect schema variants
     const abSpaceCol =
       (await resolveExistingColumn('address_block', ['spaceId', 'space_id'])) ??
       null;
@@ -144,8 +138,7 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       }
     }
 
-    // --------- Indizes gemäß Hierarchien -----------------------------------
-    // OPTION CODE LOOKUPS
+    // Index definitions
     await ensureIndex({
       name: 'idx_option_code_code',
       table: 'option_code',
@@ -167,7 +160,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['source'],
     });
 
-    // OPTION SPACE META
     await ensureIndex({
       name: 'idx_option_space_external',
       table: 'option_space',
@@ -179,7 +171,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['name'],
     });
 
-    // GLOBAL CONFIG
     await ensureIndex({
       name: 'idx_gco_global_code',
       table: 'dhcp_global_config_option',
@@ -191,7 +182,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['globalConfigId', 'optionGroupId'],
     });
 
-    // IP SPACE
     await ensureIndex({
       name: 'idx_ipsdo_space_code',
       table: 'ip_space_dhcp_option',
@@ -208,7 +198,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['externalId'],
     });
 
-    // ADDRESS BLOCK
     await ensureIndex({
       name: 'idx_ab_parent',
       table: 'address_block',
@@ -221,9 +210,7 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
         columns: [abSpaceCol],
       });
     } else {
-      this.logger.warn(
-        'Skip index idx_ab_space: no space column (spaceId/space_id) on address_block',
-      );
+      this.logger.warn('Skip idx_ab_space: no space column on address_block');
     }
     await ensureIndex({
       name: 'idx_abdo_block_code',
@@ -236,7 +223,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['addressBlockId', 'optionGroupId'],
     });
 
-    // SUBNET
     await ensureIndex({
       name: 'idx_sn_space',
       table: 'subnet',
@@ -258,7 +244,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['subnetId', 'optionGroupId'],
     });
 
-    // RANGE
     await ensureIndex({
       name: 'idx_rg_subnet',
       table: 'range',
@@ -280,7 +265,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['rangeId'],
     });
 
-    // FIXED ADDRESS
     await ensureIndex({
       name: 'idx_fa_subnet',
       table: 'fixed_address',
@@ -294,7 +278,7 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       });
     } else {
       this.logger.warn(
-        'Skip index idx_fado_fixed_code: no fixed_*_dhcp_option table found',
+        'Skip idx_fado_fixed_code: no fixed_*_dhcp_option table found',
       );
     }
     await ensureIndex({
@@ -303,7 +287,6 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['fixedAddressId', 'optionGroupId'],
     });
 
-    // OPTION GROUP META & Zuordnung
     await ensureIndex({
       name: 'idx_og_name',
       table: 'option_group',
@@ -325,7 +308,7 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
       columns: ['optionCodeId', 'optionGroupId'],
     });
 
-    // --------- ANALYZE für existierende Tabellen ----------------------------
+    // Analyze tables if present
     const analyzeTables = [
       'option_space',
       'option_code',

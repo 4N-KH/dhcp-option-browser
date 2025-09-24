@@ -31,7 +31,7 @@ export class EffectiveDhcpOptionSlimDto {
         value: string | null;
         type?: string | null;
         array?: boolean | null;
-        // === Redundanz-Felder für Optionen innerhalb Gruppen ===
+        // === Redundancy fields for options inside groups ===
         redundant?: boolean;
         redundantWith?: {
           code: string;
@@ -81,7 +81,7 @@ export class EffectiveDhcpOptionSlimDto {
   createdAt?: string | null;
   updatedAt?: string | null;
 
-  // === Redundanz-Felder für Einzeloptionen ===
+  // === Redundancy fields for individual options ===
   redundant?: boolean;
   redundantWith?: {
     code: string;

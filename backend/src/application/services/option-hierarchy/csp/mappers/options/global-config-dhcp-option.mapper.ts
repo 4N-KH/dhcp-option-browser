@@ -14,7 +14,7 @@ export function mapGlobalConfigDhcpOptionToEffectiveDto(
     ? {
         id: meta.optionSpace.id,
         name: meta.optionSpace.name,
-        protocol: meta.optionSpace.protocol ?? '', // <- garantiert immer string!
+        protocol: meta.optionSpace.protocol ?? '',
         comment: meta.optionSpace.comment ?? null,
         createdAt: meta.optionSpace.createdAt ?? null,
         updatedAt: meta.optionSpace.updatedAt ?? null,

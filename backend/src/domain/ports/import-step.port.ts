@@ -1,11 +1,11 @@
 export interface ImportStepPort {
-  /** Technischer Name der Phase (z. B. "optionSpaces"). */
+  /** Technical name of the phase (e.g. "optionSpaces"). */
   readonly name: string;
 
   /**
-   * Führt den Schritt aus.
-   * @param onProgress  (current, total) – nicht-blockierend, darf leer sein.
-   * @param isCancelled Cancellation-Callback; aktuell deaktiviert (neverCancelled).
+   * Executes the step.
+   * @param onProgress  (current, total) – non-blocking, may be omitted.
+   * @param isCancelled Cancellation callback; currently disabled (neverCancelled).
    */
   run(params: {
     onProgress?: (current: number, total: number) => void;

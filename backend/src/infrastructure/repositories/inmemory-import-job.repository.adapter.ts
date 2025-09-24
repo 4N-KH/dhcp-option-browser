@@ -5,7 +5,7 @@ import {
   ImportJobStatus,
 } from '@/domain/models/import-job.model';
 
-// In-Memory-Adapter für Dev/Tests. Production-Adapter (TypeORM) kann später ergänzt werden.
+// Simple in-memory repository for development or tests
 @Injectable()
 export class InMemoryImportJobRepositoryAdapter
   implements ImportJobRepositoryPort
@@ -16,11 +16,12 @@ export class InMemoryImportJobRepositoryAdapter
     return Math.random().toString(36).slice(2);
   }
 
+  // Create a new job with queued status
   create(initial?: Partial<ImportJobState>): Promise<ImportJobState> {
     const id = this.generateId();
     const job: ImportJobState = {
       id,
-      status: ImportJobStatus.QUEUED, // initialer Zustand – der Use-Case setzt direkt danach RUNNING
+      status: ImportJobStatus.QUEUED,
       progress: 0,
       result: initial?.result,
       error: initial?.error,
@@ -29,10 +30,12 @@ export class InMemoryImportJobRepositoryAdapter
     return Promise.resolve(job);
   }
 
+  // Get job by id
   findById(id: string): Promise<ImportJobState | null> {
     return Promise.resolve(this.store.get(id) ?? null);
   }
 
+  // State updates
   markPending(id: string): Promise<void> {
     this.patch(id, { status: ImportJobStatus.QUEUED });
     return Promise.resolve();
@@ -67,7 +70,7 @@ export class InMemoryImportJobRepositoryAdapter
     return Promise.resolve();
   }
 
-  // --- intern ---
+  // Internal helper to update job fields
   private patch(id: string, data: Partial<ImportJobState>): void {
     const current = this.store.get(id);
     if (!current) return;

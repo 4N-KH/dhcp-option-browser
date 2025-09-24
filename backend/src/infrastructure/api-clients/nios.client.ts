@@ -17,14 +17,17 @@ export class NiosClient {
     }
 
     try {
-      const response = await axios.get('https://<your-host>/wapi/v2.10/grid', {
-        auth: {
-          username,
-          password,
+      const response = await axios.get(
+        'https://<placeholder>/wapi/v2.10/grid',
+        {
+          auth: {
+            username,
+            password,
+          },
+          timeout: 5000,
+          validateStatus: () => true,
         },
-        timeout: 5000,
-        validateStatus: () => true,
-      });
+      );
 
       if (response.status === 200) {
         return { ok: true };

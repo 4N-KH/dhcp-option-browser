@@ -29,7 +29,7 @@ export class CspFullImportController {
     return this.startFullImport.execute();
   }
 
-  // Cancel-Endpoint bleibt stabil, ist aber bewusst deaktiviert:
+  // Cancel endpoint remains but is intentionally disabled
   @Post('cancel/:jobId')
   @HttpCode(HttpStatus.GONE)
   cancelImport(): never {
@@ -46,7 +46,7 @@ export class CspFullImportController {
     const job = await this.jobs.findById(jobId);
     if (!job) return { status: 'not_found' };
 
-    // CANCELLED wird extern als ERROR exponiert (solange Cancel deaktiviert ist)
+    // CANCELLED is externally exposed as ERROR (while cancel is disabled)
     const status =
       job.status === ImportJobStatus.CANCELLED
         ? ImportJobStatus.ERROR

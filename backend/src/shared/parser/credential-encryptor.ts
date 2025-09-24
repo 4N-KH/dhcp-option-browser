@@ -1,33 +1,24 @@
 import * as crypto from 'crypto';
 
-/**
- * Returns the encryption key as a Buffer, derived from the environment variable.
- * Throws an error if the secret is not set.
- */
+// Get AES key from env variable (hex encoded)
 function getEncryptionKey(): Buffer {
   const secret = process.env.CREDENTIAL_SECRET;
   if (!secret) {
-    throw new Error(
-      '[credential-encryptor] CREDENTIAL_SECRET is not set in environment!',
-    );
+    throw new Error('[credential-encryptor] CREDENTIAL_SECRET is not set');
   }
-  // Always expect a hex string for maximal entropy
   return Buffer.from(secret, 'hex');
 }
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 12; // GCM standard for secure nonces
+const IV_LENGTH = 12; // nonce length for GCM
 
 export interface EncryptedPayload {
-  encrypted: string; // Hex-encoded encrypted data
-  iv: string; // Hex-encoded initialisation vector (nonce)
-  tag: string; // Hex-encoded authentication tag
+  encrypted: string; // hex cipher text
+  iv: string; // hex nonce
+  tag: string; // hex auth tag
 }
 
-/**
- * Encrypts the given plaintext with AES-256-GCM using a random IV.
- * Returns the encrypted data, IV, and authentication tag (all as hex strings).
- */
+// Encrypt text with random IV, return cipher text + IV + tag
 export function encrypt(plaintext: string): EncryptedPayload {
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(IV_LENGTH);
@@ -44,10 +35,7 @@ export function encrypt(plaintext: string): EncryptedPayload {
   };
 }
 
-/**
- * Decrypts the payload previously produced by `encrypt`.
- * Throws if authentication fails or if any field is missing or invalid.
- */
+// Decrypt payload, verify tag, return plaintext
 export function decrypt(payload: EncryptedPayload): string {
   const key = getEncryptionKey();
   const iv = Buffer.from(payload.iv, 'hex');

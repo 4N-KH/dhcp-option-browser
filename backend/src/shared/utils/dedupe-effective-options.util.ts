@@ -2,6 +2,11 @@ import { DataSource } from 'typeorm';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/group-option-dto.type';
 
+/**
+ * Removes duplicates from an array of EffectiveDhcpOptionSlimDto.
+ * Single options are deduped by a composite key,
+ * group options are deduped by group id and internal group keys.
+ */
 export function dedupeEffectiveDhcpOptionSlimDtoArray(
   options: EffectiveDhcpOptionSlimDto[],
 ): EffectiveDhcpOptionSlimDto[] {
@@ -20,7 +25,7 @@ export function dedupeEffectiveDhcpOptionSlimDtoArray(
   }
 
   for (const opt of options) {
-    // Einzeloption (keine Gruppe)
+    // Single option (no group)
     if (
       opt.code &&
       (!opt.source?.optionGroup ||
@@ -40,7 +45,7 @@ export function dedupeEffectiveDhcpOptionSlimDtoArray(
       continue;
     }
 
-    // Gruppen-Panels: nur einen Eintrag pro Group-ID behalten!
+    // Group options: keep one entry per group id
     if (
       opt.source?.optionGroup &&
       typeof opt.source.optionGroup.id === 'number'
@@ -49,7 +54,7 @@ export function dedupeEffectiveDhcpOptionSlimDtoArray(
       if (seenGroupIds.has(groupId)) continue;
       seenGroupIds.add(groupId);
 
-      // Dedupe innerhalb der Gruppe
+      // Deduplicate within the group
       const dedupedGroupOptions: GroupOptionDto[] = [];
       const seenGroupKeys = new Set<string>();
       for (const groupOptRaw of opt.source.optionGroup.options) {
@@ -67,6 +72,7 @@ export function dedupeEffectiveDhcpOptionSlimDtoArray(
         seenGroupKeys.add(groupKey);
         dedupedGroupOptions.push(groupOpt);
       }
+
       if (dedupedGroupOptions.length > 0) {
         result.push({
           ...opt,
@@ -85,10 +91,7 @@ export function dedupeEffectiveDhcpOptionSlimDtoArray(
   return result;
 }
 
-/* =========================================================================================
- *  BASE_UNION: vereinigt alle Objekt-Ebenen (global, ip_space, address_block, subnet, range, fixed_address)
- *  mit einheitlichem Spaltenlayout.
- * =======================================================================================*/
+/* Base query combining all DHCP object levels (global, ip_space, address_block, subnet, range, fixed_address) */
 const BASE_UNION = `
 SELECT 'global'::text AS object_type,
   gco."globalConfigId" AS object_id,
@@ -204,11 +207,7 @@ LEFT JOIN subnet s ON fa."subnetId" = s.id
 LEFT JOIN ip_space ips ON s."spaceId" = ips.id
 `;
 
-/* =========================================================================================
- *  View-Erzeugung: all_dhcp_option_assignments
- *  WICHTIG: DISTINCT ON enthält jetzt auch COALESCE(option_source,'')
- *  => Mehrere Quellen (options / option group: X / …) bleiben als eigene Zeilen erhalten.
- * =======================================================================================*/
+/* View creation: all_dhcp_option_assignments with DISTINCT ON including option_source to keep multiple sources */
 export const CREATE_DHCP_ASSIGNMENTS_VIEW_SQL = `
 CREATE OR REPLACE VIEW all_dhcp_option_assignments AS
 SELECT DISTINCT ON (
@@ -246,7 +245,9 @@ ORDER BY
   object_display;
 `;
 
-/** View erzeugen/aktualisieren */
+/**
+ * Creates or updates the database view all_dhcp_option_assignments.
+ */
 export async function createAllDhcpOptionAssignmentsView(
   dataSource: DataSource,
 ) {

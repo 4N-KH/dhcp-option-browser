@@ -86,19 +86,19 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
   const buttonDisabled = activeStatuses.includes(status as ImportJobStatus);
 
   return (
-    <div className="flex flex-col items-center gap-8 py-10 px-2 min-w-[350px]">
+    <div className="flex flex-col items-center gap-6 py-8 px-2 min-w-[280px]">
       {/* Show button only if no active import is running */}
       {showButton && (
         <button
           onClick={startImport}
           disabled={buttonDisabled}
-          className={`m-3 px-8 py-3 rounded-2xl border-2
+          className={`m-2 px-4 py-2 rounded-lg border
             ${
               buttonDisabled
                 ? "border-gray-300 bg-gray-100 text-gray-400"
                 : "border-blue-800 bg-white text-blue-900 hover:bg-blue-100 hover:border-blue-900"
             }
-            font-semibold text-xl shadow-md transition-all duration-150`}
+            font-semibold text-sm shadow-md transition-all duration-150`}
         >
           {status === "success" ? "Import again" : "Import DHCP data"}
         </button>
@@ -107,13 +107,13 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
       {/* Progress bar while active */}
       {activeStatuses.includes(status as ImportJobStatus) && (
         <div className="w-full flex flex-col items-center">
-          <div className="w-full bg-[var(--accent-light)] rounded-full h-5 overflow-hidden border border-[var(--border)] mb-2">
+          <div className="w-full bg-[var(--accent-light)] rounded-full h-4 overflow-hidden border border-[var(--border)] mb-2">
             <div
-              className="bg-[var(--accent)] h-5 transition-all duration-700"
+              className="bg-[var(--accent)] h-4 transition-all duration-700"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="text-sm text-[var(--foreground)]">
+          <span className="text-xs text-[var(--foreground)]">
             {progress < 100 ? `${progress}% loading…` : "Finalizing…"}
           </span>
         </div>
@@ -121,12 +121,12 @@ const ImportWithProgress: React.FC<ImportWithProgressProps> = ({
 
       {/* Status messages */}
       {status === "success" && (
-        <span className="text-base text-[var(--success)] font-semibold">
+        <span className="text-sm text-[var(--success)] font-semibold">
           Import complete! Continue to view...
         </span>
       )}
       {status === "error" && (
-        <span className="text-base text-[var(--danger)] font-mono">
+        <span className="text-sm text-[var(--danger)] font-mono">
           {error}
         </span>
       )}

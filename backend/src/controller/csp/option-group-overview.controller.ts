@@ -22,7 +22,6 @@ export class OptionGroupOverviewController {
     return this.service.getOccurrences(groupId);
   }
 
-  // NEW: Optionen, die in der Gruppe enthalten sind
   @Get(':groupId/options')
   async getOptionsInGroup(
     @Param('groupId', ParseIntPipe) groupId: number,

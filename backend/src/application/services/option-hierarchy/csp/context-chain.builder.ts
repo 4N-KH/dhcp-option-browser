@@ -1,4 +1,3 @@
-// src/application/services/option-hierarchy/csp/context-chain.builder.ts
 import { Injectable } from '@nestjs/common';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,7 +16,6 @@ export interface ContextLevel {
 
 type ParentPointer = { type: ObjectType; id: number } | null;
 
-// Hier: ContextObj muss (wie im Service) bekannt sein!
 export type ContextObj = {
   level: ObjectType;
   levelId: number;
@@ -43,7 +41,7 @@ export class ContextChainBuilder {
   ) {}
 
   /**
-   * Baut die Vererbungskette (ContextChain) für ein beliebiges DHCP-Objekt
+   * Builds the inheritance chain (context chain) for any DHCP object.
    */
   async build(
     objectType: ObjectType,
@@ -120,6 +118,7 @@ export class ContextChainBuilder {
       }
     }
 
+    // Always add the global config if it exists and is not already in the chain
     if (!chain.some((c) => c.level === ObjectType.GLOBAL)) {
       const globalConfig = await this.globalConfigRepo.findOne({ where: {} });
       if (globalConfig) {
@@ -131,7 +130,10 @@ export class ContextChainBuilder {
   }
 }
 
-// Utility-Funktion zur Filterung NUR AddressBlock-relevanter Kontexte (für Redundanz)
+/**
+ * Filters contexts so only AddressBlock-relevant contexts remain
+ * (used for redundancy calculations).
+ */
 export function filterContextsForAddressBlock(
   allContexts: ContextObj[],
   addressBlockId: number,

@@ -2,7 +2,7 @@ import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 
 interface HierarchyLevel {
   type: ObjectType;
-  parentField?: string; // Feld, das zum Parent zeigt (z.B. 'ipSpaceId')
+  parentField?: string;
   parentType?: ObjectType;
 }
 

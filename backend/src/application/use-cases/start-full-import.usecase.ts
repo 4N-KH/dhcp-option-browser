@@ -14,13 +14,13 @@ export class StartFullImportUseCase {
     private readonly orchestrator: DhcpCspImportOrchestratorService,
   ) {}
 
-  /** Startet den Full-Import asynchron und gibt die JobId zurück. */
+  /** Starts the full import asynchronously and returns the jobId. */
   async execute(): Promise<{ jobId: string }> {
     const job = await this.jobs.create();
     await this.jobs.markRunning(job.id);
     await this.jobs.updateProgress(job.id, 1);
 
-    // Nebenläufig starten – Callback liefert strikt `void`
+    // Launch in the background – callback strictly returns void
     setImmediate((): void => {
       this.fireAndForget(job);
     });
@@ -28,9 +28,9 @@ export class StartFullImportUseCase {
     return { jobId: job.id };
   }
 
-  /** Fire-and-forget Wrapper ohne Promise-Rückgabe. */
+  /** Fire-and-forget wrapper without a Promise return. */
   private fireAndForget(job: ImportJobState): void {
-    // bewusst kein return; kein async; nur side-effects
+    // intentionally no return; no async; side-effects only
     this.run(job).catch((err: unknown) => {
       if (err instanceof Error) {
         this.logger.error(
@@ -48,12 +48,12 @@ export class StartFullImportUseCase {
   private async run(job: ImportJobState): Promise<void> {
     try {
       await this.orchestrator.runFullImport({
-        // Kein async-Callback: vermeidet no-misused-promises
+        // no async callback to avoid no-misused-promises
         onProgress: (percent: number): void => {
-          // Nicht blockierend persistieren
+          // persist non-blocking
           void this.jobs.updateProgress(job.id, percent);
         },
-        isCancelled: neverCancelled, // Cancel aktuell deaktiviert
+        isCancelled: neverCancelled, // cancel currently disabled
       });
 
       await this.jobs.markSucceeded(job.id);

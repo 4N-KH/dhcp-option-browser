@@ -1,10 +1,7 @@
-// src/shared/utils/create-views.util.ts
 import { DataSource } from 'typeorm';
 
-/* =========================================================================================
- *  BASE_UNION: vereinigt alle Objekt-Ebenen (global, ip_space, address_block, subnet, range, fixed_address)
- *  mit einheitlichem Spaltenlayout.
- * =======================================================================================*/
+/* Base query combining all DHCP object levels (global, ip_space, address_block, subnet, range, fixed_address)
+   into a unified column layout. */
 const BASE_UNION = `
 SELECT 'global'::text AS object_type,
   gco."globalConfigId" AS object_id,
@@ -120,11 +117,8 @@ LEFT JOIN subnet s ON fa."subnetId" = s.id
 LEFT JOIN ip_space ips ON s."spaceId" = ips.id
 `;
 
-/* =========================================================================================
- *  View-Erzeugung: all_dhcp_option_assignments
- *  WICHTIG: DISTINCT ON enthält jetzt COALESCE(option_source,'')
- *  => Mehrere Quellen (options / option group: X / …) bleiben getrennte Zeilen.
- * =======================================================================================*/
+/* View creation: all_dhcp_option_assignments with DISTINCT ON including option_source
+   to preserve separate rows for multiple sources (options vs. option group). */
 export const CREATE_DHCP_ASSIGNMENTS_VIEW_SQL = `
 CREATE OR REPLACE VIEW all_dhcp_option_assignments AS
 SELECT DISTINCT ON (
@@ -162,7 +156,9 @@ ORDER BY
   object_display;
 `;
 
-/** View erzeugen/aktualisieren */
+/**
+ * Creates or updates the database view all_dhcp_option_assignments.
+ */
 export async function createAllDhcpOptionAssignmentsView(
   dataSource: DataSource,
 ) {

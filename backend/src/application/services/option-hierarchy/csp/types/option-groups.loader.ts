@@ -76,7 +76,6 @@ export class OptionGroupsLoader {
     }
     if (!groupLinks.length) return [];
 
-    // NEU: Lade alle OptionGroups mit allen Optionen in einem Query
     const allGroupIds = groupLinks.map((gl) => gl.optionGroupId);
     if (!allGroupIds.length) return [];
 

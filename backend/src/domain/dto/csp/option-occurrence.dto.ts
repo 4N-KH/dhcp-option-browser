@@ -3,29 +3,29 @@ import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 export type OptionSetStatus = 'explicit' | 'inherited' | 'overridden';
 
 /**
- * Auftreten einer DHCP-Option auf einem bestimmten Objekt (Subnet, Range, etc.)
+ * Occurrence of a DHCP option on a specific object (Subnet, Range, etc.)
  */
 export interface OptionOccurrenceDto {
   objectType: ObjectType;
   objectId: number;
   objectLabel: string | null;
 
-  /** Ergonomisches, für das Frontend formatiertes Label */
+  /** Ergonomic, frontend-formatted label */
   objectDisplay: string;
 
-  /** Adresse (z.B. Netzwerk-Adresse, Start-IP, etc.) */
+  /** Address (e.g. network address, start IP, etc.) */
   address?: string | null;
-  /** CIDR oder Prefix (z.B. 24) */
+  /** CIDR or prefix (e.g. 24) */
   cidr?: string | null;
-  /** IP-Space, falls zuordenbar */
+  /** IP space, if applicable */
   ipSpace?: string | null;
 
-  /** Effektiver Optionswert */
+  /** Effective option value */
   value: string | null;
 
   setStatus: OptionSetStatus;
 
-  /** Nur gesetzt bei Vererbung */
+  /** Set only when inherited */
   inheritedFrom?: {
     objectType: ObjectType;
     objectId: number;
@@ -34,7 +34,7 @@ export interface OptionOccurrenceDto {
     cidr?: string | null;
     objectDisplay?: string;
   };
-  /** Nur gesetzt bei Überschreibung */
+  /** Set only when overridden */
   overriddenBy?: {
     objectType: ObjectType;
     objectId: number;
@@ -43,13 +43,13 @@ export interface OptionOccurrenceDto {
     cidr?: string | null;
     objectDisplay?: string;
   };
-  /** Optionstyp (z.B. string, ip-address, etc.) */
+  /** Option type (e.g. string, ip-address, etc.) */
   type?: string | null;
-  /** Ursprungsquelle (z.B. OptionGroup, GlobalConfig etc.) */
+  /** Source of the option (e.g. OptionGroup, GlobalConfig, etc.) */
   source?: string | null;
 
-  /** OptionSpaceId für Kontext */
+  /** OptionSpaceId for context */
   optionSpaceId?: number | null;
-  /** OptionCodeId für Kontext */
+  /** OptionCodeId for context */
   optionCodeId?: number | null;
 }

@@ -1,4 +1,3 @@
-// backend/src/infrastructure/api-clients/csp.client.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, timeout, map, catchError, of } from 'rxjs';

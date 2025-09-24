@@ -28,6 +28,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
   const effLabel = group.originLevelLabel ?? originLevelLabel;
   const effId = group.groupOriginLevelId ?? originLevelId;
 
+  // Inheritance badge (either inherited or explicit)
   const inheritedBadge =
     status === "GROUP_INHERITED" ? (
       <span
@@ -49,6 +50,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
         groupIsRedundant ? "border-red-700" : "",
       ].join(" ")}
     >
+      {/* Header section with group name and controls */}
       <div
         className="flex items-center justify-between px-4 py-2 cursor-pointer"
         onClick={() => setOpen((o) => !o)}
@@ -73,6 +75,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
         </button>
       </div>
 
+      {/* Option list (visible when open) */}
       {open && (
         <div className="pb-2 px-4">
           <table className="w-full text-sm mt-1">
@@ -97,12 +100,12 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
                       className={[
                         "transition",
                         isRedundant
-                          ? `animate-pulse ${tone!.bg} ${tone!.text} font-semibold`
+                          ? `${tone!.bg} ${tone!.text} font-semibold` // <-- no animate-pulse anymore
                           : "hover:bg-white/5",
                       ].join(" ")}
                       title={isRedundant ? "Redundant" : undefined}
                     >
-                      {/* code stays plain */}
+                      {/* Code is shown mono-style */}
                       <td className="py-1 px-2 font-mono">{opt.code}</td>
                       <td className="py-1 px-2">{opt.name ?? "–"}</td>
                       <td className="py-1 px-2 font-mono">

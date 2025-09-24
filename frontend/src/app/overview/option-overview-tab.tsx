@@ -9,7 +9,7 @@ import {
 } from "@/services/option-overview.service";
 import { OptionCodeOverviewDto } from "@/types/dto/option-code-overview.dto";
 
-// helpers to match signatures
+// Helper functions to wrap service calls
 function getValues(option: OptionCodeOverviewDto) {
   return fetchOptionValues(option.code, option.name);
 }

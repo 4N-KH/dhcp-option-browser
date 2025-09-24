@@ -1,5 +1,3 @@
-// backend/src/infrastructure/database/csp/range-exclusion.entity.ts
-
 import {
   Entity,
   PrimaryGeneratedColumn,

@@ -1,11 +1,9 @@
-// src/infrastructure/database/csp/all-dhcp-option-assignment.repository.ts
-
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 /**
- * Zeilenform der View all_dhcp_option_assignments
- * (bzw. kompatible Abfrageergebnisse).
+ * Row shape of the view all_dhcp_option_assignments
+ * (or compatible query results).
  */
 export interface AllDhcpOptionAssignmentRow {
   object_type: string;
@@ -24,10 +22,10 @@ export interface AllDhcpOptionAssignmentRow {
   object_display: string;
 }
 
-/** Typ für die Quellenliste im Redundanz-Overview */
+/** Type for the source list in the redundancy overview */
 export type SourceJsonInheritance = 'explicit' | 'inherited' | 'overridden';
 export interface SourceJson {
-  from: string; // z.B. "options" oder "option group: <NAME>"
+  from: string; // e.g. "options" or "option group: <NAME>"
   inheritanceType: SourceJsonInheritance;
 }
 
@@ -36,7 +34,7 @@ export class AllDhcpOptionAssignmentRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   /* ------------------------------------------------------------------ */
-  /* Helpers: strikte, lint-sichere Typumwandlungen                      */
+  /* Helpers: strict, lint-safe type conversions                        */
   /* ------------------------------------------------------------------ */
 
   private isRecord(v: unknown): v is Record<string, unknown> {
@@ -76,8 +74,8 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /**
-   * Strikte Umwandlung eines DB-Records in AllDhcpOptionAssignmentRow.
-   * Unvollständige Datensätze werden defensiv mit Defaults aufgefüllt.
+   * Strict conversion of a DB record to AllDhcpOptionAssignmentRow.
+   * Incomplete rows are defensively filled with defaults.
    */
   private mapAssignmentRow(val: unknown): AllDhcpOptionAssignmentRow | null {
     if (!this.isRecord(val)) return null;
@@ -110,7 +108,7 @@ export class AllDhcpOptionAssignmentRepository {
     return row;
   }
 
-  /** Parst eine JSON-Array-Spalte zu SourceJson[] (strikt, lint-sicher). */
+  /** Parses a JSON array column into SourceJson[] (strict, lint-safe). */
   private parseSourceJsonArray(v: unknown): SourceJson[] {
     const out: SourceJson[] = [];
 
@@ -141,7 +139,7 @@ export class AllDhcpOptionAssignmentRepository {
           return this.parseSourceJsonArray(parsed);
         }
       } catch {
-        // ignorieren – kein valides JSON
+        // ignore – not valid JSON
       }
     }
 
@@ -149,12 +147,12 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /* ------------------------------------------------------------------ */
-  /* DB-Wrapper                                                          */
+  /* DB wrappers                                                         */
   /* ------------------------------------------------------------------ */
 
   /**
-   * Kapselt TypeORMs `query` (das als `any` typisiert ist) und liefert **unknown**.
-   * Nicht-async, damit `require-await` nicht triggert.
+   * Wraps TypeORM `query` (typed as `any`) and returns **unknown**.
+   * Not async to avoid `require-await`.
    */
   private safeQuery(
     sql: string,
@@ -168,7 +166,7 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /**
-   * Liefert **immer** unknown[] und verhindert any-Propagation.
+   * Always returns unknown[] and prevents any propagation.
    */
   private async runQueryRows(
     sql: string,
@@ -179,10 +177,10 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Öffentliche Abfragen                                               */
+  /* Public queries                                                      */
   /* ------------------------------------------------------------------ */
 
-  /** Alle Optionen zu einem (code, name[, type][, source]) */
+  /** All options for a specific (code, name[, type][, source]) */
   async findByOptionCodeNameTypeSource(
     code: string,
     name: string,
@@ -210,7 +208,7 @@ export class AllDhcpOptionAssignmentRepository {
     return out;
   }
 
-  /** Aggregierte Werteverteilung für eine Option */
+  /** Aggregated value distribution for an option */
   async findValuesByOptionKey(
     code: string,
     name: string,
@@ -242,7 +240,7 @@ export class AllDhcpOptionAssignmentRepository {
     return out;
   }
 
-  /** Alle Objekte, bei denen die Option exakt (code,name,value[,type,source]) hat. */
+  /** All objects with an exact (code,name,value[,type,source]) match */
   async findOccurrencesForOptionValue(
     code: string,
     name: string,
@@ -271,7 +269,7 @@ export class AllDhcpOptionAssignmentRepository {
     return out;
   }
 
-  /** Vollständige View */
+  /** Full view */
   async findAll(): Promise<AllDhcpOptionAssignmentRow[]> {
     const rows = await this.runQueryRows(
       `SELECT * FROM all_dhcp_option_assignments`,
@@ -286,8 +284,8 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /**
-   * Redundanzübersicht auf Basis der View
-   * (setzt voraus, dass option_source dort die Quellen unterscheidet)
+   * Redundancy overview based on the view
+   * (requires that option_source distinguishes sources)
    */
   async findRedundancyOverview(): Promise<
     Array<AllDhcpOptionAssignmentRow & { sources: string[] }>
@@ -328,14 +326,14 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /**
-   * Redundanzen direkt aus Basistabellen (Options + Option-Groups),
-   * inkl. Vererbungs-Kaskaden. Status spiegelt **Tree**:
-   *   - je Label **explicit** oder **inherited** (kein globales "overridden")
-   *   - Redundanz = mindestens zwei Labels mit **demselben** Wert.
-   *   - pro Label wird genau eine Zeile gewählt (explicit > inherited, danach nächster Ursprung).
+   * Redundancy detection directly from base tables (Options + Option Groups),
+   * including inheritance cascades. Status reflects **Tree**:
+   *   - per label **explicit** or **inherited** (no global "overridden")
+   *   - redundancy = at least two labels with the same value
+   *   - exactly one row per label (explicit > inherited, then next origin)
    *
-   * FIX: Deckung auch für FixedAddresses, die nur über rangeId verknüpft sind
-   *      (f."subnetId" kann NULL sein). Alle f→r→s→a→i Pfade ergänzt.
+   * FIX: coverage for FixedAddresses linked only via rangeId
+   *      (f."subnetId" can be NULL). All f→r→s→a→i paths added.
    */
   async findRedundancyOverviewFromBase(): Promise<
     Array<{
@@ -978,12 +976,12 @@ export class AllDhcpOptionAssignmentRepository {
   }
 
   /**
-   * Panel-strikte Redundanzen (DECKT ALLE im Options-Panel blinkenden Fälle ab):
-   * - Redundanz = derselbe OPTIONSCODE kommt auf demselben Objekt aus ≥ 2 unterschiedlichen Quellen vor,
-   *   unabhängig davon, ob die Werte identisch oder verschieden sind.
-   * - pro Label genau eine Zeile (explicit > inherited, dann nächster Ursprung).
-   * - option_value wird zu "<multiple>", wenn mehrere Werte vorkommen, sonst der eine Wert (oder '').
-   * - Quellen behalten ihren Vererbungsstatus (explicit|inherited).
+   * Panel-strict redundancies (covers all blinking cases in the Options Panel):
+   * - Redundancy = the same OPTION CODE appears on the same object from ≥ 2 different sources,
+   *   regardless of whether the values are identical or different.
+   * - Exactly one row per label (explicit > inherited, then next origin).
+   * - option_value becomes "<multiple>" when multiple values exist, otherwise the single value (or '').
+   * - Sources keep their inheritance status (explicit | inherited).
    */
   async findRedundancyOverviewPanelStrictFromBase(): Promise<
     Array<{
@@ -995,7 +993,7 @@ export class AllDhcpOptionAssignmentRepository {
       option_code: string;
       option_name: string | null;
       option_type: string | null;
-      option_value: string | null; // "<multiple>" bei verschiedenen Werten
+      option_value: string | null;
       sources: SourceJson[];
     }>
   > {

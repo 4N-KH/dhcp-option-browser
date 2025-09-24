@@ -14,6 +14,7 @@ export interface NormalizedDhcpOption {
   [key: string]: any;
 }
 
+// Trim fields and ensure defaults
 export function normalizeDhcpOptions<T extends RawDhcpOption>(
   options: T[] | undefined | null,
 ): NormalizedDhcpOption[] {
@@ -28,11 +29,7 @@ export function normalizeDhcpOptions<T extends RawDhcpOption>(
   }));
 }
 
-/**
- * Normalisiert + dedupliziert in einem Schritt.
- * - Nicht-Gruppen-Optionen: Key = option_code|option_value|type
- * - "group"-Einträge: Key = group (nur einmal je eindeutigem Gruppennamen)
- */
+// Normalize and deduplicate by code/value/type or group name
 export function normalizeAndDedupeDhcpOptions<T extends RawDhcpOption>(
   options: T[] | undefined | null,
 ): NormalizedDhcpOption[] {
@@ -44,8 +41,7 @@ export function normalizeAndDedupeDhcpOptions<T extends RawDhcpOption>(
   for (const opt of normalized) {
     if (opt.type === 'group') {
       const gkey = (opt.group ?? '').toLowerCase();
-      if (!gkey) continue;
-      if (seenGroups.has(gkey)) continue;
+      if (!gkey || seenGroups.has(gkey)) continue;
       seenGroups.add(gkey);
       res.push(opt);
       continue;
@@ -58,5 +54,6 @@ export function normalizeAndDedupeDhcpOptions<T extends RawDhcpOption>(
     seenRegular.add(key);
     res.push(opt);
   }
+
   return res;
 }

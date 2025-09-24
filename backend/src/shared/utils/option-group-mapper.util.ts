@@ -1,7 +1,8 @@
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 
 /**
- * Resolves all unique OptionGroup entities (case-insensitive, whitespace-robust, id-support) from a DHCP option list.
+ * Resolves all unique OptionGroup entities from a DHCP option list.
+ * Matching is case-insensitive, trims whitespace, and supports IDs and GUIDs.
  */
 export function resolveOptionGroupsFromOptions(
   dhcpOptions: { group?: string | null }[] | undefined,
@@ -12,6 +13,8 @@ export function resolveOptionGroupsFromOptions(
   } | null = null,
 ): OptionGroup[] {
   if (!dhcpOptions) return [];
+
+  // Collect normalized group keys
   const groupKeys = Array.from(
     new Set(
       dhcpOptions
@@ -23,26 +26,24 @@ export function resolveOptionGroupsFromOptions(
   );
 
   if (logger) {
+    logger.warn?.(`[DEBUG] Resolving groupKeys: ${groupKeys.join(', ')}`);
     logger.warn?.(
-      `[DEBUG] Trying to resolve groupKeys: ${groupKeys.join(', ')}`,
-    );
-    logger.warn?.(
-      `[DEBUG] OptionGroupMap KEYS: ${Array.from(optionGroupMap.keys()).join(', ')}`,
+      `[DEBUG] OptionGroupMap keys: ${Array.from(optionGroupMap.keys()).join(', ')}`,
     );
   }
 
   const result: OptionGroup[] = [];
   for (const groupKey of groupKeys) {
-    // Direkter Map-Lookup
+    // Direct map lookup
     let optionGroup = optionGroupMap.get(groupKey);
 
-    // Fallback: Auch nach GUID (ohne Prefix) suchen
+    // Fallback: lookup by GUID without prefix
     if (!optionGroup && groupKey.startsWith('dhcp/option_group/')) {
       const guid = groupKey.replace('dhcp/option_group/', '');
       optionGroup = optionGroupMap.get(guid);
     }
 
-    // Fallback: Suche auch nach ID oder exakten Namen (case-insensitive)
+    // Fallback: lookup by name, externalId, or numeric id
     if (!optionGroup) {
       optionGroup = Array.from(optionGroupMap.values()).find(
         (g) =>
@@ -54,13 +55,13 @@ export function resolveOptionGroupsFromOptions(
 
     if (optionGroup) {
       result.push(optionGroup);
-      if (logger)
-        logger.warn?.(
-          `[DEBUG] OptionGroup resolved: ${groupKey} -> ${optionGroup.name} (${optionGroup.externalId})`,
-        );
-    } else if (logger) {
-      logger.warn?.(`[DEBUG] OptionGroup '${groupKey}' not found!`);
+      logger?.warn?.(
+        `[DEBUG] OptionGroup resolved: ${groupKey} -> ${optionGroup.name} (${optionGroup.externalId})`,
+      );
+    } else {
+      logger?.warn?.(`[DEBUG] OptionGroup '${groupKey}' not found`);
     }
   }
+
   return result;
 }

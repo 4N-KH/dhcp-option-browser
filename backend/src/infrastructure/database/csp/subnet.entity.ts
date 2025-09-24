@@ -11,6 +11,7 @@ import { AddressBlock } from './address-block.entity';
 import { SubnetDhcpOption } from './subnet-dhcp-option.entity';
 import { SubnetOptionGroup } from './subnet-option-group.entity';
 
+// Database entity for a DHCP subnet
 @Entity({ name: 'subnet' })
 export class Subnet {
   @PrimaryGeneratedColumn()
@@ -28,7 +29,7 @@ export class Subnet {
   @Column()
   cidr: number;
 
-  // ---- NEU: AddressBlock als Parent-Ebene ----
+  // Optional parent address block
   @ManyToOne(() => AddressBlock, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'addressBlockId' })
   addressBlock?: AddressBlock;
@@ -36,7 +37,7 @@ export class Subnet {
   @Column({ nullable: true })
   addressBlockId?: number;
 
-  // ---- IpSpace als Parent-Ebene (wenn kein AddressBlock) ----
+  // Optional parent IP space (if no address block)
   @ManyToOne(() => IpSpace, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'spaceId' })
   space?: IpSpace;
@@ -47,9 +48,11 @@ export class Subnet {
   @Column({ type: 'text', nullable: true })
   comment?: string | null;
 
+  // Related DHCP options
   @OneToMany(() => SubnetDhcpOption, (opt) => opt.subnet, { cascade: true })
   dhcpOptions: SubnetDhcpOption[];
 
+  // Related option groups
   @OneToMany(() => SubnetOptionGroup, (sog) => sog.subnet, { cascade: true })
   optionGroups: SubnetOptionGroup[];
 }

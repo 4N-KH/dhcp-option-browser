@@ -7,8 +7,8 @@ export class OptionValuesService {
   constructor(private readonly viewRepo: AllDhcpOptionAssignmentRepository) {}
 
   /**
-   * Liefert alle Werte (option_value) und deren Anzahl von Objekten,
-   * auf denen dieser Wert effektiv gesetzt ist, für einen gegebenen Option-Code+Name(+Type,+Source).
+   * Returns all option_value entries and the number of objects
+   * where each value is effectively set for a given option code + name (+ type, + source).
    */
   async getAllValuesForOptionKey(
     code: number,
@@ -23,7 +23,7 @@ export class OptionValuesService {
       source,
     );
     // result: Array<{ value: string; objectCount: number }>
-    // Explizit: nur Werte mit mind. 1 Objekt (objectCount > 0)
+    // Explicitly include only values with at least one object (objectCount > 0)
     return result
       .filter(
         ({ value, objectCount }) =>

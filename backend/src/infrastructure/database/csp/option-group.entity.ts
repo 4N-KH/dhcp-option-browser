@@ -5,7 +5,7 @@ import { AddressBlockOptionGroup } from './address-block-option-group.entity';
 import { RangeOptionGroup } from './range-option-group.entity';
 import { DhcpGlobalConfigOptionGroup } from './global-config-option-group.entity';
 import { IpSpaceOptionGroup } from './ip-space-option-group.entity';
-import { FixedAddressOptionGroup } from './fixed-address-option-group.entity'; // NEU
+import { FixedAddressOptionGroup } from './fixed-address-option-group.entity';
 
 @Entity({ name: 'option_group' })
 export class OptionGroup {
@@ -48,6 +48,6 @@ export class OptionGroup {
   @OneToMany(() => IpSpaceOptionGroup, (ipg) => ipg.optionGroup)
   ipSpaceOptionGroups: IpSpaceOptionGroup[];
 
-  @OneToMany(() => FixedAddressOptionGroup, (faog) => faog.optionGroup) // NEU
+  @OneToMany(() => FixedAddressOptionGroup, (faog) => faog.optionGroup)
   fixedAddressOptionGroups: FixedAddressOptionGroup[];
 }

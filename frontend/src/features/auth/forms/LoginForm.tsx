@@ -17,7 +17,7 @@ import { AuthCredentialDto } from "@/types/dto/auth-credential.dto";
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-// Utility for grouping form control methods for child components
+/** Groups form helpers for child components */
 export interface FormUtils {
   watch: UseFormWatch<LoginFormData>;
   setValue: UseFormSetValue<LoginFormData>;
@@ -46,10 +46,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
       apiKey: "",
       // region: Region.EU,
       remember: false,
-      ...initialValues, // Autofill if provided
+      ...initialValues,
     },
   });
 
+  // Reset form when initial values change
   useEffect(() => {
     if (initialValues) {
       reset({
@@ -71,12 +72,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
   const remember = watch("remember");
   const firstInputRef = useRef<HTMLInputElement>(null);
 
+  // Focus first field when mode changes
   useEffect(() => {
     firstInputRef.current?.focus();
   }, [mode]);
 
+  // Handle submit and optional CSP credential saving
   const onSubmit = async (data: LoginFormData) => {
-    // CSP: optionales Speichern — ohne Region
     if (mode === AuthMode.CSP && remember && data.apiKey) {
       const saveResult = await saveCspCredential(data.apiKey /* , region */);
       if (!saveResult.success) {
@@ -109,7 +111,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
         <CspLoginFields
           register={register}
           errors={errors}
-          // region={region} // REGION: vorläufig deaktiviert
+          // region={region} // REGION: currently disabled
           inputRef={firstInputRef}
           formUtils={formUtils}
         />

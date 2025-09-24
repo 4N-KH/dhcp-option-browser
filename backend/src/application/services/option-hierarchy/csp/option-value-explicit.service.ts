@@ -1,5 +1,3 @@
-// src/application/services/option-hierarchy/csp/option-value-explicit.service.ts
-
 import { Injectable } from '@nestjs/common';
 import { OptionOccurrenceDto } from '@/domain/dto/csp/option-occurrence.dto';
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
@@ -23,7 +21,7 @@ export class OptionValueExplicitService {
   ) {}
 
   /**
-   * Alle expliziten Optionen auf Global-Config-Ebene
+   * All explicit options at Global Config level
    */
   async findExplicitGlobalOptions(
     code: number,
@@ -58,7 +56,7 @@ export class OptionValueExplicitService {
   }
 
   /**
-   * Alle expliziten Optionen auf IP-Space-Ebene
+   * All explicit options at IP Space level
    */
   async findExplicitIpSpaceOptions(
     code: number,
@@ -93,7 +91,7 @@ export class OptionValueExplicitService {
   }
 
   /**
-   * Alle expliziten Optionen auf AddressBlock-Ebene
+   * All explicit options at Address Block level
    */
   async findExplicitAddressBlockOptions(
     code: number,
@@ -137,7 +135,7 @@ export class OptionValueExplicitService {
   }
 
   /**
-   * Alle expliziten Optionen auf Subnetzebene
+   * All explicit options at Subnet level
    */
   async findExplicitSubnetOptions(
     code: number,
@@ -168,7 +166,7 @@ export class OptionValueExplicitService {
         opt.subnet?.cidr !== undefined && opt.subnet?.cidr !== null
           ? String(opt.subnet.cidr)
           : null,
-      ipSpace: opt.subnet?.space?.name ?? null, // ACHTUNG: space, nicht ipSpace!
+      ipSpace: opt.subnet?.space?.name ?? null,
       value: opt.option_value,
       setStatus: 'explicit',
       type: opt.optionCode?.type ?? null,
@@ -181,7 +179,7 @@ export class OptionValueExplicitService {
   }
 
   /**
-   * Alle expliziten Optionen auf Range-Ebene
+   * All explicit options at Range level
    */
   async findExplicitRangeOptions(
     code: number,
@@ -210,7 +208,7 @@ export class OptionValueExplicitService {
         opt.range?.start && opt.range?.end
           ? `${opt.range.start}-${opt.range.end}`
           : null,
-      ipSpace: opt.range?.subnet?.space?.name ?? null, // ACHTUNG: space, nicht ipSpace!
+      ipSpace: opt.range?.subnet?.space?.name ?? null,
       value: opt.option_value,
       setStatus: 'explicit',
       type: opt.optionCode?.type ?? null,
@@ -223,7 +221,7 @@ export class OptionValueExplicitService {
   }
 
   /**
-   * Alle expliziten Optionen auf FixedAddress-Ebene
+   * All explicit options at Fixed Address level
    */
   async findExplicitFixedAddressOptions(
     code: number,
@@ -247,7 +245,7 @@ export class OptionValueExplicitService {
       }`,
       address: opt.fixedAddress?.address ?? null,
       cidr: null,
-      ipSpace: opt.fixedAddress?.subnet?.space?.name ?? null, // ACHTUNG: space, nicht ipSpace!
+      ipSpace: opt.fixedAddress?.subnet?.space?.name ?? null,
       value: opt.option_value,
       setStatus: 'explicit',
       type: opt.optionCode?.type ?? null,
@@ -260,7 +258,7 @@ export class OptionValueExplicitService {
   }
 
   /**
-   * Kombinierte Abfrage: ALLE Ebenen! Optional Wert-Filter.
+   * Combined query across all levels; optional value filter.
    */
   async findExplicitOptionsAllLevels(
     code: number,

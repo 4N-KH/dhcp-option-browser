@@ -22,17 +22,17 @@ import RedundancyOverviewPanel from "@/features/redundancy/RedundancyOverviewPan
 import OptionGroupOverviewPanel from "@/features/option-view/OptionGroupOverviewPanel";
 import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 
-/* ---------------- optional Hints vom Redundancy-Panel ---------------- */
+/* ---------------- optional hints coming from the redundancy panel ---------------- */
 export type JumpHint = {
-  name?: string; // z. B. "labor_vm"
-  address?: string; // z. B. "10.10.0.0/24" ODER "10.10.0.0"
+  name?: string; // e.g., "labor_vm"
+  address?: string; // e.g., "10.10.0.0/24" OR "10.10.0.0"
   ipSpaceName?: string;
   subnetId?: number;
   start?: string;
   end?: string;
 };
 
-/* ---------------- Suchleiste (inline, ohne separates File) ---------------- */
+/* ---------------- inline search bar (no separate file) ---------------- */
 function SearchBar({
   placeholder = "Find name, address/CIDR, IP or range…",
   onSearch,
@@ -44,9 +44,11 @@ function SearchBar({
 }) {
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     inputRef.current?.setAttribute("aria-label", "DHCP tree search");
   }, []);
+
   return (
     <form
       onSubmit={(e) => {
@@ -74,7 +76,6 @@ function SearchBar({
 }
 
 /* ---------------- safe helpers for optional arrays ---------------- */
-
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 const ipSpaceAddressBlocks = (ip: LightIpSpaceDto): LightAddressBlockDto[] =>
@@ -95,7 +96,6 @@ const rangeFixed = (rg: LightRangeDto): LightFixedAddressDto[] =>
   arr<LightFixedAddressDto>(rg.fixedAddresses);
 
 /* ---------------- key helpers (MUST MATCH LightTreeView) ---------------- */
-
 type NT = Exclude<RedundancyLevel, "global">; // navigable node types
 type KeyStr = string;
 
@@ -111,7 +111,7 @@ function s(v: unknown): string | null {
   return null;
 }
 
-/** Build SAME stable key id as LightTreeView.stableIdFor */
+/** Build the SAME stable key id as LightTreeView.stableIdFor */
 function stableIdForSelection(sel: TreeSelection): string {
   const t = sel.type as TreeNodeKey["type"];
   const o = sel.object as unknown;
@@ -136,7 +136,7 @@ function stableIdForSelection(sel: TreeSelection): string {
       return combo ?? s(rd(o, "name")) ?? "subnet:unknown";
     }
     case "range": {
-      const sid = s(rd(o, "subnetId")) ?? s(rd(rd(o, "subnet"), "id")) ?? "?:"; // fallback
+      const sid = s(rd(o, "subnetId")) ?? s(rd(rd(o, "subnet"), "id")) ?? "?:";
       const start = s(rd(o, "start")) ?? "start?";
       const end = s(rd(o, "end")) ?? "end?";
       return `${sid}:${start}-${end}`;
@@ -146,7 +146,7 @@ function stableIdForSelection(sel: TreeSelection): string {
         s(rd(o, "subnetId")) ??
         s(rd(rd(o, "range"), "subnetId")) ??
         s(rd(rd(o, "subnet"), "id")) ??
-        "?:"; // fallback
+        "?:";
       const ip = s(rd(o, "ip")) ?? s(rd(o, "name")) ?? "ip?";
       return `${sid}:${ip}`;
     }
@@ -159,17 +159,16 @@ const keyStrOfSelection = (sel: TreeSelection): KeyStr =>
   `${sel.type}:${stableIdForSelection(sel)}`;
 
 /* ---------------- index builder: parent map + id & natural keys ---------------- */
-
 function buildIndex(tree: DhcpLightTreeDto) {
   const parent = new Map<KeyStr, KeyStr | null>();
   const nodeByKey = new Map<KeyStr, TreeSelection>();
   const idToKey = new Map<KeyStr, KeyStr>();
 
-  // natürliche Schlüssel (für Suche & Fallbacks)
+  // natural keys (used for search & fallbacks)
   const ipSpaceByName = new Map<string, KeyStr>();
-  const addressBlockByAddress = new Map<string, KeyStr>(); // akzeptiert "addr" UND "addr/cidr"
+  const addressBlockByAddress = new Map<string, KeyStr>(); // accepts "addr" AND "addr/cidr"
   const addressBlockByName = new Map<string, KeyStr>();
-  const subnetByAddress = new Map<string, KeyStr>(); // akzeptiert "addr" UND "addr/cidr"
+  const subnetByAddress = new Map<string, KeyStr>(); // accepts "addr" AND "addr/cidr"
   const subnetByName = new Map<string, KeyStr>();
   const rangeByTuple = new Map<string, KeyStr>(); // `${subnetId}:${start}-${end}`
   const fixedByTuple = new Map<string, KeyStr>(); // `${subnetId}:${ip}`
@@ -190,7 +189,7 @@ function buildIndex(tree: DhcpLightTreeDto) {
     nodeByKey.set(key, sel);
     setId(sel, key);
 
-    // natürliche Schlüssel registrieren
+    // register natural keys
     switch (sel.type) {
       case "ipSpace": {
         const name = s(rd(sel.object, "name"));
@@ -202,7 +201,7 @@ function buildIndex(tree: DhcpLightTreeDto) {
         const cidr = s(rd(sel.object, "cidr"));
         const name = s(rd(sel.object, "name"));
         if (addr) {
-          addressBlockByAddress.set(addr, key); // reine Adresse
+          addressBlockByAddress.set(addr, key); // plain address
           if (cidr) addressBlockByAddress.set(`${addr}/${cidr}`, key); // addr/cidr
         }
         if (name) addressBlockByName.set(name, key);
@@ -238,8 +237,7 @@ function buildIndex(tree: DhcpLightTreeDto) {
     }
   };
 
-  // --- Walk: IpSpace → AddressBlocks (rekursiv children) + Subnets → Ranges + Fixeds ---
-
+  // Walk: IpSpace → AddressBlocks (recursively via children) + Subnets → Ranges + Fixeds
   const walkAddressBlock = (ab: LightAddressBlockDto, parentKey: KeyStr) => {
     const abSel: TreeSelection = { type: "addressBlock", object: ab };
     const abKey = keyStrOfSelection(abSel);
@@ -302,7 +300,7 @@ function buildIndex(tree: DhcpLightTreeDto) {
     nodeByKey,
     idToKey,
     rootKey,
-    // natürliche Schlüssel
+    // natural keys
     ipSpaceByName,
     addressBlockByAddress,
     addressBlockByName,
@@ -314,7 +312,6 @@ function buildIndex(tree: DhcpLightTreeDto) {
 }
 
 /* ---------------- path & selection using index (stable keys) ---------------- */
-
 function pathFromIndex(
   parent: Map<KeyStr, KeyStr | null>,
   keyStart: KeyStr | null,
@@ -345,7 +342,6 @@ function selectionFromKey(
 }
 
 /* ---------------- robust lookup for Jump (Redundancy Panel) ---------------- */
-
 function resolveKeyForJump(
   level: NT,
   objectId: number,
@@ -363,11 +359,11 @@ function resolveKeyForJump(
     fixedByTuple,
   } = index;
 
-  // 1) exakte ID
+  // 1) exact id
   const byId = idToKey.get(`${level}:${String(objectId)}`);
   if (byId) return byId;
 
-  // 2) Fallback nach Typ/Hints
+  // 2) type-specific fallback via hints
   switch (level) {
     case "ipSpace": {
       const fromName = hint?.ipSpaceName ?? hint?.name;
@@ -427,13 +423,12 @@ function resolveKeyForJump(
   return null;
 }
 
-/* ---------------- Suche: Parser & Finder (ohne any) ---------------- */
-
+/* ---------------- search: parser & finder (no any) ---------------- */
 function parseQuery(raw: string) {
   const q = raw.trim();
   const lower = q.toLowerCase();
 
-  // Range: "subnetId:start-end" ODER "start-end"
+  // Range: "subnetId:start-end" OR "start-end"
   const withSubnet = q.match(
     /^(\d+):(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,3}(?:\.\d{1,3}){3})$/,
   );
@@ -441,7 +436,7 @@ function parseQuery(raw: string) {
     /^(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,3}(?:\.\d{1,3}){3})$/,
   );
 
-  // CIDR/IP: "addr" oder "addr/cidr"
+  // CIDR/IP: "addr" or "addr/cidr"
   const cidrMatch = q.match(
     /^(\d{1,3}(?:\.\d{1,3}){3})(?:\/(\d|[12]\d|3[0-2]))?$/,
   );
@@ -479,7 +474,7 @@ function findKeyByQuery(
     nodeByKey,
   } = index;
 
-  // 1) Exakte Maps
+  // 1) map-based exacts
 
   // CIDR / IP → prefer subnet/addressBlock maps & FixedAddress
   if (cidrMatch) {
@@ -495,8 +490,10 @@ function findKeyByQuery(
       );
     }
 
-    // pure IP → FixedAddress (wenn subnetId unbekannt → heuristisch)
-    const fixedGuess = [...fixedByTuple.keys()].find((k) => k.endsWith(`:${addr}`));
+    // pure IP → FixedAddress (if subnetId unknown → heuristic)
+    const fixedGuess = [...fixedByTuple.keys()].find((k) =>
+      k.endsWith(`:${addr}`),
+    );
     if (fixedGuess) return fixedByTuple.get(fixedGuess) ?? null;
 
     return subnetByAddress.get(addr) ?? addressBlockByAddress.get(addr) ?? null;
@@ -515,7 +512,7 @@ function findKeyByQuery(
     if (any) return rangeByTuple.get(any) ?? null;
   }
 
-  // IP-Space / AB / Subnet Name exakt
+  // IP-Space / AddressBlock / Subnet by exact name
   const ipSpace = ipSpaceByName.get(q) ?? ipSpaceByName.get(q.toUpperCase());
   if (ipSpace) return ipSpace;
 
@@ -525,7 +522,7 @@ function findKeyByQuery(
   const snByName = subnetByName.get(q);
   if (snByName) return snByName;
 
-  // 2) Fallback: contains-scan über node props (typisiert)
+  // 2) fallback: loose contains-scan across safe props
   const cand = [...nodeByKey.entries()].find(([, sel]) => {
     const obj = (sel.object ?? {}) as Partial<SearchableNode>;
     const name = toStr(obj.name).toLowerCase();
@@ -546,7 +543,6 @@ function findKeyByQuery(
 }
 
 /* ---------------- component ---------------- */
-
 export default function OverviewPage() {
   const [tree, setTree] = useState<DhcpLightTreeDto | null>(null);
   const [selected, setSelected] = useState<TreeSelection | null>(null);
@@ -558,7 +554,7 @@ export default function OverviewPage() {
     null,
   );
 
-  // Suchindex cachen
+  // cached search index
   const [index, setIndex] = useState<ReturnType<typeof buildIndex> | null>(
     null,
   );
@@ -575,7 +571,7 @@ export default function OverviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  /** Robust: akzeptiert optional Hints vom Redundancy-Panel */
+  /** Robust: accepts optional hints from redundancy panel */
   const handleJumpToTree = (
     level: RedundancyLevel,
     objectId: number,
@@ -614,7 +610,7 @@ export default function OverviewPage() {
     setIndex(updated ? buildIndex(updated) : null);
   };
 
-  // Suche → Pfad aufklappen & selektieren
+  // Search → expand path and select
   const handleSearch = (query: string) => {
     if (!tree || !index || !query) return;
     setTab("tree");
@@ -696,7 +692,7 @@ export default function OverviewPage() {
         {tab === "tree" ? (
           <div className="flex h-full w-full">
             <div className="w-1/3 min-w-[340px] max-w-[480px] border-r border-[var(--border)] bg-[rgba(255,255,255,0.02)] overflow-y-auto">
-              {/* Suchleiste */}
+              {/* Search bar */}
               <SearchBar
                 onSearch={handleSearch}
                 className="border-b border-[var(--border)]"

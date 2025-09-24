@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// Barrel-File (index.ts) für Entities und Repositories
+// Barrel file exporting all database entities and repositories
 // ---------------------------------------------------------------------------
 
-// DHCP-Config & Spaces
+// DHCP configuration & spaces
 export * from './global-config.entity';
 export * from './ip-space.entity';
 export * from './address-block.entity';
@@ -10,7 +10,7 @@ export * from './subnet.entity';
 export * from './range.entity';
 export * from './fixed-address.entity';
 
-// DHCP Options
+// DHCP options
 export * from './global-config-option.entity';
 export * from './ip-space-dhcp-option.entity';
 export * from './address-block-dhcp-option.entity';
@@ -18,7 +18,7 @@ export * from './subnet-dhcp-option.entity';
 export * from './range-dhcp-option.entity';
 export * from './fixed-dhcp-option.entity';
 
-// OptionGroups
+// Option groups
 export * from './option-group.entity';
 export * from './option-group-dhcp-option.entity';
 export * from './global-config-option-group.entity';
@@ -28,24 +28,23 @@ export * from './subnet-option-group.entity';
 export * from './range-option-group.entity';
 export * from './fixed-address-option-group.entity';
 
-// Option Code & Space
+// Option code & space
 export * from './option-code.entity';
 export * from './option-space.entity';
 
-// Range-Exclusions
+// Range exclusions
 export * from './range-exclusion.entity';
 
-// Filter
+// Option filters
 export * from './option-filter.entity';
 
-// Credentials & User
+// Credentials & users
 export * from './csp-credential.entity';
 export * from './user.entity';
 
 // ---------------------------------------------------------------------------
-// Repository-Exports ergänzen (!!!)
+// Repository exports
 // ---------------------------------------------------------------------------
-
 export * from './global-config-option.repository';
 export * from './ip-space-dhcp-option.repository';
 export * from './address-block-dhcp-option.repository';

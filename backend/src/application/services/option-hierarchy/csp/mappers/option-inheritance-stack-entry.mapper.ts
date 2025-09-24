@@ -18,12 +18,8 @@ interface StackEntryInput {
   comment?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
-  name?: string | null; // <-- Das MUSS hier rein!
+  name?: string | null;
 }
-
-/**
- * Universelle Utility, die einen Stack-Entry für eine Option der Vererbungskette erstellt.
- */
 export function mapOptionToStackEntry(
   input: StackEntryInput,
 ): OptionInheritanceStackEntryDto {

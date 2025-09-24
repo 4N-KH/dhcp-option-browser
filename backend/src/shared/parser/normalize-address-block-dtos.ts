@@ -1,13 +1,16 @@
 import { CspAddressBlockDto } from '@/domain/dto/csp/address-block.dto';
 
+// Convert raw input to a clean array of CspAddressBlockDto
 export function normalizeAddressBlockDtos(
   input: unknown,
 ): CspAddressBlockDto[] {
   if (!Array.isArray(input)) return [];
+
   return input.map((raw) => {
     const dto = raw as Partial<CspAddressBlockDto>;
-
     let dhcp_options: CspAddressBlockDto['dhcp_options'] = undefined;
+
+    // Validate and normalize dhcp_options
     if (Array.isArray(dto.dhcp_options)) {
       dhcp_options = dto.dhcp_options
         .filter(
@@ -20,11 +23,11 @@ export function normalizeAddressBlockDtos(
             type: string;
           } =>
             !!opt &&
-            // Normale Option
+            // valid single option
             ((typeof opt.option_code === 'string' &&
               typeof opt.option_value === 'string' &&
               typeof opt.type === 'string') ||
-              // Group-Referenz: group gesetzt UND type ist "group"
+              // valid group reference
               (opt.type === 'group' && typeof opt.group === 'string')),
         )
         .map((opt) => ({

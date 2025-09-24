@@ -1,4 +1,3 @@
-// src/application/services/option-hierarchy/csp/option-group-meta.factory.ts
 import { Injectable } from '@nestjs/common';
 import { OptionGroup } from '@/infrastructure/database/csp/option-group.entity';
 import { OptionGroupMetaDto } from '@/domain/dto/csp/option-group-meta.dto';

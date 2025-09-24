@@ -20,13 +20,13 @@ export interface RedundantOptionDto {
 }
 
 export interface RedundancyOverviewItemDto {
-  /** Tree-Level, gleich wie object_type */
+  /** Tree level, same as object_type */
   level: RedundancyLevel;
-  /** Primärschlüssel des Objekts — NEU: für Deep-Link ins Frontend */
+  /** Primary key of the object — used for deep-linking in the frontend */
   objectId: number;
-  /** Anzeigename (Label) falls vorhanden, sonst null */
+  /** Display name (label) if available, otherwise null */
   name: string | null;
-  /** Adresse/CIDR/Range-Text falls sinnvoll */
+  /** Address/CIDR/Range text if applicable */
   address: string | null;
   redundantOption: RedundantOptionDto;
 }

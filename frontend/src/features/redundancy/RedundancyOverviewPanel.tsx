@@ -18,9 +18,8 @@ const Row: React.FC<{
 }> = ({ item, onJump }) => {
   const { level, name, address, redundantOption, objectId } = item;
 
-  const setIn = redundantOption.setIn
-    .map((s) => `${s.from} (${s.inheritanceType})`)
-    .join("; ");
+  // Status in Klammern (inheritanceType) entfernt
+  const setIn = redundantOption.setIn.map((s) => `${s.from}`).join("; ");
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-white/5 p-4">

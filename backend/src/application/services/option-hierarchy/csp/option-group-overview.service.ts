@@ -1,4 +1,3 @@
-// backend/src/application/services/option-hierarchy/csp/option-group-overview.service.ts
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
@@ -465,9 +464,6 @@ export class OptionGroupOverviewService {
     }));
   }
 
-  /**
-   * Listet die Optionen, die in der OptionGroup *definiert* sind – inkl. Wert.
-   */
   async getGroupOptions(groupId: number): Promise<OptionInGroupDto[]> {
     const sql = `
       SELECT

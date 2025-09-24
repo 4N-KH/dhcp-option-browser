@@ -1,5 +1,3 @@
-// csp-light-tree.types.ts
-
 import {
   IpSpace,
   AddressBlock,

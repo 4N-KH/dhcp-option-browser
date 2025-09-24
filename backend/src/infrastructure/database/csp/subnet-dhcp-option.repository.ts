@@ -1,9 +1,8 @@
-// src/infrastructure/database/csp/subnet-dhcp-option.repository.ts
-
 import { Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { SubnetDhcpOption } from './subnet-dhcp-option.entity';
 
+// Repository wrapper for SubnetDhcpOption
 @Injectable()
 export class SubnetDhcpOptionRepository {
   private repo: Repository<SubnetDhcpOption>;
@@ -12,6 +11,7 @@ export class SubnetDhcpOptionRepository {
     this.repo = this.dataSource.getRepository(SubnetDhcpOption);
   }
 
+  // Find all DHCP options for a given subnet
   async findByParentId(subnetId: number) {
     return this.repo.find({
       where: { subnetId },
@@ -19,34 +19,27 @@ export class SubnetDhcpOptionRepository {
     });
   }
 
+  // Find a single DHCP option by primary key
   async findOneById(id: number) {
-    return this.repo.findOne({
-      where: { id },
-    });
+    return this.repo.findOne({ where: { id } });
   }
 
-  /**
-   * Explizite Suche nach Option auf Subnetzebene (korrekt nach OptionCode.code/name/type/source!)
-   */
+  // Find options on a subnet by code, name, and optional type/source
   async findByCodeNameTypeSource(
     code: string,
     name: string,
     type?: string,
     source?: string,
   ) {
-    // Hole alle mit OptionCode-Relation
-    return this.repo
-      .find({
-        relations: ['optionCode', 'optionCode.optionSpace', 'subnet'],
-      })
-      .then((results) =>
-        results.filter(
-          (opt) =>
-            opt.optionCode?.code === code && // <- HIER!
-            opt.optionCode?.name === name &&
-            (type ? opt.optionCode?.type === type : true) &&
-            (source ? opt.optionCode?.source === source : true),
-        ),
-      );
+    const results = await this.repo.find({
+      relations: ['optionCode', 'optionCode.optionSpace', 'subnet'],
+    });
+    return results.filter(
+      (opt) =>
+        opt.optionCode?.code === code &&
+        opt.optionCode?.name === name &&
+        (type ? opt.optionCode?.type === type : true) &&
+        (source ? opt.optionCode?.source === source : true),
+    );
   }
 }

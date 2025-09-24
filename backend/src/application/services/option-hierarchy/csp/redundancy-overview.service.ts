@@ -1,4 +1,3 @@
-// backend/src/application/services/option-hierarchy/csp/redundancy-overview.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { RedundancyOverviewItemDto } from '@/domain/dto/csp/redundancy-overview-item.dto';
 import {
@@ -15,11 +14,11 @@ export class RedundancyOverviewService {
   ) {}
 
   /**
-   * Panel-strikte Redundanz:
-   * Ein OptionsCODE erscheint auf demselben Objekt aus ≥ 2 unterschiedlichen Quellen,
-   * unabhängig davon, ob die Werte identisch oder unterschiedlich sind.
-   * - Bei gemischten Werten wird der Wert als "<multiple>" ausgegeben.
-   * - "setIn" enthält je Quelle den Vererbungsstatus (explicit|inherited).
+   * Panel-strict redundancy:
+   * An option code appears on the same object from ≥ 2 different sources,
+   * regardless of whether the values are identical or different.
+   * - If values differ, the value is returned as "<multiple>".
+   * - "setIn" contains the inheritance status (explicit | inherited) per source.
    */
   async getRedundancyOverview(): Promise<RedundancyOverviewItemDto[]> {
     const rows =

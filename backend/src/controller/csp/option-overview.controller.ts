@@ -7,7 +7,6 @@ import { OptionCodeOverviewDto } from '@/domain/dto/csp/option-code-overview.dto
 import { OptionValueOverviewDto } from '@/domain/dto/csp/option-value-overview.dto';
 import { OptionOccurrenceDto } from '@/domain/dto/csp/option-occurrence.dto';
 
-// /api vor Controller-Pfad setzen!
 @Controller('api/option-overview')
 export class OptionOverviewController {
   constructor(
@@ -19,7 +18,6 @@ export class OptionOverviewController {
 
   @Get()
   async getAllOptions(): Promise<OptionCodeOverviewDto[]> {
-    // Nur noch Optionen mit mindestens 1 Value
     return this.optionOverviewService.getAllOptionCodesWithAtLeastOneValue();
   }
 

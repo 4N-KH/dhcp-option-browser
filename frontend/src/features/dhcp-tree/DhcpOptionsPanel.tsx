@@ -1,3 +1,4 @@
+// Minimal horizontal scroll removal and stable rendering
 import React, { useMemo } from "react";
 import {
   EffectiveDhcpOptionSlimDto,
@@ -26,7 +27,7 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
   options,
   error,
 }) => {
-  // Preprocess options into direct options, grouped panels, and redundancy keys
+  // Precompute direct options, group panels and redundancy keys
   const { directOptions, groupPanels, partnerKeys } = useMemo(() => {
     if (!options)
       return {
@@ -39,7 +40,6 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
     const groupMap = new Map<number, GroupPanelMeta>();
     const partnerKeys = new Set<string>();
 
-    // Extract groups and track redundancy relationships
     for (const opt of options) {
       const group = opt.source?.optionGroup;
       if (group && typeof group.id === "number") {
@@ -54,7 +54,6 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
             originLevelLabel: group.originLevelLabel,
           });
         }
-        // Collect redundancy keys from group options
         for (const gopt of group.options) {
           if (gopt.redundantWith) {
             partnerKeys.add(
@@ -63,15 +62,14 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
                 gopt.redundantWith.value ?? null,
                 gopt.redundantWith.level,
                 gopt.redundantWith.levelId,
-                gopt.redundantWith.groupId,
-              ),
+                gopt.redundantWith.groupId
+              )
             );
           }
         }
       }
     }
 
-    // Identify standalone options (not in a group) and track redundancy
     for (const opt of options) {
       const group = opt.source?.optionGroup;
       if (!group || typeof group.id !== "number") {
@@ -84,8 +82,8 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
             opt.redundantWith.value ?? null,
             opt.redundantWith.level,
             opt.redundantWith.levelId,
-            opt.redundantWith.groupId,
-          ),
+            opt.redundantWith.groupId
+          )
         );
       }
     }
@@ -107,13 +105,13 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
     );
 
   return (
-    <div className="bg-blue-950/40 rounded-2xl p-6 shadow min-h-[120px] mt-2 overflow-x-auto">
-      {/* Direct options table */}
+    <div className="bg-blue-950/40 rounded-2xl p-6 shadow min-h-[120px] mt-2 overflow-hidden">
+      {/* Table of direct (non-grouped) options with horizontal scroll */}
       <div className="mb-10">
         <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">
           Options
         </div>
-        <div className="overflow-x-auto rounded-xl bg-blue-950/60">
+        <div className="rounded-xl bg-blue-950/60 overflow-x-auto">
           <table className="min-w-[900px] w-full text-sm border-separate border-spacing-0">
             <thead>
               <tr className="text-blue-200 uppercase text-xs font-bold border-b border-blue-900">
@@ -147,7 +145,7 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
         </div>
       </div>
 
-      {/* Grouped options */}
+      {/* Render grouped options via OptionGroupPanel */}
       <div>
         <div className="text-blue-300 font-semibold mb-3 text-lg tracking-wide">
           Option Groups
@@ -171,16 +169,15 @@ const DhcpOptionsPanel: React.FC<DhcpOptionsPanelProps> = ({
                 options={group.options}
                 partnerKeys={partnerKeys}
               />
-            ),
+            )
           )
         ) : (
           <div className="text-gray-500 py-2 px-4">No option groups</div>
         )}
       </div>
 
-      {/* UX hint */}
       <div className="text-xs text-gray-500 mt-3 ml-2">
-        Tip: Click a group to expand. is shown for each group.
+        Tip: Click a group to expand.
       </div>
     </div>
   );

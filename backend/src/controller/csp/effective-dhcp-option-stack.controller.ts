@@ -23,7 +23,6 @@ import {
 } from '@/domain/enums/csp/object-type.enum';
 import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-option-slim.dto';
 
-// NEU: Panel-striktes Redundanz-Flagging
 import { markRedundancyPerPanelStrict } from '@/shared/utils/mark-redundancy-per-panel.util';
 
 @ApiTags('DHCP Option Stack')
@@ -78,7 +77,6 @@ export class EffectiveDhcpOptionStackController {
   markRedundant(
     @Body() options: EffectiveDhcpOptionSlimDto[],
   ): EffectiveDhcpOptionSlimDto[] {
-    // Neues Utility: markiert nur innerhalb des Panels, niemals global
     markRedundancyPerPanelStrict(options);
     return options;
   }

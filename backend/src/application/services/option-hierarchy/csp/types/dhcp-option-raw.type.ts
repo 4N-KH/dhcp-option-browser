@@ -2,10 +2,10 @@ import { OptionCodeEntity } from '@/infrastructure/database/csp/option-code.enti
 import { OptionSpaceMetaDto } from '@/domain/dto/csp/option-space-meta.dto';
 
 /**
- * Rohdaten eines DHCP-Options-Eintrags, wie aus der DB/API geholt.
- * Für Mapping und Assembler:
- * - `option_value` ist das Hauptfeld für den eigentlichen Wert (string/null)
- * - optional kann auch `value` existieren (Legacy, je nach Quelle/Mapping)
+ * Raw data of a DHCP option entry as retrieved from DB/API.
+ * For mapping and assembling:
+ * - `option_value` is the primary field for the actual value (string/null)
+ * - `value` may also exist for legacy sources or mappings
  */
 export interface DhcpOptionRaw {
   option_code: string;

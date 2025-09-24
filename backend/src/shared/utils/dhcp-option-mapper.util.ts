@@ -9,7 +9,7 @@ interface CspDhcpOptionLike {
 }
 
 /**
- * Baut die Maps für OptionCodes und OptionSpaces analog zum AddressBlock-Import (mit beiden Schlüsseln!)
+ * Builds a map of option codes using both externalId and numeric code as keys.
  */
 export function buildOptionCodeMap(
   allOptionCodes: OptionCodeEntity[],
@@ -17,25 +17,26 @@ export function buildOptionCodeMap(
   const map = new Map<string, OptionCodeEntity>();
   for (const code of allOptionCodes) {
     if (code.externalId) map.set(code.externalId, code);
-    if (code.code !== undefined && code.code !== null)
+    if (code.code !== undefined && code.code !== null) {
       map.set(String(code.code), code);
+    }
   }
   return map;
 }
 
 /**
- * Universelle Hilfsfunktion für das Mapping von DTOs auf DB-Optionen.
- * Gibt ein Objekt mit allen benötigten Feldern zurück (inkl. OptionSpace und OptionSpaceId).
+ * Maps a raw DHCP option DTO to a partial database entity,
+ * resolving OptionCode and OptionSpace references when available.
  */
 export function mapDhcpOptionToEntity<T extends object>(
   opt: CspDhcpOptionLike,
   optionCodeMap: Map<string, OptionCodeEntity>,
 ): Partial<T> {
-  // Finde OptionCode-Referenz (über code und externalId)
   const optionCodeRef =
     optionCodeMap.get(opt.option_code) ??
     optionCodeMap.get(String(opt.option_code)) ??
     undefined;
+
   const optionSpaceRef: OptionSpace | undefined = optionCodeRef?.optionSpace;
   const optionSpaceId = optionSpaceRef?.id ?? undefined;
 

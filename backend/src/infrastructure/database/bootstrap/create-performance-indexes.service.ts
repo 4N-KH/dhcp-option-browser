@@ -8,8 +8,8 @@ export class CreatePerformanceIndexesService implements OnModuleInit {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
-   * Legt fehlende Performance-Indizes für alle DHCP-Hierarchien an
-   * und aktualisiert die Statistiken. Läuft einmalig beim App-Start.
+   * Creates missing performance indexes for all DHCP hierarchies
+   * and updates statistics. Runs once on application startup.
    */
   async onModuleInit(): Promise<void> {
     const indexQueries: string[] = [

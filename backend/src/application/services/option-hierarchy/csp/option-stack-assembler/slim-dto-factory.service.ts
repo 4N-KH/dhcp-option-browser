@@ -81,6 +81,9 @@ export class SlimDtoFactoryService {
     return lastOrigin;
   }
 
+  /**
+   * Builds a slim DTO for a single option code based on its inheritance stack.
+   */
   buildSlimDtoFromStack(
     code: string,
     stack: OptionInheritanceStackEntryDto[],
@@ -119,7 +122,6 @@ export class SlimDtoFactoryService {
       optionGroupName: s.optionGroup?.name ?? '',
     }));
 
-    // robust: direkt von der Option übernehmen!
     let redundant = false;
     if (hasRedundancyMarking(top) && top.redundant) {
       redundant = true;
@@ -171,7 +173,6 @@ export class SlimDtoFactoryService {
             const optionCodeSource = getString(opt, 'optionCodeSource') ?? null;
             const optionSpace = getObject(opt, 'optionSpace') ?? null;
 
-            // <- Das redundant-Flag immer 1:1 übernehmen!
             const isRedundant =
               hasRedundancyMarking(opt) && opt.redundant === true;
 
@@ -300,6 +301,9 @@ export class SlimDtoFactoryService {
     };
   }
 
+  /**
+   * Builds slim DTOs for all option codes and group-only entries.
+   */
   buildSlimDtoForAll(
     stacks: Map<string, OptionInheritanceStackEntryDto[]>,
     contexts: ContextObj[],
@@ -370,7 +374,6 @@ export class SlimDtoFactoryService {
                 getString(opt, 'optionCodeSource') ?? null;
               const optionSpace = getObject(opt, 'optionSpace') ?? null;
 
-              // <- Das redundant-Flag immer 1:1 übernehmen!
               const isRedundant =
                 hasRedundancyMarking(opt) && opt.redundant === true;
 

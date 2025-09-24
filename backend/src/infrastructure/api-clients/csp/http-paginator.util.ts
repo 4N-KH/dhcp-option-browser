@@ -42,7 +42,7 @@ function getHeader(headers: unknown, key: string): string | undefined {
  *
  * @param http        NestJS HttpService instance
  * @param baseUrl     API endpoint base URL (without page_size/page_id)
- * @param headers     HTTP headers (incl. authorisation)
+ * @param headers     HTTP headers (incl. authorization)
  * @param pageSize    Number of items per page (default: 100)
  * @param onProgress  Optional progress callback: (percent: number) => void
  * @param isCancelled Optional cancellation check: () => boolean
@@ -112,7 +112,7 @@ export async function fetchAllPaginated<T>(
         nextPageId = responseData.next_page_id ?? null;
         requestSuccess = true;
 
-        // Fortschritt berechnen und melden
+        // Calculate and report progress
         if (onProgress && total && total > 0) {
           const percent = Math.min(Math.round((fetched / total) * 100), 99);
           onProgress(percent);
@@ -197,7 +197,7 @@ export async function fetchAllPaginated<T>(
     }
   } while (nextPageId);
 
-  // 100% Progress am Ende (wenn Callback gesetzt)
+  // Final 100% progress update if callback is provided
   if (onProgress) {
     onProgress(100);
   }

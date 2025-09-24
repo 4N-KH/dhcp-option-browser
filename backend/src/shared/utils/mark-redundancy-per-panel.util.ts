@@ -2,10 +2,9 @@ import { EffectiveDhcpOptionSlimDto } from '@/domain/dto/csp/effective-dhcp-opti
 import type { GroupOptionDto } from '@/application/services/option-hierarchy/csp/types/group-option-dto.type';
 
 /**
- * Panel-strikte Redundanz (über Gruppen hinweg!):
- * Markiert alle Optionen im aktuellen Panel als redundant, wenn
- * derselbe Optionscode (unabhängig vom Wert) mindestens zweimal vorkommt.
- * Einzeloptionen UND alle Gruppenoptionen werden gemeinsam geprüft.
+ * Marks all options in the current panel as redundant if
+ * the same option code (value ignored) occurs more than once.
+ * Both single options and all group options are checked together.
  */
 export function markRedundancyPerPanelStrict(
   options: EffectiveDhcpOptionSlimDto[],
@@ -13,6 +12,7 @@ export function markRedundancyPerPanelStrict(
   type Ref = { opt?: EffectiveDhcpOptionSlimDto; groupOpt?: GroupOptionDto };
   const byCode = new Map<string, Ref[]>();
 
+  // Collect all occurrences grouped by option code
   for (const opt of options) {
     const isGroupContainer =
       !!opt.source?.optionGroup &&
@@ -33,6 +33,8 @@ export function markRedundancyPerPanelStrict(
       }
     }
   }
+
+  // Flag redundant entries
   for (const occurrences of byCode.values()) {
     const redundant = occurrences.length > 1;
     for (const entry of occurrences) {

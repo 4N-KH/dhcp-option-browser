@@ -1,7 +1,7 @@
 export interface ImportConfigPort {
-  /** Maximale Laufzeit eines Full-Imports in Millisekunden; danach Abbruch mit TIMED_OUT. */
+  /** Maximum runtime of a full import in milliseconds; aborts with TIMED_OUT after this limit. */
   maxRuntimeMs: number;
 
-  /** Aktivierte Phasen in der gewünschten Reihenfolge (nur zur Anzeige/Zählung). */
+  /** Enabled phases in the desired order (used only for display/counting). */
   phases: string[];
 }

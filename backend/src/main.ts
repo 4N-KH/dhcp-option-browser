@@ -4,25 +4,25 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap(): Promise<void> {
-  // Logger-Instanz für Bootstrap-Meldungen
+  // Logger used for application startup messages
   const logger = new Logger('Bootstrap');
 
   try {
-    // ----- WICHTIG: Logger explizit für alle Level setzen! -----
+    // Create the NestJS app with full log levels enabled
     const app = await NestFactory.create(AppModule, {
       logger: ['log', 'error', 'warn', 'debug', 'verbose'],
     });
 
-    // Damit wirklich JEDE Log-Message durchgeht (auch aus Services)
+    // Allow all log levels across the entire application
     Logger.overrideLogger(['log', 'error', 'warn', 'debug', 'verbose']);
 
-    // Enable CORS für dein Frontend
+    // Enable CORS for the frontend
     app.enableCors({
       origin: 'http://localhost:3000',
       credentials: true,
     });
 
-    // Globale DTO-Validation aktivieren
+    // Apply global DTO validation and transformation
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,

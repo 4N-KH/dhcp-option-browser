@@ -18,7 +18,7 @@ export function getOriginLevelLabel(
 ): string | undefined {
   if (!originLevel || originLevelId == null) return undefined;
 
-  // Global bleibt ausformuliert, damit "Inherited from Global DHCP Configuration" klar lesbar ist.
+  // Global config
   if (
     originLevel === 'global' &&
     contextTreeMaps?.globalConfigId === originLevelId
@@ -26,7 +26,7 @@ export function getOriginLevelLabel(
     return 'Global DHCP Configuration';
   }
 
-  // ipSpace
+  // IP space
   if (originLevel === 'ipSpace' && contextTreeMaps?.ipSpacesById) {
     const ip = contextTreeMaps.ipSpacesById.get(originLevelId);
     const base =
@@ -34,7 +34,7 @@ export function getOriginLevelLabel(
     return `ipSpace ${base}`;
   }
 
-  // address block
+  // Address block
   if (originLevel === 'addressBlock' && contextTreeMaps?.addressBlocksById) {
     const ab = contextTreeMaps.addressBlocksById.get(originLevelId);
     const base =
@@ -48,7 +48,7 @@ export function getOriginLevelLabel(
     return `address block ${base}`;
   }
 
-  // subnet
+  // Subnet
   if (originLevel === 'subnet' && contextTreeMaps?.subnetsById) {
     const sn = contextTreeMaps.subnetsById.get(originLevelId);
     const base =
@@ -62,7 +62,7 @@ export function getOriginLevelLabel(
     return `subnet ${base}`;
   }
 
-  // range
+  // Range
   if (originLevel === 'range' && contextTreeMaps?.rangesById) {
     const rg = contextTreeMaps.rangesById.get(originLevelId);
     const name = rg?.name && rg.name.trim().length > 0 ? rg.name : null;
@@ -71,7 +71,7 @@ export function getOriginLevelLabel(
     return `range ${base}`;
   }
 
-  // fixed address
+  // Fixed address
   if (originLevel === 'fixedAddress' && contextTreeMaps?.fixedAddressesById) {
     const fa = contextTreeMaps.fixedAddressesById.get(originLevelId);
     const base =
@@ -81,6 +81,6 @@ export function getOriginLevelLabel(
     return `fixed address ${base}`;
   }
 
-  // Fallback (sollte selten greifen)
+  // Fallback
   return `${originLevel} #${originLevelId}`;
 }

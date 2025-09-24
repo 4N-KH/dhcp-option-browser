@@ -14,7 +14,7 @@ export function mapIpSpaceDhcpOptionToEffectiveDto(
     ? {
         id: meta.optionSpace.id,
         name: meta.optionSpace.name,
-        protocol: meta.optionSpace.protocol ?? '', // Immer ein String!
+        protocol: meta.optionSpace.protocol ?? '',
         comment: meta.optionSpace.comment ?? null,
         createdAt: meta.optionSpace.createdAt ?? null,
         updatedAt: meta.optionSpace.updatedAt ?? null,

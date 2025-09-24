@@ -1,4 +1,3 @@
-// src/shared/utils/dhcp-object-label.util.ts
 import { ObjectType } from '@/domain/enums/csp/object-type.enum';
 import type {
   IpSpaceEntity,
@@ -7,6 +6,7 @@ import type {
   RangeEntity,
   FixedAddressEntity,
 } from '@/shared/types/csp-dhcp-entities';
+
 type EntityMaps = {
   ipSpacesById?: Map<number, IpSpaceEntity>;
   addressBlocksById?: Map<number, AddressBlockEntity>;
@@ -16,8 +16,8 @@ type EntityMaps = {
 };
 
 /**
- * Liefert ein sprechendes Label für jedes DHCP-Objekt,
- * abhängig von Typ und ID, mit Rückgriff auf die Entity-Maps.
+ * Returns a human-readable label for a DHCP object
+ * based on its type and ID, using entity maps when available.
  */
 export function buildObjectLabelSync(
   objectType: ObjectType,

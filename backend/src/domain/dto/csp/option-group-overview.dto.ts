@@ -5,9 +5,9 @@ export interface OptionGroupOverviewDto {
   groupName: string;
   counts: {
     total: number; // explicit + inherited (effective)
-    explicit: number; // effektive explizite Vorkommen
-    inherited: number; // effektive geerbte Vorkommen
-    overridden: number; // nicht effektiv (nur als Info)
+    explicit: number; // effective explicit occurrences
+    inherited: number; // effective inherited occurrences
+    overridden: number; // not effective (info only)
   };
   byLevel: {
     global: {

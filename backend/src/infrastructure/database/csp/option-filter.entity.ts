@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-// Falls nötig, importiere das DTO, das du wirklich verwendest:
 export interface CspDhcpOption {
   group?: string | null;
   option_code: string;

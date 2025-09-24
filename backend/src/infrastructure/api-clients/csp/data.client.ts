@@ -24,7 +24,7 @@ import {
 
 import { normalizeAddressBlockDtos } from '@/shared/parser/normalize-address-block-dtos';
 
-// Helper: Type Guard for paginated API responses with results array
+// Helper: Type guard for paginated API responses with a results array
 function hasResultsArray(obj: unknown): obj is { results: unknown[] } {
   return (
     typeof obj === 'object' &&
@@ -73,7 +73,7 @@ export class CspDataClient {
     };
   }
 
-  // Standard page size for production – can be overridden per call
+  // Default page size for production – can be overridden per call
   private readonly defaultPageSize = 100;
 
   async fetchIpSpaces(
@@ -107,7 +107,7 @@ export class CspDataClient {
       onProgress,
       isCancelled,
     );
-    // Always normalise, then validate
+    // Always normalize, then validate
     const normalized = normalizeAddressBlockDtos(raw);
     return validateArray(CspAddressBlockSchema, normalized);
   }

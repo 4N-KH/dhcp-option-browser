@@ -19,8 +19,8 @@ export class OptionOverviewService {
   ) {}
 
   /**
-   * Gibt nur OptionCodes zurück, die mind. einen Wert in den Zuweisungen haben (kein NULL/leer),
-   * eindeutig auf code, name, type, source (Matching über alle Felder!).
+   * Returns only option codes that have at least one assignment value
+   * (not NULL or empty). Unique by code, name, type and source.
    */
   async getAllOptionCodesWithAtLeastOneValue(): Promise<
     OptionCodeOverviewDto[]

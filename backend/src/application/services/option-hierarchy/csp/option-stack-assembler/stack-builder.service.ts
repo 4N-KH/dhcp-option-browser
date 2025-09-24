@@ -80,6 +80,10 @@ export class StackBuilderService {
     private readonly optionGroupMetaFactory: OptionGroupMetaFactory,
   ) {}
 
+  /**
+   * Builds inheritance stacks for all option codes across the provided contexts.
+   * Returns a map of option code → stack entries and a map of all option groups.
+   */
   build(contexts: ContextObj[]): {
     stacks: Map<string, OptionInheritanceStackEntryDto[]>;
     allGroups: Map<
@@ -90,7 +94,7 @@ export class StackBuilderService {
     const allCodes = new Set<string>();
     const groupStatus = new Map<number, GroupStatus>();
 
-    // 1) defensiv bereinigen & Codes/Gruppenstatus sammeln
+    // 1) Clean contexts and collect codes and group status
     const contextsClean: ContextObj[] = contexts.map((ctx) => {
       const cleanGroups: { group: OptionGroup; options: DhcpOptionRaw[] }[] =
         [];
@@ -105,7 +109,7 @@ export class StackBuilderService {
         });
       }
       const options = dedupeOptionList(ctx.options ?? []);
-      // Codes einsammeln
+      // collect option codes
       options.forEach((opt) => allCodes.add(codeOf(opt)));
       cleanGroups.forEach((groupObj) => {
         groupObj.options.forEach((opt) => allCodes.add(codeOf(opt)));
@@ -115,14 +119,14 @@ export class StackBuilderService {
         ) {
           groupStatus.set(groupObj.group.id, {
             group: groupObj.group,
-            explicitAt: 0, // Platzhalter, setzen wir gleich korrekt
+            explicitAt: 0, // placeholder, set below
           });
         }
       });
       return { ...ctx, options, optionGroups: cleanGroups };
     });
 
-    // explicitAt korrekt setzen (wir kennen jetzt die Indizes)
+    // set explicitAt for each group
     for (let i = 0; i < contextsClean.length; ++i) {
       for (const groupObj of contextsClean[i].optionGroups) {
         if (
@@ -136,7 +140,7 @@ export class StackBuilderService {
       }
     }
 
-    // 2) Gruppen, die später überschrieben werden, tracken
+    // 2) Track groups that are overridden later
     for (const [groupId, stat] of groupStatus.entries()) {
       for (let j = stat.explicitAt + 1; j < contextsClean.length; ++j) {
         const nextCtx = contextsClean[j];
@@ -150,7 +154,7 @@ export class StackBuilderService {
       }
     }
 
-    // 3) Gruppen in nachfolgenden Kontexten als "inherited" sichtbar machen
+    // 3) Add inherited group placeholders to later contexts
     for (const [, stat] of groupStatus.entries()) {
       for (let i = stat.explicitAt + 1; i < contextsClean.length; ++i) {
         const ctx = contextsClean[i];
@@ -166,7 +170,7 @@ export class StackBuilderService {
       }
     }
 
-    // 4) Alle Gruppen zusammenstellen
+    // 4) Collect all groups across contexts
     const allGroups = new Map<
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
@@ -183,7 +187,7 @@ export class StackBuilderService {
       }
     }
 
-    // 5) Für jeden Option-Code den Stack bauen
+    // 5) Build option stacks for each option code
     const stacks = new Map<string, OptionInheritanceStackEntryDto[]>();
 
     for (const code of allCodes) {
@@ -195,7 +199,7 @@ export class StackBuilderService {
       for (let i = 0; i < contextsClean.length; ++i) {
         const ctx = contextsClean[i];
 
-        // 5a) direkte Option am Kontext
+        // 5a) direct option on this context
         const foundOpt = ctx.options.find((opt) => codeOf(opt) === code);
         if (foundOpt) {
           const entry = this.stackEntryFactory.toStackEntry(
@@ -216,7 +220,7 @@ export class StackBuilderService {
           continue;
         }
 
-        // 5b) Option via OptionGroup im Kontext
+        // 5b) option via option group
         let groupMeta:
           | ReturnType<OptionGroupMetaFactory['fromEntity']>
           | undefined;
@@ -257,12 +261,12 @@ export class StackBuilderService {
           continue;
         }
 
-        // 5c) ggf. vererben
+        // 5c) inherit last explicit value if still valid
         if (lastExplicit && lastExplicitIdx !== null) {
           let shouldBeInherited = true;
 
-          // Wenn letzte explizite aus Gruppe kam und die selbe Gruppe
-          // im aktuellen Kontext den Code anders setzt -> kein Inherit
+          // if last explicit came from a group and the same group
+          // sets a different value here, stop inheritance
           if (
             lastExplicitGroupId !== null &&
             ctx.optionGroups.some(
@@ -297,7 +301,7 @@ export class StackBuilderService {
         }
       }
 
-      // 6) Overridden-Status berechnen
+      // 6) calculate overridden status
       for (let i = 0; i < stack.length; ++i) {
         const current = stack[i];
         if (!current.isExplicit) {

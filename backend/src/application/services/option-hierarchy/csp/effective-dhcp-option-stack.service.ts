@@ -20,7 +20,7 @@ import { Repository } from 'typeorm';
 
 import type { ContextObj } from './types/context-obj.type';
 
-// Redundanz & Dedupe-Utility:
+// Redundancy & dedupe utilities
 import { markRedundancyPerPanelStrict } from '@/shared/utils/mark-redundancy-per-panel.util';
 import { dedupeEffectiveDhcpOptionSlimDtoArray } from '@/shared/utils/dedupe-effective-options.util';
 
@@ -45,6 +45,10 @@ export class EffectiveDhcpOptionStackService {
     private readonly globalConfigRepo: Repository<DhcpGlobalConfig>,
   ) {}
 
+  /**
+   * Builds the effective DHCP option stack for a specific object.
+   * Returns slim DTOs with inheritance and redundancy information.
+   */
   async getEffectiveOptionsForObject(
     objectType: ObjectType,
     objectId: number,
@@ -56,13 +60,13 @@ export class EffectiveDhcpOptionStackService {
       );
     }
 
-    // 1. Kontext-Kette aufbauen
+    // 1. Build context chain (parent hierarchy)
     const contextChain = await this.contextChainBuilder.build(
       objectType,
       objectId,
     );
 
-    // 2. Explizite Optionen + OptionGroups laden
+    // 2. Load explicit options and option groups for each context
     const allContexts: ContextObj[] = [];
     for (const ctx of contextChain) {
       const options = await this.explicitOptionsLoader.load(
@@ -76,7 +80,7 @@ export class EffectiveDhcpOptionStackService {
       allContexts.push({ ...ctx, options, optionGroups });
     }
 
-    // 3. OptionGroups-Vererbung robust ergänzen (nie doppelt!)
+    // 3. Add inherited option groups without duplicates
     const allGroups = new Map<
       number,
       { group: OptionGroup; ctxIdx: number; ctx: ContextObj }
@@ -105,7 +109,7 @@ export class EffectiveDhcpOptionStackService {
       }
     }
 
-    // 4. Label-Maps für Kontext-Labels bauen
+    // 4. Build label maps for context display data
     const [ipSpaces, addressBlocks, subnets, ranges, globalConfig] =
       await Promise.all([
         this.ipSpaceRepo.find(),
@@ -135,17 +139,17 @@ export class EffectiveDhcpOptionStackService {
       ),
     };
 
-    // 5. Kontext ggf. auf AddressBlock filtern
+    // 5. Filter contexts if object is an AddressBlock
     let filteredContexts = allContexts;
     if (objectType === ObjectType.ADDRESSBLOCK) {
       filteredContexts = filterContextsForAddressBlock(allContexts, objectId);
     }
 
-    // 6. Stacks bauen und DTOs mappen
+    // 6. Assemble option stacks
     const { stacks, allGroups: fullAllGroups } =
       this.optionStackAssembler.assemble(filteredContexts);
 
-    // 7. Slim-DTOs fürs Frontend (noch ohne Redundanz)
+    // 7. Build slim DTOs for the frontend (without redundancy)
     let slimDtos = this.optionStackAssembler.buildSlimDtoForAll(
       stacks,
       filteredContexts,
@@ -153,10 +157,10 @@ export class EffectiveDhcpOptionStackService {
       contextTreeMaps,
     );
 
-    // 8. Deduplizieren: Keine doppelten Optionen oder Gruppenoptionen pro Panel!
+    // 8. Remove duplicate options or group options per panel
     slimDtos = dedupeEffectiveDhcpOptionSlimDtoArray(slimDtos);
 
-    // 9. Jetzt Redundanz-Flags panel-weise markieren (NUR Panel-scharf, keine globale Duplikaterkennung!)
+    // 9. Mark redundancy flags per panel (panel-specific only)
     markRedundancyPerPanelStrict(slimDtos);
 
     if (enableDebugLogging) {

@@ -64,7 +64,6 @@ export class OptionInheritanceStackEntryDto {
   @ApiPropertyOptional({ type: OptionSpaceMetaDto })
   optionSpace?: OptionSpaceMetaDto | null;
 
-  // === Redundanz-Information ===
   @ApiPropertyOptional()
   redundant?: boolean;
 

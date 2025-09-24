@@ -22,28 +22,28 @@ import { CspDataClient } from './infrastructure/api-clients/csp/data.client';
 import { ApiConfigService } from './shared/config/api-config.service';
 
 // --- Import/Export Controller ---
-import { ImportController } from './controller/import.controller';
-import { CredentialsCspController } from './controller/auth/csp/credentials-csp.controller';
-import { AuthController } from './controller/auth/auth.controller';
-import { CspFullImportController } from './controller/csp-full-import.controller';
+import { ImportController } from './controller/csp/import.controller';
+import { CredentialsCspController } from './controller/csp/auth/credentials-csp.controller';
+import { AuthController } from './controller/csp/auth/auth.controller';
+import { CspFullImportController } from './controller/csp/csp-full-import.controller';
 
 // --- DHCP Hierarchy/Option Controllers ---
-import { CspLightTreeController } from './controller/csp-light-tree.controller';
-import { EffectiveDhcpOptionStackController } from './controller/effective-dhcp-option-stack.controller';
+import { CspLightTreeController } from './controller/csp/csp-light-tree.controller';
+import { EffectiveDhcpOptionStackController } from './controller/csp/effective-dhcp-option-stack.controller';
 
 // --- Option Overview Controller & Services ---
-import { OptionOverviewController } from './controller/option-overview.controller';
+import { OptionOverviewController } from './controller/csp/option-overview.controller';
 import { OptionOverviewService } from './application/services/option-hierarchy/csp/option-overview.service';
 import { OptionValuesService } from './application/services/option-hierarchy/csp/option-values.service';
 import { OptionValueEffectivenessService } from './application/services/option-hierarchy/csp/option-value-effectiveness.service';
 import { OptionValueExplicitService } from './application/services/option-hierarchy/csp/option-value-explicit.service';
 
 // --- Redundancy Overview ---
-import { RedundancyOverviewController } from './controller/redundancy-overview.controller';
+import { RedundancyOverviewController } from './controller/csp/redundancy-overview.controller';
 import { RedundancyOverviewService } from './application/services/option-hierarchy/csp/redundancy-overview.service';
 
 // --- Option Group Overview ---
-import { OptionGroupOverviewController } from './controller/option-group-overview.controller';
+import { OptionGroupOverviewController } from './controller/csp/option-group-overview.controller';
 import { OptionGroupOverviewService } from './application/services/option-hierarchy/csp/option-group-overview.service';
 import { OptionGroupOverviewRepository } from './infrastructure/database/csp/option-group-overview.repository';
 
@@ -126,7 +126,7 @@ import { DefaultEncodingSanitizerService } from './application/services/import/t
 import { StartFullImportUseCase } from './application/use-cases/start-full-import.usecase';
 import { InMemoryImportJobRepositoryAdapter } from './infrastructure/repositories/inmemory-import-job.repository.adapter';
 
-// --- NEW: Tokens & Config for orchestrated steps ---
+// --- Tokens & Config for orchestrated steps ---
 import {
   IMPORT_CONFIG,
   IMPORT_STEPS,
@@ -136,7 +136,7 @@ import { DefaultImportConfig } from './infrastructure/config/default-import.conf
 // --- Types for step wiring ---
 import { ImportStepPort } from './domain/ports/import-step.port';
 
-// --- NEW: Performance Indexes Service ---
+// --- Performance Indexes Service ---
 import { CreatePerformanceIndexesService } from './application/services/maintenance/create-performance-indexes.service';
 
 @Module({
@@ -375,7 +375,7 @@ import { CreatePerformanceIndexesService } from './application/services/maintena
     DefaultEncodingSanitizerService,
     { provide: EncodingSanitizer, useClass: DefaultEncodingSanitizerService },
 
-    // NEW: Performance Indexes at startup
+    // Performance Indexes at startup
     CreatePerformanceIndexesService,
   ],
 })
