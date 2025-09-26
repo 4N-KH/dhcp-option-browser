@@ -1,10 +1,10 @@
-import React, { useReducer } from "react";
+import React, { useReducer, useState, useEffect } from "react";
 import { OptionCodeOverviewDto } from "@/types/dto/option-code-overview.dto";
 import { OptionValueOverviewDto } from "@/types/dto/option-value-overview.dto";
 import { OptionOccurrenceDto } from "@/types/dto/option-occurrence.dto";
 import { AnimatePresence, motion } from "framer-motion";
 
-/** Central design theme for gradients, colors, border radius, shadows */
+/** ---------------------- Design constants ---------------------- */
 const THEME = {
   borderRadius: { panel: "2.5rem", item: "0.75rem" },
   color: {
@@ -22,10 +22,10 @@ const THEME = {
   shadow: { panel: "0 8px 32px 0 rgba(37,65,183,0.13)" },
 };
 
-// Translation stub
+// simple translation stub
 const t = (s: string) => s;
 
-/** Shimmer component for loading placeholders */
+/** ---------------------- Loading placeholder ---------------------- */
 const Shimmer: React.FC<{ count?: number }> = ({ count = 6 }) => (
   <div className="space-y-3 p-10 flex flex-col h-[340px] justify-center">
     {Array.from({ length: count }).map((_, i) => (
@@ -37,13 +37,15 @@ const Shimmer: React.FC<{ count?: number }> = ({ count = 6 }) => (
   </div>
 );
 
-// Reducer for managing open/selected option state
+/** ---------------------- Reducer state ---------------------- */
 type State = { openOption: string | null; selectedValue: string | null };
 type Action =
   | { type: "TOGGLE_OPEN"; optionCode: string }
   | { type: "SELECT_VALUE"; value: string }
   | { type: "RESET" };
+
 const initialState: State = { openOption: null, selectedValue: null };
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "TOGGLE_OPEN":
@@ -61,6 +63,7 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+/** ---------------------- Component props ---------------------- */
 type Props = {
   options: OptionCodeOverviewDto[] | null;
   loading?: boolean;
@@ -76,6 +79,7 @@ type Props = {
 
 const getOptionKey = (opt: OptionCodeOverviewDto) => `${opt.code}:${opt.name}`;
 
+/** ---------------------- Main Panel ---------------------- */
 const OptionOverviewPanel: React.FC<Props> = ({
   options,
   loading,
@@ -84,18 +88,16 @@ const OptionOverviewPanel: React.FC<Props> = ({
   fetchOccurrences,
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [values, setValues] = React.useState<OptionValueOverviewDto[] | null>(
+  const [values, setValues] = useState<OptionValueOverviewDto[] | null>(null);
+  const [occurrences, setOccurrences] = useState<OptionOccurrenceDto[] | null>(
     null
   );
-  const [occurrences, setOccurrences] = React.useState<
-    OptionOccurrenceDto[] | null
-  >(null);
-  const [loadingValues, setLoadingValues] = React.useState(false);
-  const [loadingOccurrences, setLoadingOccurrences] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<"v4" | "v6">("v4");
+  const [loadingValues, setLoadingValues] = useState(false);
+  const [loadingOccurrences, setLoadingOccurrences] = useState(false);
+  const [activeTab, setActiveTab] = useState<"v4" | "v6">("v4");
 
-  // Load option values when an option is opened
-  React.useEffect(() => {
+  /** load option values when an option is opened */
+  useEffect(() => {
     if (state.openOption) {
       setLoadingValues(true);
       setValues(null);
@@ -114,8 +116,8 @@ const OptionOverviewPanel: React.FC<Props> = ({
     }
   }, [state.openOption, fetchValues, options]);
 
-  // Load occurrences for selected option value
-  React.useEffect(() => {
+  /** load occurrences for a selected option value */
+  useEffect(() => {
     if (state.openOption && state.selectedValue) {
       setLoadingOccurrences(true);
       setOccurrences(null);
@@ -146,7 +148,7 @@ const OptionOverviewPanel: React.FC<Props> = ({
       </div>
     );
 
-  // Fallback split: v4 = all entries, v6 = address6/ipv6 types only
+  // separate IPv4 and IPv6 occurrences for the detail table
   const v4Occurrences = occurrences ?? [];
   const v6Occurrences =
     occurrences?.filter(
@@ -166,7 +168,7 @@ const OptionOverviewPanel: React.FC<Props> = ({
         borderRadius: THEME.borderRadius.panel,
       }}
     >
-      {/* Left: List of options with source tags */}
+      {/* ---------------------- Left side: option list ---------------------- */}
       <section
         className={`w-1/2 min-w-[280px] max-w-[500px] border-r border-blue-900/50 p-5 h-full flex flex-col ${THEME.color.sectionLeft}`}
       >
@@ -176,23 +178,28 @@ const OptionOverviewPanel: React.FC<Props> = ({
         <ul className="divide-y divide-blue-900 overflow-y-auto">
           {options.map((opt) => {
             const optionKey = getOptionKey(opt);
+
+            // only show extra sources that differ from the main source
             const optSources =
               state.openOption === optionKey && occurrences
                 ? Array.from(
                     new Set(
                       occurrences
-                        .filter((o) => o.source)
+                        .filter(
+                          (o) => o.source && o.source !== opt.source
+                        )
                         .map((o) => o.source as string)
                     )
                   )
                 : [];
-            // color for the main source tag
+
             const mainSourceColor =
               opt.source === "customer"
                 ? THEME.color.tagGreen
                 : opt.source === "dhcp_server"
                 ? THEME.color.tagBlue
                 : THEME.color.tagGray;
+
             return (
               <li key={optionKey}>
                 <div
@@ -293,7 +300,7 @@ const OptionOverviewPanel: React.FC<Props> = ({
         </ul>
       </section>
 
-      {/* Right: IPv4/IPv6 detail panel */}
+      {/* ---------------------- Right side: detail panel ---------------------- */}
       <section
         className={`flex-1 min-w-[300px] p-5 h-full flex flex-col ${THEME.color.sectionRight}`}
       >
@@ -333,6 +340,7 @@ const OptionOverviewPanel: React.FC<Props> = ({
   );
 };
 
+/** ---------------------- Objects table ---------------------- */
 const ObjectsTable: React.FC<{
   loading: boolean;
   occurrences: OptionOccurrenceDto[];
