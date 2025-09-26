@@ -1,7 +1,10 @@
 import { DataSource } from 'typeorm';
 
-/* Base query combining all DHCP object levels (global, ip_space, address_block, subnet, range, fixed_address)
-   into a unified column layout. */
+/*
+ * Base query combining all DHCP object levels (global, ip_space, address_block, subnet, range, fixed_address)
+ * into a unified column layout.  Alle CASTs bleiben auf varchar, um bei CREATE/DROP-Zyklen stabile Typen zu gewährleisten.
+ * WICHTIG: option_source kommt jetzt aus option_code.source (liefert z.B. 'customer' oder 'dhcp_server').
+ */
 const BASE_UNION = `
 SELECT 'global'::text AS object_type,
   gco."globalConfigId" AS object_id,
@@ -12,11 +15,11 @@ SELECT 'global'::text AS object_type,
   code.code AS option_code,
   code.name AS option_name,
   code.type AS option_type,
-  'options'::text AS option_source,
+  code.source AS option_source,
   gco.option_value,
   gco."optionSpaceId",
   gco."optionCodeId",
-  'Global Config'::text AS object_display
+  'Global Config'::varchar AS object_display
 FROM dhcp_global_config_option gco
 LEFT JOIN option_code code ON gco."optionCodeId" = code.id
 UNION ALL
@@ -29,7 +32,7 @@ SELECT 'ip_space'::text AS object_type,
   code.code AS option_code,
   code.name AS option_name,
   code.type AS option_type,
-  'options'::text AS option_source,
+  code.source AS option_source,
   ipso.option_value,
   ipso."optionSpaceId",
   ipso."optionCodeId",
@@ -47,7 +50,7 @@ SELECT 'address_block'::text AS object_type,
   code.code AS option_code,
   code.name AS option_name,
   code.type AS option_type,
-  'options'::text AS option_source,
+  code.source AS option_source,
   abdo.option_value,
   abdo."optionSpaceId",
   abdo."optionCodeId",
@@ -66,7 +69,7 @@ SELECT 'subnet'::text AS object_type,
   code.code AS option_code,
   code.name AS option_name,
   code.type AS option_type,
-  'options'::text AS option_source,
+  code.source AS option_source,
   sdo.option_value,
   sdo."optionSpaceId",
   sdo."optionCodeId",
@@ -85,7 +88,7 @@ SELECT 'range'::text AS object_type,
   code.code AS option_code,
   code.name AS option_name,
   code.type AS option_type,
-  'options'::text AS option_source,
+  code.source AS option_source,
   rdo.option_value,
   rdo."optionSpaceId",
   rdo."optionCodeId",
@@ -105,7 +108,7 @@ SELECT 'fixed_address'::text AS object_type,
   code.code AS option_code,
   code.name AS option_name,
   code.type AS option_type,
-  'options'::text AS option_source,
+  code.source AS option_source,
   fdo.option_value,
   fdo."optionSpaceId",
   fdo."optionCodeId",
@@ -117,10 +120,9 @@ LEFT JOIN subnet s ON fa."subnetId" = s.id
 LEFT JOIN ip_space ips ON s."spaceId" = ips.id
 `;
 
-/* View creation: all_dhcp_option_assignments with DISTINCT ON including option_source
-   to preserve separate rows for multiple sources (options vs. option group). */
+/* Final CREATE VIEW statement with DISTINCT ON including option_source from option_code */
 export const CREATE_DHCP_ASSIGNMENTS_VIEW_SQL = `
-CREATE OR REPLACE VIEW all_dhcp_option_assignments AS
+CREATE VIEW all_dhcp_option_assignments AS
 SELECT DISTINCT ON (
   object_type,
   object_id,
@@ -157,10 +159,15 @@ ORDER BY
 `;
 
 /**
- * Creates or updates the database view all_dhcp_option_assignments.
+ * Drops the existing view and recreates it to avoid type-mismatch errors
+ * (e.g. varchar → text changes).
  */
 export async function createAllDhcpOptionAssignmentsView(
   dataSource: DataSource,
-) {
+): Promise<void> {
+  // Always drop first to ensure a clean recreation
+  await dataSource.query(
+    `DROP VIEW IF EXISTS all_dhcp_option_assignments CASCADE;`,
+  );
   await dataSource.query(CREATE_DHCP_ASSIGNMENTS_VIEW_SQL);
 }

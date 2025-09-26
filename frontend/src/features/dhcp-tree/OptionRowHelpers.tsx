@@ -2,7 +2,7 @@ import React from "react";
 import { EffectiveDhcpOptionSlimDto } from "@/types/dto/effective-dhcp-option-slim.dto";
 import { getInheritedLabel } from "./helpers/labels";
 
-/** Solid, high-contrast color palette (used only for redundant rows) */
+/** Solid, high-contrast color palette (only for redundant rows) */
 type Tone = { bg: string; text: string };
 const TONES: Tone[] = [
   { bg: "bg-red-600", text: "text-white" },
@@ -24,7 +24,20 @@ export function getSolidByCode(code: string | number): Tone {
   return TONES[Math.abs(n) % TONES.length];
 }
 
-/** Helpers to extract origin level metadata */
+/** Build a stable key for "redundantWith" pairs */
+export function getOptionKey(
+  code: string,
+  value: string | null,
+  level: string,
+  levelId: number,
+  groupId?: number,
+) {
+  return [code, value ?? "", level, String(levelId), String(groupId ?? "")]
+    .map((s) => encodeURIComponent(s))
+    .join("|");
+}
+
+/** Helpers to extract origin level metadata from single or group source */
 function getOriginLevelLabel(o: EffectiveDhcpOptionSlimDto): string | undefined {
   return (
     o.source.originLevelLabel ??
@@ -32,16 +45,14 @@ function getOriginLevelLabel(o: EffectiveDhcpOptionSlimDto): string | undefined 
     o.source.optionGroup?.groupOriginLevel
   );
 }
-
 function getOriginLevelId(o: EffectiveDhcpOptionSlimDto): number | undefined {
   return o.source.originLevelId ?? o.source.optionGroup?.groupOriginLevelId;
 }
-
 function getOriginLevel(o: EffectiveDhcpOptionSlimDto): string | undefined {
   return o.source.originLevel ?? o.source.optionGroup?.groupOriginLevel;
 }
 
-/** Status badge: shows whether a DHCP option is explicit, inherited, or overridden */
+/** Status badge: explicit / inherited / overridden */
 export function StatusBadge({
   status,
   overridden,
@@ -62,7 +73,6 @@ export function StatusBadge({
       </span>
     );
   }
-
   if (status === "INHERITED" || status === "GROUP_INHERITED") {
     return (
       <span className="bg-blue-900 text-blue-200 px-2 py-0.5 rounded text-xs font-semibold ring-1 ring-white/10">
@@ -76,7 +86,6 @@ export function StatusBadge({
       </span>
     );
   }
-
   return (
     <span className="bg-green-800 text-green-200 px-2 py-0.5 rounded text-xs font-semibold ring-1 ring-white/10">
       Explicit
@@ -84,7 +93,7 @@ export function StatusBadge({
   );
 }
 
-/** Table row for displaying a single effective DHCP option */
+/** Table row for a single effective DHCP option */
 export function DhcpOptionRow({
   option,
   rowIndex,
@@ -104,20 +113,18 @@ export function DhcpOptionRow({
       ? "hover:bg-white/5"
       : "hover:bg-white/5";
 
+  // Nur effectiveValue verwenden (Single-Optionen). Falls ein Backend ausnahmsweise ein "value" mitsendet,
+  // kann dieser Fallback den Wert lesen, ohne die TS-Typen aufzubrechen.
+  const legacyValue = (option as unknown as { value?: string | null })?.value ?? null;
+  const displayValue = option.effectiveValue ?? legacyValue ?? "–";
+
   return (
     <tr className={`transition ${trClass}`}>
-      {/* Code stays plain mono-style */}
       <td className="px-3 py-1 font-mono">{option.code}</td>
       <td className="px-3 py-1">{option.name ?? "–"}</td>
-      <td className="px-3 py-1 font-mono">{option.effectiveValue ?? "–"}</td>
+      <td className="px-3 py-1 font-mono">{displayValue}</td>
       <td className="px-3 py-1">
-        {option.optionSpace
-          ? `${option.optionSpace.name}${
-              option.optionSpace.protocol
-                ? " (" + option.optionSpace.protocol + ")"
-                : ""
-            }`
-          : "–"}
+        {option.optionSpace ? option.optionSpace.name : "–"}
       </td>
       <td className="px-3 py-1">{option.type ?? "–"}</td>
       <td className="px-3 py-1">

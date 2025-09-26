@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const DhcpOptionSchema = z.object({
   group: z.string().nullable().optional(),
-  option_code: z.string(),
-  option_value: z.string(),
-  type: z.string(),
+  option_code: z.string().nullable(),
+  option_value: z.string().nullable().optional(),
+  type: z.string().nullable().optional(),
 });
 
 export const CspOptionGroupSchema = z.object({

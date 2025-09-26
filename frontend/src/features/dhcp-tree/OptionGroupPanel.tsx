@@ -1,3 +1,4 @@
+// src/features/dhcp-tree/OptionGroupPanel.tsx
 import React, { useState } from "react";
 import { OptionGroupInSource } from "@/types/dto/effective-dhcp-option-slim.dto";
 import { getInheritedLabel } from "./helpers/labels";
@@ -28,7 +29,6 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
   const effLabel = group.originLevelLabel ?? originLevelLabel;
   const effId = group.groupOriginLevelId ?? originLevelId;
 
-  // Inheritance badge (either inherited or explicit)
   const inheritedBadge =
     status === "GROUP_INHERITED" ? (
       <span
@@ -50,7 +50,7 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
         groupIsRedundant ? "border-red-700" : "",
       ].join(" ")}
     >
-      {/* Header section with group name and controls */}
+      {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-2 cursor-pointer"
         onClick={() => setOpen((o) => !o)}
@@ -64,18 +64,18 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
           )}
           {inheritedBadge}
           {group.comment && (
-            <span className="text-xs text-gray-400 ml-2">{group.comment}</span>
+            <span className="text-xs text-blue-300 ml-2">({group.comment})</span>
           )}
         </div>
         <button
-          className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-200"
+          className="px-3 py-1 text-xs rounded bg-blue-800 text-blue-200"
           tabIndex={-1}
         >
           {open ? "Hide Options" : "Show Options"}
         </button>
       </div>
 
-      {/* Option list (visible when open) */}
+      {/* Option list */}
       {open && (
         <div className="pb-2 px-4">
           <table className="w-full text-sm mt-1">
@@ -100,12 +100,11 @@ const OptionGroupPanel: React.FC<OptionGroupPanelProps> = ({
                       className={[
                         "transition",
                         isRedundant
-                          ? `${tone!.bg} ${tone!.text} font-semibold` // <-- no animate-pulse anymore
+                          ? `${tone!.bg} ${tone!.text} font-semibold`
                           : "hover:bg-white/5",
                       ].join(" ")}
                       title={isRedundant ? "Redundant" : undefined}
                     >
-                      {/* Code is shown mono-style */}
                       <td className="py-1 px-2 font-mono">{opt.code}</td>
                       <td className="py-1 px-2">{opt.name ?? "–"}</td>
                       <td className="py-1 px-2 font-mono">

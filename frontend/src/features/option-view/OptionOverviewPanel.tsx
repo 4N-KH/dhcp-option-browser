@@ -16,6 +16,8 @@ const THEME = {
       "bg-gradient-to-b from-blue-950/60 via-blue-900/40 to-blue-800/10",
     shimmer: "bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900/80",
     tagBlue: "bg-blue-600 text-white",
+    tagGreen: "bg-green-600 text-white",
+    tagGray: "bg-gray-600 text-white",
   },
   shadow: { panel: "0 8px 32px 0 rgba(37,65,183,0.13)" },
 };
@@ -147,9 +149,10 @@ const OptionOverviewPanel: React.FC<Props> = ({
   // Fallback split: v4 = all entries, v6 = address6/ipv6 types only
   const v4Occurrences = occurrences ?? [];
   const v6Occurrences =
-    occurrences?.filter(o =>
-      o.type?.toLowerCase().includes("address6") ||
-      o.type?.toLowerCase().includes("ipv6")
+    occurrences?.filter(
+      (o) =>
+        o.type?.toLowerCase().includes("address6") ||
+        o.type?.toLowerCase().includes("ipv6")
     ) ?? [];
 
   return (
@@ -183,6 +186,13 @@ const OptionOverviewPanel: React.FC<Props> = ({
                     )
                   )
                 : [];
+            // color for the main source tag
+            const mainSourceColor =
+              opt.source === "customer"
+                ? THEME.color.tagGreen
+                : opt.source === "dhcp_server"
+                ? THEME.color.tagBlue
+                : THEME.color.tagGray;
             return (
               <li key={optionKey}>
                 <div
@@ -199,9 +209,14 @@ const OptionOverviewPanel: React.FC<Props> = ({
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-base">{opt.code}</span>
                     <span>{opt.name}</span>
+                    <span
+                      className={`px-3 py-[2px] rounded-full text-xs font-semibold ${mainSourceColor}`}
+                    >
+                      {opt.source ?? "unknown"}
+                    </span>
                     {optSources.length > 0 && (
                       <span
-                        className={`px-3 py-[2px] rounded-full text-xs font-semibold ${THEME.color.tagBlue}`}
+                        className={`ml-2 px-2 py-[2px] rounded-full text-xs font-semibold ${THEME.color.tagBlue}`}
                       >
                         {optSources.join(", ")}
                       </span>

@@ -16,15 +16,16 @@ export class AuthController {
     if (dto.mode === AuthMode.CSP) {
       const result = await this.cspAuth.login(
         dto.apiKey!,
-        // dto.region!,
         dto.remember ?? false,
       );
       return {
         success: result.success,
         token: result.token,
         expiresIn: result.expiresIn,
+        hashChanged: result.hashChanged,
       };
     }
+
     if (dto.mode === AuthMode.GRID) {
       const result = await this.gridAuth.login(dto);
       return {
@@ -33,6 +34,7 @@ export class AuthController {
         message: result.message,
       };
     }
+
     return { success: false, message: 'Invalid auth mode' };
   }
 }

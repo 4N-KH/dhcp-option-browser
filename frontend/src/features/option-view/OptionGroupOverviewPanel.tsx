@@ -15,7 +15,6 @@ import {
 import { RedundancyLevel } from "@/types/dto/redundancy-overview-item.dto";
 
 type Props = {
-  /** Jump-to-tree callback: expand tree to this level/id */
   onShowInTree?: (level: RedundancyLevel, objectId: number) => void;
 };
 
@@ -56,18 +55,10 @@ const GroupOptions: React.FC<{ groupId: number }> = ({ groupId }) => {
     staleTime: 60_000,
   });
 
-  if (isLoading)
-    return <div className="text-xs text-blue-200">Loading group options…</div>;
-  if (error)
-    return <div className="text-xs text-red-300">Failed to load options.</div>;
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="text-xs opacity-60">
-        No options defined in this group.
-      </div>
-    );
-  }
+  if (isLoading) return <div className="text-xs text-blue-200">Loading…</div>;
+  if (error) return <div className="text-xs text-red-300">Failed to load options.</div>;
+  if (!data || data.length === 0)
+    return <div className="text-xs opacity-60">No options defined in this group.</div>;
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -103,42 +94,39 @@ const GroupRow: React.FC<{
         >
           <div className="font-semibold">{g.groupName}</div>
           <div className="mt-1 flex flex-wrap gap-2 text-xs">
-            <StatPill
-              label="total"
-              value={g.counts.total}
-              title="effective (explicit+inherited)"
-            />
+            <StatPill label="total" value={g.counts.total} title="explicit+inherited" />
             <StatPill label="explicit" value={g.counts.explicit} />
             <StatPill label="inherited" value={g.counts.inherited} />
             <StatPill label="overridden" value={g.counts.overridden} />
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {LevelOrder.map((lvl) => {
-              const b = g.byLevel[lvl];
-              return (
-                <div
-                  key={lvl}
-                  className="text-xs px-3 py-2 rounded-lg border border-[var(--border)] bg-white/5"
-                >
-                  <div className="font-medium mb-1">{lvl}</div>
-                  <div className="flex flex-wrap gap-2">
-                    <StatPill label="total" value={b.total} />
-                    <StatPill label="exp" value={b.explicit} />
-                    <StatPill label="inh" value={b.inherited} />
-                    <StatPill label="ovr" value={b.overridden} />
+
+          {expanded && (
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {LevelOrder.filter((lvl) => g.byLevel[lvl].total > 0).map((lvl) => {
+                const b = g.byLevel[lvl];
+                return (
+                  <div
+                    key={lvl}
+                    className="text-xs px-3 py-2 rounded-lg border border-[var(--border)] bg-white/5"
+                  >
+                    <div className="font-medium mb-1">{lvl}</div>
+                    <div className="flex flex-wrap gap-2">
+                      <StatPill label="total" value={b.total} />
+                      <StatPill label="exp" value={b.explicit} />
+                      <StatPill label="inh" value={b.inherited} />
+                      <StatPill label="ovr" value={b.overridden} />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </button>
       </div>
 
       {expanded && (
         <div className="mt-3 px-3 py-2 rounded-lg border border-dashed border-[var(--border)] bg-white/5">
-          <div className="text-xs font-semibold mb-2">
-            Options in this group
-          </div>
+          <div className="text-xs font-semibold mb-2">Options in this group</div>
           <GroupOptions groupId={g.groupId} />
         </div>
       )}
@@ -154,28 +142,23 @@ const OccRow: React.FC<{
     <div className="flex items-center justify-between gap-3">
       <div>
         <div className="font-medium">
-          {o.objectType} • {o.objectLabel}
+          {o.objectType} • {o.objectDisplay}
         </div>
-        <div className="opacity-70">{o.objectDisplay}</div>
         <div className="opacity-70">
           {o.ipSpace ?? ""}
           {o.cidr ? ` • ${o.cidr}` : ""}
           {o.address ? ` • ${o.address}` : ""}
         </div>
         <div className="mt-1 text-xs">
-          <span className="opacity-70">status:</span>{" "}
-          <strong>{o.setStatus}</strong>
+          <span className="opacity-70">status:</span> <strong>{o.setStatus}</strong>
         </div>
       </div>
 
       {onShowInTree && o.objectId != null && o.objectType !== "global" && (
         <button
           className="m-2 px-3 py-1 rounded-md bg-[var(--accent)] text-white text-xs hover:opacity-90"
-          onClick={() =>
-            onShowInTree(o.objectType as RedundancyLevel, o.objectId)
-          }
+          onClick={() => onShowInTree(o.objectType as RedundancyLevel, o.objectId)}
           title="Show in DHCP Tree"
-          aria-label="Show in DHCP Tree"
         >
           Show in Tree
         </button>
@@ -201,22 +184,24 @@ const OptionGroupOverviewPanel: React.FC<Props> = ({ onShowInTree }) => {
   });
 
   return (
-    <div className="grid grid-cols-2 gap-4 h-full">
-      <div className="flex flex-col overflow-hidden">
+    <div className="grid grid-cols-2 gap-4 h-full min-h-0">
+      {/* left: group list */}
+      <div className="flex flex-col min-h-0">
         <div className="mb-2 font-semibold">Option Groups</div>
         {isLoading && <div className="text-blue-200">Loading…</div>}
         {error && <div className="text-red-300">Failed: {String(error)}</div>}
-        <div className="grid gap-2 overflow-auto pr-2">
+        <div className="flex-1 overflow-auto pr-2 min-h-0">
           {(data ?? []).map((g) => (
             <GroupRow key={g.groupId} g={g} onOpen={setOpen} />
           ))}
         </div>
       </div>
 
-      <div className="flex flex-col overflow-hidden">
+      {/* right: occurrences */}
+      <div className="flex flex-col min-h-0">
         <div className="mb-2 flex items-center gap-3">
           <div className="font-semibold">
-            Occurrences {open ? `– ${open.groupName}` : ""}
+            {open ? "Occurrences" : "Select a group…"}
           </div>
           {open && (
             <button
@@ -228,14 +213,12 @@ const OptionGroupOverviewPanel: React.FC<Props> = ({ onShowInTree }) => {
             </button>
           )}
         </div>
-        <div className="grid gap-2 overflow-auto pr-2">
+        <div className="flex-1 overflow-auto pr-2 min-h-0">
           {open &&
             (occ ?? []).map((o, idx) => (
               <OccRow key={idx} o={o} onShowInTree={onShowInTree} />
             ))}
-          {!open && (
-            <div className="opacity-60">Select a group on the left…</div>
-          )}
+          {!open && <div className="opacity-60">No group selected.</div>}
         </div>
       </div>
     </div>

@@ -7,30 +7,38 @@ import {
 } from 'jsonwebtoken';
 import { Buffer } from 'buffer';
 
-// Strongly-typed JWT payload contract
+/**
+ * Strongly-typed JWT payload contract
+ * We now use `hash` as the unique tenant identifier.
+ */
 export interface JwtPayload {
-  id: string;
-  region?: string;
-  iat?: number;
-  exp?: number;
+  hash: string; // loginHash of the API key
+  iat?: number; // issued-at timestamp
+  exp?: number; // expiration timestamp
 }
 
-// Runtime type guard for JwtPayload contract
+/**
+ * Runtime type guard for JwtPayload contract
+ */
 export function isJwtPayload(obj: unknown): obj is JwtPayload {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    'id' in obj &&
-    typeof (obj as { id?: unknown }).id === 'string'
+    'hash' in obj &&
+    typeof (obj as { hash?: unknown }).hash === 'string'
   );
 }
 
-// Throws a standardised unauthorised exception (NestJS style)
+/**
+ * Throws a standardised unauthorised exception (NestJS style)
+ */
 export function throwUnauthorized(message: string): never {
   throw new UnauthorizedException(message);
 }
 
-// Internal wrapper: disables no-unsafe-call only for the jsonwebtoken API
+/**
+ * Internal wrapper: disables no-unsafe-call only for the jsonwebtoken API
+ */
 function jwtSignUnknown(
   payload: object,
   secret: string,
@@ -40,7 +48,9 @@ function jwtSignUnknown(
   return jwtSign(payload, secret, options);
 }
 
-// Ensures JWT is always a UTF-8 string, never Buffer/any
+/**
+ * Ensures JWT is always a UTF-8 string, never Buffer/any
+ */
 export function signJwtStrict(
   payload: object,
   secret: string,
@@ -52,7 +62,9 @@ export function signJwtStrict(
   throw new Error('Unexpected return type from jwt.sign()');
 }
 
-// Internal wrapper: disables no-unsafe-call only for the jsonwebtoken API
+/**
+ * Internal wrapper: disables no-unsafe-call only for the jsonwebtoken API
+ */
 function jwtVerifyUnknown(
   token: string,
   secret: string,
@@ -62,7 +74,9 @@ function jwtVerifyUnknown(
   return jwtVerify(token, secret, options);
 }
 
-// Ensures strict payload typing for JWT verification
+/**
+ * Ensures strict payload typing for JWT verification
+ */
 export function verifyJwtStrict<T extends object>(
   token: string,
   secret: string,

@@ -5,11 +5,10 @@ import React, { useEffect, useState } from "react";
 import LoginForm from "../forms/LoginForm";
 import { AuthCredentialDto } from "@/types/dto/auth-credential.dto";
 import { AuthMode } from "@/types/enum/auth-mode.enum";
-// import { Region } from "@/types/enum/region.enum";
 import { getCspCredential } from "@/services/auth.service";
 
 interface LoginPageProps {
-  onLogin: (dto: AuthCredentialDto, remember: boolean) => void;
+  onLogin: (dto: AuthCredentialDto, remember: boolean) => Promise<void>;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
@@ -23,7 +22,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setInitialValues({
           mode: AuthMode.CSP,
           apiKey: result.apiKey,
-          // region: Region.EU,
           remember: true,
         });
       }

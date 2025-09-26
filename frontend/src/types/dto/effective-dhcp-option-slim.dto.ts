@@ -1,11 +1,13 @@
-export interface RedundantWithInfo {
+// src/types/dto/effective-dhcp-option-slim.dto.ts
+export type GroupSetStatus = "GROUP_EXPLICIT" | "GROUP_INHERITED";
+
+export type RedundantWithInfo = {
   code: string;
+  value: string | null;
   level: string;
   levelId: number;
   groupId?: number;
-  groupName?: string;
-  value?: string | null;
-}
+};
 
 export interface OptionInGroupDto {
   code: string;
@@ -13,6 +15,20 @@ export interface OptionInGroupDto {
   value: string | null;
   type?: string | null;
   array?: boolean | null;
+  optionCodeComment?: string | null;
+  optionCodeSource?: string | null;
+  optionSpace?: {
+    id: number;
+    name: string;
+    protocol?: string | null;
+    comment?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+  level: string;      // backend liefert String
+  levelId: number;
+  groupId?: number;
+  groupName?: string;
   redundant?: boolean;
   redundantWith?: RedundantWithInfo;
 }
@@ -22,7 +38,7 @@ export interface OptionGroupInSource {
   name: string;
   comment?: string | null;
   options: OptionInGroupDto[];
-  groupInheritanceType?: "GROUP_EXPLICIT" | "GROUP_INHERITED";
+  groupInheritanceType?: GroupSetStatus;
   isGroupInherited?: boolean;
   groupOriginLevel?: string;
   groupOriginLevelId?: number;

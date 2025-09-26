@@ -7,24 +7,22 @@ import { z } from "zod";
 
 import { loginSchema } from "../logic/login.schema";
 import { AuthMode } from "@/types/enum/auth-mode.enum";
-// import { Region } from "@/types/enum/region.enum";
 import AuthModeTabs from "../components/AuthModeTabs";
 import GridLoginFields from "../components/GridLoginFields";
 import CspLoginFields from "../components/CspLoginFields";
 import RememberCheckbox from "../components/RememberCheckbox";
-import { login, saveCspCredential } from "@/services/auth.service";
+import { saveCspCredential } from "@/services/auth.service";
 import { AuthCredentialDto } from "@/types/dto/auth-credential.dto";
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-/** Groups form helpers for child components */
 export interface FormUtils {
   watch: UseFormWatch<LoginFormData>;
   setValue: UseFormSetValue<LoginFormData>;
 }
 
 interface LoginFormProps {
-  onLogin: (dto: AuthCredentialDto, remember: boolean) => void;
+  onLogin: (dto: AuthCredentialDto, remember: boolean) => Promise<void>;
   initialValues?: Partial<LoginFormData>;
 }
 
@@ -44,13 +42,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
       username: "",
       password: "",
       apiKey: "",
-      // region: Region.EU,
       remember: false,
       ...initialValues,
     },
   });
 
-  // Reset form when initial values change
   useEffect(() => {
     if (initialValues) {
       reset({
@@ -58,40 +54,29 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
         username: initialValues.username ?? "",
         password: initialValues.password ?? "",
         apiKey: initialValues.apiKey ?? "",
-        // region: initialValues.region ?? Region.EU,
         remember: initialValues.remember ?? false,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialValues]);
+  }, [initialValues, reset]);
 
   const formUtils: FormUtils = { watch, setValue };
-
   const mode = watch("mode");
-  // const region = watch("region") ?? Region.EU;
   const remember = watch("remember");
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus first field when mode changes
   useEffect(() => {
     firstInputRef.current?.focus();
   }, [mode]);
 
-  // Handle submit and optional CSP credential saving
   const onSubmit = async (data: LoginFormData) => {
     if (mode === AuthMode.CSP && remember && data.apiKey) {
-      const saveResult = await saveCspCredential(data.apiKey /* , region */);
+      const saveResult = await saveCspCredential(data.apiKey);
       if (!saveResult.success) {
         alert(saveResult.message || "Could not save CSP credentials.");
         return;
       }
     }
-    const loginResult = await login(data);
-    if (loginResult.success) {
-      onLogin(data, remember);
-    } else {
-      alert(loginResult.message || "Unknown error");
-    }
+    await onLogin(data, remember);
   };
 
   return (
@@ -111,7 +96,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, initialValues }) => {
         <CspLoginFields
           register={register}
           errors={errors}
-          // region={region} // REGION: currently disabled
           inputRef={firstInputRef}
           formUtils={formUtils}
         />

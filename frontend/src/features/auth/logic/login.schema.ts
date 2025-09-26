@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { AuthMode } from "@/types/enum/auth-mode.enum";
-// import { Region } from "@/types/enum/region.enum";
 
 // Defines login form schema with conditional validation
 export const loginSchema = z
@@ -9,7 +8,6 @@ export const loginSchema = z
     username: z.string().trim().optional(),
     password: z.string().trim().optional(),
     apiKey: z.string().trim().optional(),
-    // region: z.nativeEnum(Region).optional(),
     remember: z.boolean(),
   })
   .superRefine((data, ctx) => {

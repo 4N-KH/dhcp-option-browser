@@ -1,10 +1,6 @@
-import { IsEnum, IsString } from 'class-validator';
-import { Region } from '@/domain/enums/csp/region.enum';
+import { IsString } from 'class-validator';
 
 export class SaveCspCredentialDto {
-  @IsEnum(Region)
-  region: Region;
-
   @IsString()
   apiKey: string;
 }

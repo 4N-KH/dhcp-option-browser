@@ -87,13 +87,15 @@ export class CspOptionGroupDhcpOptionImportService {
       for (const opt of group.dhcp_options) {
         checkCancel();
 
-        const codeEntity = codeMap.get(opt.option_code);
+        // Zod erlaubt null → hier sicher in string normalisieren
+        const optionCode = opt.option_code ?? '';
+        const codeEntity = codeMap.get(optionCode);
         const optionSpaceRef = codeEntity?.optionSpace ?? undefined;
         const optionSpaceId = optionSpaceRef?.id ?? undefined;
 
         if (!codeEntity) {
           this.logger.warn(
-            `OptionCode with externalId=${opt.option_code} not found – skipping.`,
+            `OptionCode with externalId=${optionCode} not found – skipping.`,
           );
           skipped++;
           progress++;
@@ -101,8 +103,9 @@ export class CspOptionGroupDhcpOptionImportService {
           continue;
         }
 
+        // option_value kann null sein → leeren String speichern
         const sanitizedValue = this.encodingSanitizer.sanitize(
-          opt.option_value,
+          opt.option_value ?? '',
         );
 
         const exists = await this.ogdoRepo.findOne({

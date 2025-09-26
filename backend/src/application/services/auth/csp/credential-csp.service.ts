@@ -15,18 +15,21 @@ export class CredentialCspService {
     private readonly credentialRepo: Repository<CspCredentialEntity>,
   ) {}
 
-  // Store or update encrypted API key for a user
+  /**
+   * Store or update an encrypted API key for a given user.
+   * Upserts by userId.
+   */
   async saveCredential(
     userId: string,
     apiKey: string,
   ): Promise<CspCredentialEntity> {
     const payload: EncryptedPayload = encrypt(apiKey);
 
-    // Upsert by userId
     let entity = await this.credentialRepo.findOne({ where: { userId } });
     if (!entity) {
-      entity = this.credentialRepo.create({ userId, region: null });
+      entity = this.credentialRepo.create({ userId });
     }
+
     entity.encryptedApiKey = payload.encrypted;
     entity.iv = payload.iv;
     entity.tag = payload.tag;
@@ -34,7 +37,10 @@ export class CredentialCspService {
     return this.credentialRepo.save(entity);
   }
 
-  // Retrieve and decrypt the API key by userId
+  /**
+   * Retrieve and decrypt the API key by userId.
+   * Returns null if no credential is stored.
+   */
   async getCredential(userId: string): Promise<string | null> {
     const entity = await this.credentialRepo.findOne({ where: { userId } });
     if (!entity) return null;
@@ -47,7 +53,9 @@ export class CredentialCspService {
     return decrypt(payload);
   }
 
-  // Delete credentials by userId
+  /**
+   * Delete stored credentials for a given user.
+   */
   async deleteCredential(userId: string): Promise<void> {
     await this.credentialRepo.delete({ userId });
   }

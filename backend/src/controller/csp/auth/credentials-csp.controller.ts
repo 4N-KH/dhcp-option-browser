@@ -24,8 +24,8 @@ export class CredentialsCspController {
     @Body() body: SaveCspCredentialDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const userId = req.user?.id;
-    if (!userId) {
+    const loginHash = req.user?.hash;
+    if (!loginHash) {
       throw new HttpException(
         'User not authenticated',
         HttpStatus.UNAUTHORIZED,
@@ -34,35 +34,35 @@ export class CredentialsCspController {
 
     const { apiKey } = body as unknown as { apiKey: string };
 
-    const entity = await this.cspService.saveCredential(userId, apiKey);
+    const entity = await this.cspService.saveCredential(loginHash, apiKey);
     return { success: true, id: entity.id };
   }
 
   @Get()
   async getCredential(@Req() req: AuthenticatedRequest) {
-    const userId = req.user?.id;
-    if (!userId) {
+    const loginHash = req.user?.hash;
+    if (!loginHash) {
       throw new HttpException(
         'User not authenticated',
         HttpStatus.UNAUTHORIZED,
       );
     }
 
-    const apiKey = await this.cspService.getCredential(userId);
+    const apiKey = await this.cspService.getCredential(loginHash);
     return { apiKey };
   }
 
   @Delete()
   async deleteCredential(@Req() req: AuthenticatedRequest) {
-    const userId = req.user?.id;
-    if (!userId) {
+    const loginHash = req.user?.hash;
+    if (!loginHash) {
       throw new HttpException(
         'User not authenticated',
         HttpStatus.UNAUTHORIZED,
       );
     }
 
-    await this.cspService.deleteCredential(userId);
+    await this.cspService.deleteCredential(loginHash);
     return { success: true };
   }
 }

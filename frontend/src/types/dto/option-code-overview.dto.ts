@@ -1,4 +1,6 @@
 export interface OptionCodeOverviewDto {
-  code: string;
+  code: number;
   name: string;
+  type: string | null;
+  source: string | null;
 }
