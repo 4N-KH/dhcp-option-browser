@@ -9,12 +9,16 @@ import {
 } from "@/services/option-overview.service";
 import { OptionCodeOverviewDto } from "@/types/dto/option-code-overview.dto";
 
-// Helper functions to wrap service calls
+/**
+ * Helper functions to wrap service calls.
+ * Casts option.code to string to match the service signatures.
+ */
 function getValues(option: OptionCodeOverviewDto) {
-  return fetchOptionValues(option.code, option.name);
+  return fetchOptionValues(String(option.code), option.name);
 }
+
 function getOccurrences(option: OptionCodeOverviewDto, value: string) {
-  return fetchOptionValueOccurrences(option.code, option.name, value);
+  return fetchOptionValueOccurrences(String(option.code), option.name, value);
 }
 
 const OptionOverviewTab: React.FC = () => {
